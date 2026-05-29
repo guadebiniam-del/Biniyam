@@ -1,0 +1,21 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <group
+        android:pivotX="54"
+        android:pivotY="54">
+        <!-- Main bold recycling symbol path centered safely inside 66dp area -->
+        <!-- Dynamic Green arrows with white accents -->
+        <path
+            android:fillColor="#81C784"
+            android:pathData="M54,24 L69,44 L58,44 C58,54 49,63 39,63 L39,57 C46,57 52,51 52,44 L41,44 Z" />
+        <path
+            android:fillColor="#A5D6A7"
+            android:pathData="M74,51 L59,31 L67,31 C62,23 51,18 41,23 L37,28 C45,23 53,28 56,30 L49,30 Z" />
+        <path
+            android:fillColor="#C8E6C9"
+            android:pathData="M49,76 L63,56 L55,56 C60,49 67,49 74,53 L77,46 C70,41 60,41 55,46 L49,46 Z" />
+    </group>
+</vector>
