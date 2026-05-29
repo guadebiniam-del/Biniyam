@@ -18,15 +18,27 @@ class InventoryRepository(private val dao: InventoryDao) {
     suspend fun deleteProduct(product: Product) = dao.deleteProduct(product)
 
     suspend fun addProductTransactionAndUpdateStock(transaction: ProductTransaction) {
-        // Insert product transaction
-        dao.insertProductTransaction(transaction)
+        val existingList = dao.getProductTransactionsForDate(transaction.date)
+        val existing = existingList.find { it.productId == transaction.productId }
 
-        // Adjust product stock
-        val product = dao.getProductById(transaction.productId)
-        if (product != null) {
-            val netAdjustment = transaction.fabricated - transaction.sold + transaction.adjusted
-            val newStock = maxOf(0, product.currentStock + netAdjustment)
-            dao.updateProduct(product.copy(currentStock = newStock))
+        if (existing != null) {
+            val product = dao.getProductById(transaction.productId)
+            if (product != null) {
+                val oldNet = existing.fabricated - existing.sold + existing.adjusted
+                val newNet = transaction.fabricated - transaction.sold + transaction.adjusted
+                val diff = newNet - oldNet
+                val newStock = maxOf(0, product.currentStock + diff)
+                dao.updateProduct(product.copy(currentStock = newStock))
+            }
+            dao.insertProductTransaction(transaction.copy(id = existing.id))
+        } else {
+            dao.insertProductTransaction(transaction)
+            val product = dao.getProductById(transaction.productId)
+            if (product != null) {
+                val netAdjustment = transaction.fabricated - transaction.sold + transaction.adjusted
+                val newStock = maxOf(0, product.currentStock + netAdjustment)
+                dao.updateProduct(product.copy(currentStock = newStock))
+            }
         }
     }
 
@@ -55,17 +67,30 @@ class InventoryRepository(private val dao: InventoryDao) {
     suspend fun insertRawMaterial(rawMaterial: RawMaterial) = dao.insertRawMaterial(rawMaterial)
 
     suspend fun addRawMaterialTransactionAndUpdateStock(transaction: RawMaterialTransaction) {
-        dao.insertRawMaterialTransaction(transaction)
+        val existingList = dao.getRawMaterialTransactionsForDate(transaction.date)
+        val existing = existingList.find { it.materialType == transaction.materialType }
 
-        val material = dao.getRawMaterialByType(transaction.materialType)
-        if (material != null) {
-            val netChange = transaction.added - transaction.used
-            val newStock = maxOf(0.0, material.currentStock + netChange)
-            dao.updateRawMaterial(material.copy(currentStock = newStock))
+        if (existing != null) {
+            val material = dao.getRawMaterialByType(transaction.materialType)
+            if (material != null) {
+                val oldNet = existing.added - existing.used
+                val newNet = transaction.added - transaction.used
+                val diff = newNet - oldNet
+                val newStock = maxOf(0.0, material.currentStock + diff)
+                dao.updateRawMaterial(material.copy(currentStock = newStock))
+            }
+            dao.insertRawMaterialTransaction(transaction.copy(id = existing.id))
         } else {
-            // If raw material doesn't exist, create it
-            val initialStock = maxOf(0.0, transaction.added - transaction.used)
-            dao.insertRawMaterial(RawMaterial(type = transaction.materialType, currentStock = initialStock))
+            dao.insertRawMaterialTransaction(transaction)
+            val material = dao.getRawMaterialByType(transaction.materialType)
+            if (material != null) {
+                val netChange = transaction.added - transaction.used
+                val newStock = maxOf(0.0, material.currentStock + netChange)
+                dao.updateRawMaterial(material.copy(currentStock = newStock))
+            } else {
+                val initialStock = maxOf(0.0, transaction.added - transaction.used)
+                dao.insertRawMaterial(RawMaterial(type = transaction.materialType, currentStock = initialStock))
+            }
         }
     }
 
@@ -81,13 +106,27 @@ class InventoryRepository(private val dao: InventoryDao) {
     suspend fun deleteMasterbatch(masterbatch: Masterbatch) = dao.deleteMasterbatch(masterbatch)
 
     suspend fun addMasterbatchTransactionAndUpdateStock(transaction: MasterbatchTransaction) {
-        dao.insertMasterbatchTransaction(transaction)
+        val existingList = dao.getMasterbatchTransactionsForDate(transaction.date)
+        val existing = existingList.find { it.masterbatchId == transaction.masterbatchId }
 
-        val masterbatch = dao.getMasterbatchById(transaction.masterbatchId)
-        if (masterbatch != null) {
-            val netChange = transaction.bought - transaction.used
-            val newStock = maxOf(0.0, masterbatch.currentStock + netChange)
-            dao.updateMasterbatch(masterbatch.copy(currentStock = newStock))
+        if (existing != null) {
+            val mb = dao.getMasterbatchById(transaction.masterbatchId)
+            if (mb != null) {
+                val oldNet = existing.bought - existing.used
+                val newNet = transaction.bought - transaction.used
+                val diff = newNet - oldNet
+                val newStock = maxOf(0.0, mb.currentStock + diff)
+                dao.updateMasterbatch(mb.copy(currentStock = newStock))
+            }
+            dao.insertMasterbatchTransaction(transaction.copy(id = existing.id))
+        } else {
+            dao.insertMasterbatchTransaction(transaction)
+            val masterbatch = dao.getMasterbatchById(transaction.masterbatchId)
+            if (masterbatch != null) {
+                val netChange = transaction.bought - transaction.used
+                val newStock = maxOf(0.0, masterbatch.currentStock + netChange)
+                dao.updateMasterbatch(masterbatch.copy(currentStock = newStock))
+            }
         }
     }
 

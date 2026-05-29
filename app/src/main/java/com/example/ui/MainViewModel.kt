@@ -95,12 +95,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     // Products
-    fun addNewProduct(name: String, size: String, color: String, weight: Double, initialStock: Int) {
+    fun addNewProduct(name: String, size: String, color: String, counter: Int, piecesPerBag: Int, weight: Double, initialStock: Int) {
         viewModelScope.launch {
             val product = Product(
                 name = name,
                 size = size,
                 color = color,
+                counter = counter,
+                piecesPerBag = piecesPerBag,
                 bagWeightKg = weight,
                 currentStock = initialStock
             )

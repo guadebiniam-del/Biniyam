@@ -20,7 +20,7 @@ import kotlinx.coroutines.launch
         Worker::class,
         WorkerAttendance::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -38,6 +38,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "anwar_recycle_database"
                 )
+                    .fallbackToDestructiveMigration()
                     .addCallback(AppDatabaseCallback(scope))
                     .build()
                 INSTANCE = instance
@@ -76,9 +77,9 @@ abstract class AppDatabase : RoomDatabase() {
 
                     // Pre-populate Products (items)
                     val products = listOf(
-                        Product(id = 1, name = "Shopping Bag Medium", size = "Medium", color = "Red", bagWeightKg = 10.0, currentStock = 120),
-                        Product(id = 2, name = "Heavy Duty Waste Bag", size = "Large", color = "Black", bagWeightKg = 15.0, currentStock = 85),
-                        Product(id = 3, name = "Construction Sheet Poly", size = "X-Large", color = "Blue", bagWeightKg = 25.0, currentStock = 40)
+                        Product(id = 1, name = "Shopping Bag (Standard)", size = "30x40", color = "Red", counter = 500, piecesPerBag = 100, bagWeightKg = 0.25, currentStock = 120),
+                        Product(id = 2, name = "Industrial Waste Bag", size = "40x50", color = "Black", counter = 600, piecesPerBag = 120, bagWeightKg = 0.35, currentStock = 85),
+                        Product(id = 3, name = "Heavy Carrier Bag", size = "50x60", color = "Blue", counter = 800, piecesPerBag = 150, bagWeightKg = 0.5, currentStock = 40)
                     )
                     products.forEach { dao.insertProduct(it) }
 

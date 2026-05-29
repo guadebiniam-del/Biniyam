@@ -10,7 +10,9 @@ data class Product(
     val name: String,
     val size: String,
     val color: String,
-    val bagWeightKg: Double,
+    val counter: Int = 500,
+    val piecesPerBag: Int = 100,
+    val bagWeightKg: Double = 0.5,
     val currentStock: Int = 0 // Number of bags in stock
 )
 

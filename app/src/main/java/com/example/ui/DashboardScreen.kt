@@ -220,7 +220,8 @@ fun DashboardScreen(
                         onRawMaterialClick = { selectedRawMaterialForActivity = it },
                         onMasterbatchClick = { selectedMasterbatchForActivity = it },
                         reportPeriod = reportPeriod,
-                        onPeriodSelect = { viewModel.setReportPeriod(it) }
+                        onPeriodSelect = { viewModel.setReportPeriod(it) },
+                        viewModel = viewModel
                     )
                 }
             } else {
@@ -421,8 +422,8 @@ fun DashboardScreen(
     if (showAddProductDialog) {
         AddProductDialog(
             onDismiss = { showAddProductDialog = false },
-            onSave = { name, size, color, weight, initialStock ->
-                viewModel.addNewProduct(name, size, color, weight, initialStock)
+            onSave = { name, size, color, counter, piecesPerBag, weight, initialStock ->
+                viewModel.addNewProduct(name, size, color, counter, piecesPerBag, weight, initialStock)
                 showAddProductDialog = false
             }
         )
@@ -502,18 +503,107 @@ fun BentoGridOverviewPanel(
     onRawMaterialClick: (RawMaterial) -> Unit,
     onMasterbatchClick: (Masterbatch) -> Unit,
     reportPeriod: MainViewModel.ReportPeriod,
-    onPeriodSelect: (MainViewModel.ReportPeriod) -> Unit
+    onPeriodSelect: (MainViewModel.ReportPeriod) -> Unit,
+    viewModel: MainViewModel
 ) {
+    val selectedDateStr = viewModel.selectedDate.collectAsStateWithLifecycle().value
+    val allTransactions = viewModel.allProductTransactions.collectAsStateWithLifecycle().value
+
+    // Let's compute weekly and monthly targets based on selectedDateStr and allTransactions
+    val sdf = remember { SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()) }
+    val calendar = remember(selectedDateStr) {
+        Calendar.getInstance().apply {
+            try {
+                val refDate = sdf.parse(selectedDateStr)
+                if (refDate != null) time = refDate
+            } catch (e: Exception) {}
+        }
+    }
+
+    // Is today Sunday?
+    val isSunday = calendar.get(Calendar.DAY_OF_WEEK) == Calendar.SUNDAY
+
+    // Calculate Week Range for Week totals
+    val (weekBags, weekKg) = remember(allTransactions, products, selectedDateStr) {
+        val calWeek = Calendar.getInstance().apply {
+            try {
+                val refDate = sdf.parse(selectedDateStr)
+                if (refDate != null) time = refDate
+            } catch (e: Exception) {}
+            firstDayOfWeek = Calendar.MONDAY
+            set(Calendar.DAY_OF_WEEK, Calendar.MONDAY)
+        }
+        val startStr = sdf.format(calWeek.time)
+        val endStr = Calendar.getInstance().apply {
+            time = calWeek.time
+            add(Calendar.DATE, 6)
+        }.let { sdf.format(it.time) }
+
+        val weekTrans = allTransactions.filter { it.date in startStr..endStr }
+        val bags = weekTrans.sumOf { it.fabricated }
+        val kg = weekTrans.sumOf { t ->
+            val p = products.find { it.id == t.productId }
+            t.fabricated * (p?.bagWeightKg ?: 0.5)
+        }
+        Pair(bags, kg)
+    }
+
+    // Calculate Month Range for Month totals
+    val (monthBags, monthKg) = remember(allTransactions, products, selectedDateStr) {
+        val calMonth = Calendar.getInstance().apply {
+            try {
+                val refDate = sdf.parse(selectedDateStr)
+                if (refDate != null) time = refDate
+            } catch (e: Exception) {}
+            set(Calendar.DAY_OF_MONTH, 1)
+        }
+        val startStr = sdf.format(calMonth.time)
+        val endStr = Calendar.getInstance().apply {
+            time = calMonth.time
+            set(Calendar.DAY_OF_MONTH, calMonth.getActualMaximum(Calendar.DAY_OF_MONTH))
+        }.let { sdf.format(it.time) }
+
+        val monthTrans = allTransactions.filter { it.date in startStr..endStr }
+        val bags = monthTrans.sumOf { it.fabricated }
+        val kg = monthTrans.sumOf { t ->
+            val p = products.find { it.id == t.productId }
+            t.fabricated * (p?.bagWeightKg ?: 0.5)
+        }
+        Pair(bags, kg)
+    }
+
+    // Map today's transactions for easy filling register
+    val productTodayMap = remember(products, allTransactions, selectedDateStr) {
+        products.associateWith { product ->
+            allTransactions.find { it.productId == product.id && it.date == selectedDateStr }
+        }
+    }
+
+    // Daily automatic calculations based on currently saved transactions
+    val todayKgProduced = products.sumOf { p ->
+        val trans = productTodayMap[p]
+        (trans?.fabricated ?: 0) * p.bagWeightKg
+    }
+    val todayKgSold = products.sumOf { p ->
+        val trans = productTodayMap[p]
+        (trans?.sold ?: 0) * p.bagWeightKg
+    }
+    val warehouseTotalKg = products.sumOf { p ->
+        p.currentStock * p.bagWeightKg
+    }
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+        verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         
-        // Date active range indicator
+        // Date active range indicator & Segment Selector
         Row(
-            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 4.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -524,7 +614,6 @@ fun BentoGridOverviewPanel(
                 fontWeight = FontWeight.Medium
             )
             
-            // Subtly integrated Segmented Tab for Period select inside the overview
             Row(
                 modifier = Modifier
                     .background(Color.White, RoundedCornerShape(8.dp))
@@ -559,116 +648,385 @@ fun BentoGridOverviewPanel(
             }
         }
 
-        // --- ROW 1: PRODUCTS (SPAN-4) & DAILY TARGET (SPAN-2) ---
-        Row(
+        // --- WEEKDAY SHIFT STATE & DATE ALERT HERO BRANDING ---
+        Card(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = if (isSunday) Color(0xFFFEF2F2) else Color(0xFFF0FDF4)
+            ),
+            border = BorderStroke(1.dp, if (isSunday) Color(0xFFFCA5A5) else Color(0xFFFFE4E6).copy(alpha = 0.5f))
         ) {
-            // PRODUCTS Card (weight = 0.65f)
-            val totalKg = products.sumOf { p ->
-                val pStat = stats.productSummary[p.id] ?: ProductAggStats(p.id, 0, 0, 0)
-                pStat.fabricated * p.bagWeightKg
-            }
-
-            val primaryProdString = products.firstOrNull()?.let { "${it.color}/${it.size}" } ?: "Blue/HDPE"
-
-            Card(
-                onClick = { 
-                    products.firstOrNull()?.let { onProductClick(it) }
-                },
+            Row(
                 modifier = Modifier
-                    .weight(0.65f)
-                    .height(130.dp)
-                    .testTag("bento_products_card"),
-                shape = RoundedCornerShape(24.dp),
-                colors = CardDefaults.cardColors(containerColor = BentoLightGreen),
-                border = BorderStroke(1.dp, BentoInnerBorder)
+                    .fillMaxWidth()
+                    .padding(14.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Column(
+                Box(
                     modifier = Modifier
-                        .fillMaxSize()
-                        .padding(16.dp),
-                    verticalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "PRODUCTS",
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.ExtraBold,
-                            color = Color(0xFF3A4B35),
-                            letterSpacing = 1.sp
-                        )
-                        Icon(
-                            Icons.Default.List,
-                            contentDescription = "Products Icon",
-                            tint = Color(0xFF3A4B35),
-                            modifier = Modifier.size(16.dp)
-                        )
-                    }
-                    
-                    Column {
-                        Text(
-                            text = "${String.format("%,d", totalKg.toInt())} kg",
-                            style = MaterialTheme.typography.headlineMedium,
-                            fontWeight = FontWeight.Black,
-                            color = BentoForestGreen
-                        )
-                        Text(
-                            text = "Fabricated: ${stats.totalFabricated} bags • $primaryProdString",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = BentoSubText,
-                            fontWeight = FontWeight.Medium
-                        )
-                    }
-                }
-            }
-
-            // DAILY TARGET PERCENT (weight = 0.35f)
-            val targetPercent = if (stats.totalFabricated > 0) {
-                ((stats.totalFabricated.toFloat() / 100f) * 100).toInt().coerceIn(1, 100)
-            } else {
-                84
-            }
-
-            Card(
-                modifier = Modifier
-                    .weight(0.35f)
-                    .height(130.dp)
-                    .testTag("bento_target_card"),
-                shape = RoundedCornerShape(24.dp),
-                colors = CardDefaults.cardColors(containerColor = BentoForestGreen)
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(16.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center
+                        .size(32.dp)
+                        .background(
+                            if (isSunday) Color(0xFFFEE2E2) else Color(0xFFDCFCE7),
+                            CircleShape
+                        ),
+                    contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = "$targetPercent%",
-                        style = MaterialTheme.typography.headlineMedium,
-                        fontWeight = FontWeight.Black,
-                        color = BentoLightGreen
+                        text = if (isSunday) "💤" else "⚙️",
+                        style = MaterialTheme.typography.bodyMedium
                     )
-                    Spacer(modifier = Modifier.height(4.dp))
+                }
+                Column(modifier = Modifier.weight(1.0f)) {
                     Text(
-                        text = "DAILY TARGET",
+                        text = if (isSunday) "SUNDAY BREAK — OPERATIONS PAUSED" else "ACTIVE SHIFT RECORD",
                         style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFFA4B19D),
-                        textAlign = TextAlign.Center,
-                        letterSpacing = 0.5.sp
+                        fontWeight = FontWeight.ExtraBold,
+                        color = if (isSunday) Color(0xFF991B1B) else Color(0xFF166534)
+                    )
+                    Text(
+                        text = if (isSunday) "All years work schedule operates Monday-Saturday. Enjoy your weekly rest!" else "Fill industrial bag production, weights, sales numbers and stock targets seamlessly.",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = if (isSunday) Color(0xFF7F1D1D) else Color(0xFF14532D)
                     )
                 }
             }
         }
 
-        // --- ROW 2: RAW FEEDSTOCK (SPAN-3) & MASTERBATCH AGENTS (SPAN-3) ---
+        // --- DYNAMIC PRODUCTION KPI SUMMARY COUNTERS ---
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Card(
+                modifier = Modifier.weight(1f),
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = BentoLightGreen),
+                border = BorderStroke(1.dp, BentoInnerBorder)
+            ) {
+                Column(modifier = Modifier.padding(14.dp)) {
+                    Text("TOTAL PRODUCED", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.ExtraBold, color = BentoForestGreen)
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text("${todayKgProduced.toInt()} KG", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Black, color = BentoForestGreen)
+                    Text("Fabricated Today", style = MaterialTheme.typography.labelSmall, color = BentoSubText)
+                }
+            }
+            Card(
+                modifier = Modifier.weight(1f),
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = BentoInfoBg),
+                border = BorderStroke(1.dp, Color(0xFFD1E4FF))
+            ) {
+                Column(modifier = Modifier.padding(14.dp)) {
+                    Text("TOTAL SOLD", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.ExtraBold, color = BentoInfoText)
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text("${todayKgSold.toInt()} KG", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Black, color = BentoInfoText)
+                    Text("Shipped Today", style = MaterialTheme.typography.labelSmall, color = BentoSubText)
+                }
+            }
+        }
+
+        // --- WEEKLY AND MONTHLY PRODUCTION ACHIEVEMENTS ---
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(24.dp),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFFF7F8F6)),
+            border = BorderStroke(1.dp, BentoBorder)
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text(
+                    text = "FACTORY PERFORMANCE SUMMARY",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = BentoForestGreen,
+                    letterSpacing = 1.sp
+                )
+                Spacer(modifier = Modifier.height(10.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("WEEKLY TOTALS", style = MaterialTheme.typography.labelSmall, color = BentoSubText, fontWeight = FontWeight.Bold)
+                        Text("${weekKg.toInt()} kg", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.ExtraBold, color = BentoTextDark)
+                        Text("$weekBags bags fabricated", style = MaterialTheme.typography.labelSmall, color = BentoSubText)
+                    }
+                    Box(modifier = Modifier.width(1.dp).height(50.dp).background(BentoBorder))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("MONTHLY TOTALS", style = MaterialTheme.typography.labelSmall, color = BentoSubText, fontWeight = FontWeight.Bold)
+                        Text("${monthKg.toInt()} kg", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.ExtraBold, color = BentoTextDark)
+                        Text("$monthBags bags fabricated", style = MaterialTheme.typography.labelSmall, color = BentoSubText)
+                    }
+                }
+            }
+        }
+
+        // --- ALL ITEMS PRODUCTION SHIFT SHEET REGISTER ---
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("shift_sheet_card"),
+            shape = RoundedCornerShape(24.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.White),
+            border = BorderStroke(1.dp, BentoBorder)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text(
+                            text = "PRODUCT SHIFT SHEET",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = BentoForestGreen,
+                            letterSpacing = 1.sp
+                        )
+                        Text(
+                            text = "Record item counts for selected day",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = BentoSubText
+                        )
+                    }
+                    
+                    Button(
+                        onClick = { 
+                            // Quick Action to Trigger host AddProduct modal
+                            onProductClick(Product(id = 0, name = "", size = "30x40", color = "Red", counter = 500, piecesPerBag = 100, bagWeightKg = 0.25, currentStock = 0))
+                        },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = BentoLightGreen,
+                            contentColor = BentoForestGreen
+                        ),
+                        shape = RoundedCornerShape(12.dp),
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                        modifier = Modifier.height(28.dp).testTag("quick_add_product_btn")
+                    ) {
+                        Icon(Icons.Default.Add, contentDescription = "Add New Product Size", modifier = Modifier.size(12.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("New Bag Size", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                    }
+                }
+
+                HorizontalDivider(color = BentoBorder.copy(alpha = 0.5f))
+
+                if (products.isEmpty()) {
+                    Box(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 24.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("No product bag sizes defined. Add sizes to begin.", style = MaterialTheme.typography.bodySmall, color = BentoSubText)
+                    }
+                }
+
+                products.forEach { product ->
+                    val todayTrans = productTodayMap[product]
+                    
+                    var producedInput by remember(product.id, selectedDateStr) { 
+                        mutableStateOf(if (todayTrans != null && todayTrans.fabricated > 0) todayTrans.fabricated.toString() else "") 
+                    }
+                    var soldInput by remember(product.id, selectedDateStr) { 
+                        mutableStateOf(if (todayTrans != null && todayTrans.sold > 0) todayTrans.sold.toString() else "") 
+                    }
+
+                    val isSaved = remember(producedInput, soldInput, todayTrans) {
+                        val fabVal = producedInput.toIntOrNull() ?: 0
+                        val sldVal = soldInput.toIntOrNull() ?: 0
+                        fabVal == (todayTrans?.fabricated ?: 0) && sldVal == (todayTrans?.sold ?: 0)
+                    }
+
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFFFBFDFA)),
+                        border = BorderStroke(1.dp, BentoBorder.copy(alpha = 0.5f))
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(12.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            // Product Title & Spec Indicators
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.Top
+                            ) {
+                                Column {
+                                    Text(
+                                        text = "${product.name} (${product.color})",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = BentoTextDark
+                                    )
+                                    Row(
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .background(BentoLightGreen, RoundedCornerShape(4.dp))
+                                                .padding(horizontal = 4.dp, vertical = 2.dp)
+                                        ) {
+                                            Text("Size: ${product.size}", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = BentoForestGreen)
+                                        }
+                                        Text("•", style = MaterialTheme.typography.labelSmall, color = BentoSubText)
+                                        Text("Counter: ${product.counter}", style = MaterialTheme.typography.labelSmall, color = BentoSubText)
+                                        Text("•", style = MaterialTheme.typography.labelSmall, color = BentoSubText)
+                                        Text("${product.piecesPerBag} Pcs/Bag", style = MaterialTheme.typography.labelSmall, color = BentoSubText)
+                                        Text("•", style = MaterialTheme.typography.labelSmall, color = BentoSubText)
+                                        Text("Unit: ${product.bagWeightKg} kg", style = MaterialTheme.typography.labelSmall, color = BentoSubText)
+                                    }
+                                }
+
+                                // Warehouse calculation
+                                Column(horizontalAlignment = Alignment.End) {
+                                    Text("Warehouse Remaining", style = MaterialTheme.typography.labelSmall, color = BentoSubText)
+                                    Text(
+                                        text = "${product.currentStock} bags",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = BentoForestGreen
+                                    )
+                                    Text(
+                                        text = "(${String.format("%.1f", product.currentStock * product.bagWeightKg)} kg)",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = BentoSubText
+                                    )
+                                }
+                            }
+
+                            HorizontalDivider(color = BentoBorder.copy(alpha = 0.3f))
+
+                            // Inputs & Auto Calculations
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text("Bags Produced:", style = MaterialTheme.typography.labelSmall, color = BentoSubText)
+                                        val enteredFab = producedInput.toIntOrNull() ?: 0
+                                        if (enteredFab > 0) {
+                                            Text(" (${String.format("%.1f", enteredFab * product.bagWeightKg)} kg)", style = MaterialTheme.typography.labelSmall, color = BentoForestGreen, fontWeight = FontWeight.Bold)
+                                        }
+                                    }
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    OutlinedTextField(
+                                        value = producedInput,
+                                        onValueChange = { producedInput = it },
+                                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                        placeholder = { Text("0", style = MaterialTheme.typography.bodySmall) },
+                                        textStyle = MaterialTheme.typography.bodySmall,
+                                        singleLine = true,
+                                        modifier = Modifier.height(48.dp).fillMaxWidth().testTag("sheet_fab_input_${product.id}"),
+                                        shape = RoundedCornerShape(8.dp),
+                                        colors = OutlinedTextFieldDefaults.colors(
+                                            focusedContainerColor = Color.White,
+                                            unfocusedContainerColor = Color.White,
+                                            focusedBorderColor = BentoForestGreen,
+                                            unfocusedBorderColor = BentoBorder
+                                        )
+                                    )
+                                }
+
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text("Bags Sold:", style = MaterialTheme.typography.labelSmall, color = BentoSubText)
+                                        val enteredSold = soldInput.toIntOrNull() ?: 0
+                                        if (enteredSold > 0) {
+                                            Text(" (${String.format("%.1f", enteredSold * product.bagWeightKg)} kg)", style = MaterialTheme.typography.labelSmall, color = BentoInfoText, fontWeight = FontWeight.Bold)
+                                        }
+                                    }
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    OutlinedTextField(
+                                        value = soldInput,
+                                        onValueChange = { soldInput = it },
+                                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                        placeholder = { Text("0", style = MaterialTheme.typography.bodySmall) },
+                                        textStyle = MaterialTheme.typography.bodySmall,
+                                        singleLine = true,
+                                        modifier = Modifier.height(48.dp).fillMaxWidth().testTag("sheet_sold_input_${product.id}"),
+                                        shape = RoundedCornerShape(8.dp),
+                                        colors = OutlinedTextFieldDefaults.colors(
+                                            focusedContainerColor = Color.White,
+                                            unfocusedContainerColor = Color.White,
+                                            focusedBorderColor = BentoForestGreen,
+                                            unfocusedBorderColor = BentoBorder
+                                        )
+                                    )
+                                }
+
+                                // Interactive Quick Save Action Button with Saved Visual State
+                                Column {
+                                    Spacer(modifier = Modifier.height(14.dp))
+                                    IconButton(
+                                        onClick = {
+                                            val fVal = producedInput.toIntOrNull() ?: 0
+                                            val sVal = soldInput.toIntOrNull() ?: 0
+                                            viewModel.recordProductDailyActivity(product.id, fVal, sVal, 0, "Daily entry update")
+                                        },
+                                        modifier = Modifier
+                                            .size(36.dp)
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .background(
+                                                if (isSaved) Color(0xFFDCFCE7) else BentoForestGreen
+                                            ).testTag("sheet_save_btn_${product.id}")
+                                    ) {
+                                        Icon(
+                                            imageVector = if (isSaved) Icons.Default.Check else Icons.Default.Done,
+                                            contentDescription = "Save values",
+                                            tint = if (isSaved) Color(0xFF15803D) else Color.White,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                // Card total summation line
+                HorizontalDivider(color = BentoBorder.copy(alpha = 0.5f))
+                Column(
+                    modifier = Modifier.fillMaxWidth().background(Color(0xFFF1F5F0), RoundedCornerShape(12.dp)).padding(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Text("DAILY SHEET GRAND TOTALS", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Black, color = BentoForestGreen)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text("Total KG Manufactured today:", style = MaterialTheme.typography.labelSmall, color = BentoTextDark)
+                        Text("${todayKgProduced.toInt()} KG", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = BentoForestGreen)
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text("Total KG Shipped/Sold today:", style = MaterialTheme.typography.labelSmall, color = BentoTextDark)
+                        Text("${todayKgSold.toInt()} KG", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = BentoInfoText)
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text("Total Remaining Warehouse Stock:", style = MaterialTheme.typography.labelSmall, color = BentoTextDark)
+                        Text("${warehouseTotalKg.toInt()} KG", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = BentoForestGreen)
+                    }
+                }
+            }
+        }
+
+        // --- ROW 2: RAW FEEDSTOCK & MASTERBATCH AGENTS ---
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -701,14 +1059,13 @@ fun BentoGridOverviewPanel(
                         verticalArrangement = Arrangement.spacedBy(6.dp),
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        // LDPE feed row
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text("LDPE", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = BentoTextDark)
-                                                        val added = stats.ldAdded
+                            val added = stats.ldAdded
                             val used = stats.ldUsed
                             val diff = added - used
                             val indicatorText = if (diff >= 0.0) "+${diff.toInt()}kg" else "${diff.toInt()}kg"
@@ -716,7 +1073,6 @@ fun BentoGridOverviewPanel(
                             Text(indicatorText, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = indicatorColor)
                         }
                         
-                        // HDPE feed row
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
@@ -731,7 +1087,6 @@ fun BentoGridOverviewPanel(
                             Text(indicatorText, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = indicatorColor)
                         }
 
-                        // Waste row
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
@@ -788,7 +1143,6 @@ fun BentoGridOverviewPanel(
                         letterSpacing = 1.sp
                     )
 
-                    // Pigment Circular Meter
                     Box(
                         modifier = Modifier.weight(1f),
                         contentAlignment = Alignment.Center
@@ -857,7 +1211,6 @@ fun BentoGridOverviewPanel(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                // Initial Avatars representation
                 Row(
                     modifier = Modifier.wrapContentSize(),
                     horizontalArrangement = Arrangement.spacedBy((-12).dp)
@@ -907,7 +1260,6 @@ fun BentoGridOverviewPanel(
                     )
                 }
 
-                // Forward Link indicator block
                 Box(
                     modifier = Modifier
                         .background(Color.White, RoundedCornerShape(14.dp))
@@ -923,12 +1275,11 @@ fun BentoGridOverviewPanel(
             }
         }
 
-        // --- ROW 4: ADJUSTMENTS (PENDING ALERTS - SPAN-3) & SOLD SHIPMENT (SPAN-3) ---
+        // --- ROW 4: ADJUSTMENTS & SOLD SHIPMENT ---
         Row(
             modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            // ADJUSTMENTS (Alert Pink)
             val adjCount = stats.totalAdjusted
             Card(
                 modifier = Modifier
@@ -965,7 +1316,7 @@ fun BentoGridOverviewPanel(
                             fontWeight = FontWeight.Black,
                             color = BentoAlertText
                         )
-                        val badgeTextValue = if (adjCount > 0) "+$adjCount bags" else if (adjCount < 0) "$adjCount bags" else "4 Pending review"
+                        val badgeTextValue = if (adjCount > 0) "+$adjCount bags" else if (adjCount < 0) "$adjCount bags" else "No issues today"
                         Text(
                             text = badgeTextValue,
                             style = MaterialTheme.typography.labelSmall,
@@ -976,7 +1327,6 @@ fun BentoGridOverviewPanel(
                 }
             }
 
-            // SOLD SHIPPED BAGS (Info Blue)
             val shipCount = stats.totalSold
             Card(
                 modifier = Modifier
@@ -1522,23 +1872,28 @@ fun EmptyStatePlaceholder(text: String) {
 @Composable
 fun AddProductDialog(
     onDismiss: () -> Unit,
-    onSave: (name: String, size: String, color: String, weight: Double, stock: Int) -> Unit
+    onSave: (name: String, size: String, color: String, counter: Int, piecesPerBag: Int, weight: Double, stock: Int) -> Unit
 ) {
     var name by remember { mutableStateOf("") }
-    var size by remember { mutableStateOf("Medium") }
+    var size by remember { mutableStateOf("30x40") }
     var color by remember { mutableStateOf("Red") }
-    var weightStr by remember { mutableStateOf("10.0") }
+    var counterStr by remember { mutableStateOf("500") }
+    var piecesStr by remember { mutableStateOf("100") }
+    var weightStr by remember { mutableStateOf("0.25") }
     var initialStockStr by remember { mutableStateOf("0") }
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Add New Product Item") },
+        title = { Text("Add New Product Item", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+                modifier = Modifier.verticalScroll(rememberScrollState())
+            ) {
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it },
-                    label = { Text("Product name (e.g. Medium Shopping Bag)") },
+                    label = { Text("Product Label (e.g. Premium Shopping Bag)") },
                     modifier = Modifier
                         .fillMaxWidth()
                         .testTag("diag_product_name")
@@ -1546,19 +1901,35 @@ fun AddProductDialog(
                 OutlinedTextField(
                     value = size,
                     onValueChange = { size = it },
-                    label = { Text("Size (e.g. Small, Medium, Large)") },
+                    label = { Text("Size (e.g., 30x40, 40x50)") },
                     modifier = Modifier.fillMaxWidth()
                 )
                 OutlinedTextField(
                     value = color,
                     onValueChange = { color = it },
-                    label = { Text("Color (e.g. Red, Black, Yellow)") },
+                    label = { Text("Color (e.g. Red, Black, Blue)") },
                     modifier = Modifier.fillMaxWidth()
                 )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = counterStr,
+                        onValueChange = { counterStr = it },
+                        label = { Text("Counter (e.g. 500)") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.weight(1f)
+                    )
+                    OutlinedTextField(
+                        value = piecesStr,
+                        onValueChange = { piecesStr = it },
+                        label = { Text("Pieces/Bag (e.g. 100)") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.weight(1f)
+                    )
+                }
                 OutlinedTextField(
                     value = weightStr,
                     onValueChange = { weightStr = it },
-                    label = { Text("Weight of 1 Bag in kg (e.g. 10.0)") },
+                    label = { Text("Weight of 1 Bag in KG (e.g. 0.25)") },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -1574,10 +1945,12 @@ fun AddProductDialog(
         confirmButton = {
             Button(
                 onClick = {
-                    val weight = weightStr.toDoubleOrNull() ?: 10.0
+                    val counterVal = counterStr.toIntOrNull() ?: 500
+                    val piecesVal = piecesStr.toIntOrNull() ?: 100
+                    val weight = weightStr.toDoubleOrNull() ?: 0.25
                     val stock = initialStockStr.toIntOrNull() ?: 0
                     if (name.isNotEmpty()) {
-                        onSave(name, size, color, weight, stock)
+                        onSave(name, size, color, counterVal, piecesVal, weight, stock)
                     }
                 },
                 modifier = Modifier.testTag("diag_product_submit")
