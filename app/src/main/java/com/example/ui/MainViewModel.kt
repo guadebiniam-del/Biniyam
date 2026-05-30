@@ -48,6 +48,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val allMasterbatchTransactions: StateFlow<List<MasterbatchTransaction>> = repository.allMasterbatchTransactionsFlow
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    val allActivityLogs: StateFlow<List<ActivityLog>> = repository.allActivityLogsFlow
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
     // --- SYSTEM TIME & CALENDAR PERIOD STATES ---
     sealed class ReportPeriod {
         object Daily : ReportPeriod()
@@ -82,6 +85,30 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private fun allAttendanceFlow(): Flow<List<WorkerAttendance>> = repository.allAttendanceFlow
 
 
+    // --- LOGGER UTILITY ---
+    fun logAction(category: String, actionType: String, description: String) {
+        viewModelScope.launch {
+            try {
+                val manufacturer = android.os.Build.MANUFACTURER ?: "Generic"
+                val model = android.os.Build.MODEL ?: "Android Device"
+                val deviceName = if (manufacturer.equals("unknown", ignoreCase = true)) model else "$manufacturer $model"
+                val etDateTime = EthiopianCalendarHelper.getTodayEthiopianDateTimeString()
+                val log = ActivityLog(
+                    id = java.util.UUID.randomUUID().toString(),
+                    timestamp = System.currentTimeMillis(),
+                    ethiopianDateTime = etDateTime,
+                    category = category,
+                    actionType = actionType,
+                    description = description,
+                    deviceName = deviceName
+                )
+                repository.insertActivityLog(log)
+            } catch (e: Exception) {
+                android.util.Log.e("MainViewModel", "Error recording log: ${e.message}", e)
+            }
+        }
+    }
+
     // --- INVENTORY BUSINESS ACTIONS ---
 
     fun updateSelectedDate(dateStr: String) {
@@ -104,13 +131,23 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 bagWeightKg = weight,
                 currentStock = initialStock
             )
-            repository.insertProduct(product)
+            val generatedId = repository.insertProduct(product)
+            logAction(
+                category = "Product",
+                actionType = "Add",
+                description = "Registered new product: '$name' (ID: $generatedId, Size: $size, Color: $color, Weight: ${weight}kg, Initial Stock: $initialStock bags)"
+            )
         }
     }
 
     fun deleteProduct(product: Product) {
         viewModelScope.launch {
             repository.deleteProduct(product)
+            logAction(
+                category = "Product",
+                actionType = "Delete",
+                description = "Removed product: '${product.name}' (Size: ${product.size}, Color: ${product.color}, Final Stock: ${product.currentStock} bags)"
+            )
         }
     }
 
@@ -125,12 +162,28 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 notes = notes
             )
             repository.addProductTransactionAndUpdateStock(transaction)
+            
+            val product = allProducts.value.find { it.id == productId }
+            val formattedNotes = if (notes.isBlank()) "None" else "'$notes'"
+            logAction(
+                category = "Product",
+                actionType = "Edit",
+                description = "Updated Daily sheet for '${product?.name ?: "Product #$productId"}': Fabricated: +$fabricated, Sold: -$sold, Adjusted: ${if (adjusted >= 0) "+" else ""}$adjusted bags. Notes: $formattedNotes (Date: ${selectedDate.value})"
+            )
         }
     }
 
     fun adjustProductStock(productId: Int, adjustedValue: Int, notes: String) {
         viewModelScope.launch {
             repository.adjustProductStockDirect(productId, adjustedValue, notes, selectedDate.value)
+            
+            val product = allProducts.value.find { it.id == productId }
+            val formattedNotes = if (notes.isBlank()) "None" else "'$notes'"
+            logAction(
+                category = "Product",
+                actionType = "Edit",
+                description = "Recorded manual stock adjustment for '${product?.name ?: "Product #$productId"}': Adjusted by ${if (adjustedValue >= 0) "+" else ""}$adjustedValue bags. Notes: $formattedNotes (Date: ${selectedDate.value})"
+            )
         }
     }
 
@@ -144,6 +197,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 added = added
             )
             repository.addRawMaterialTransactionAndUpdateStock(transaction)
+            logAction(
+                category = "Raw Material",
+                actionType = "Edit",
+                description = "Updated Raw Material '$materialType' levels on ${selectedDate.value}: Used: -${used}kg, Added: +${added}kg"
+            )
         }
     }
 
@@ -157,19 +215,36 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 bought = bought
             )
             repository.addMasterbatchTransactionAndUpdateStock(transaction)
+            
+            val mb = allMasterbatches.value.find { it.id == masterbatchId }
+            logAction(
+                category = "Masterbatch",
+                actionType = "Edit",
+                description = "Updated Masterbatch '${mb?.color ?: "ID #$masterbatchId"}' Pigment: Used: -${used}kg, Bought: +${bought}kg (Date: ${selectedDate.value})"
+            )
         }
     }
 
     fun addNewMasterbatch(color: String, initialStock: Double) {
         viewModelScope.launch {
             val mb = Masterbatch(color = color, currentStock = initialStock)
-            repository.insertMasterbatch(mb)
+            val generatedId = repository.insertMasterbatch(mb)
+            logAction(
+                category = "Masterbatch",
+                actionType = "Add",
+                description = "Added new Masterbatch option Color: '$color' (ID: $generatedId, Initial Stock: ${initialStock}kg)"
+            )
         }
     }
 
     fun deleteMasterbatch(masterbatch: Masterbatch) {
         viewModelScope.launch {
             repository.deleteMasterbatch(masterbatch)
+            logAction(
+                category = "Masterbatch",
+                actionType = "Delete",
+                description = "Removed Masterbatch color option: '${masterbatch.color}' (Final Stock was: ${masterbatch.currentStock}kg)"
+            )
         }
     }
 
@@ -182,7 +257,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 name = name,
                 joinDate = selectedDate.value
             )
-            repository.insertWorker(worker)
+            val generatedId = repository.insertWorker(worker)
+            logAction(
+                category = "Worker",
+                actionType = "Add",
+                description = "Registered new Worker: '$name' (ID: $generatedId, Active starting: ${selectedDate.value})"
+            )
         }
     }
 
@@ -194,6 +274,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 status = status
             )
             repository.recordAttendance(attendance)
+            
+            val worker = allWorkers.value.find { it.id == workerId }
+            logAction(
+                category = "Worker",
+                actionType = "Edit",
+                description = "Recorded Worker Attendance for '${worker?.name ?: "Worker #$workerId"}': System status changed/set to '$status' (Date: ${selectedDate.value})"
+            )
         }
     }
 

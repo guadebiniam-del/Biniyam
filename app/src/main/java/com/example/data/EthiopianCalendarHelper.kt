@@ -109,6 +109,20 @@ object EthiopianCalendarHelper {
         return String.format(Locale.US, "%04d-%02d-%02d", triple.first, triple.second, triple.third)
     }
 
+    // Get current Ethiopian date and 24h time as a friendly string
+    fun getTodayEthiopianDateTimeString(): String {
+        val cal = Calendar.getInstance()
+        val triple = gregorianToEthiopian(cal.get(Calendar.YEAR), cal.get(Calendar.MONTH) + 1, cal.get(Calendar.DAY_OF_MONTH))
+        val hour = cal.get(Calendar.HOUR_OF_DAY)
+        val minute = cal.get(Calendar.MINUTE)
+        val second = cal.get(Calendar.SECOND)
+        
+        val timeStr = String.format(Locale.US, "%02d:%02d:%02d", hour, minute, second)
+        val monthName = ETHIOPIAN_MONTHS.getOrNull(triple.second - 1) ?: "Unknown"
+        val weekday = getAmharicWeekday(triple.first, triple.second, triple.third)
+        return "$weekday፣ $monthName ${triple.third} ቀን ${triple.first} ዓ.ም. $timeStr"
+    }
+
     // Shift an Ethiopian date formatted as "yyyy-MM-dd" by offsetDays
     fun shiftEthiopianDate(dateStr: String, offsetDays: Int): String {
         val parts = dateStr.split("-")

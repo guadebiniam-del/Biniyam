@@ -50,8 +50,9 @@ fun DashboardScreen(
     val reportPeriod by viewModel.reportPeriod.collectAsStateWithLifecycle()
     val stats by viewModel.statsState.collectAsStateWithLifecycle()
     val workerStats by viewModel.workerAttendanceStats.collectAsStateWithLifecycle()
+    val activityLogs by viewModel.allActivityLogs.collectAsStateWithLifecycle()
 
-    // Active tab selection matching the Bento Grid HTML design: Daily Overview, Inventory, Workers
+    // Active tab selection matching the Bento Grid HTML design: Daily Overview, Inventory, Workers, Activity Log
     var activeTab by remember { mutableStateOf("Daily Overview") }
 
     // Dialog trigger states
@@ -180,10 +181,12 @@ fun DashboardScreen(
 
                 // Horizontal scrollable Tab Category Tags
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    val tabsList = listOf("Daily Overview", "Inventory", "Workers")
+                    val tabsList = listOf("Daily Overview", "Inventory", "Workers", "Activity Log")
                     tabsList.forEach { tabName ->
                         val isSelected = activeTab == tabName
                         
@@ -418,6 +421,14 @@ fun DashboardScreen(
                                     }
                                 }
                             }
+                        }
+                    }
+
+                    if (activeTab == "Activity Log") {
+                        item {
+                            ActivityLogSection(
+                                activityLogs = activityLogs
+                            )
                         }
                     }
                 }
@@ -2545,5 +2556,418 @@ fun imageIconsList(label: String): androidx.compose.ui.graphics.vector.ImageVect
     return when (label) {
         "recycle" -> Icons.Default.Refresh
         else -> null
+    }
+}
+
+// --- LIVE ACTIVITY LOGS COMPOSABLE ---
+@Composable
+fun ActivityLogSection(
+    activityLogs: List<ActivityLog>
+) {
+    var searchQuery by remember { mutableStateOf("") }
+    var selectedCategoryFilter by remember { mutableStateOf("All") }
+    var selectedActionFilter by remember { mutableStateOf("All") }
+
+    val categories = listOf("All", "Product", "Raw Material", "Masterbatch", "Worker")
+    val actions = listOf("All", "Add", "Edit", "Delete")
+
+    // Filter logic
+    val filteredLogs = activityLogs.filter { log ->
+        val matchesSearch = log.description.contains(searchQuery, ignoreCase = true) ||
+                log.deviceName.contains(searchQuery, ignoreCase = true) ||
+                log.ethiopianDateTime.contains(searchQuery, ignoreCase = true)
+        
+        val matchesCategory = selectedCategoryFilter == "All" || log.category.equals(selectedCategoryFilter, ignoreCase = true)
+        val matchesAction = selectedActionFilter == "All" || log.actionType.equals(selectedActionFilter, ignoreCase = true)
+        
+        matchesSearch && matchesCategory && matchesAction
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp)
+            .testTag("activity_logs_section_container")
+    ) {
+        // Section Header
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(24.dp),
+            colors = CardDefaults.cardColors(containerColor = BentoNeutralGray),
+            border = BorderStroke(1.dp, BentoBorder)
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .background(BentoForestGreen.copy(alpha = 0.15f), CircleShape)
+                            .padding(8.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.List,
+                            contentDescription = "Live Activity",
+                            tint = BentoForestGreen,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                    Column {
+                        Text(
+                            text = "LIVE ACTIVITY MONITOR",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Black,
+                            color = Color.White
+                        )
+                        Text(
+                            text = "Track logs across all connected devices in Ethiopian calendar",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = BentoSubText
+                        )
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Basic Stats overview
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            // Stats 1: Total records
+            Card(
+                modifier = Modifier.weight(1.5f),
+                colors = CardDefaults.cardColors(containerColor = BentoNeutralGray),
+                border = BorderStroke(1.dp, BentoBorder)
+            ) {
+                Row(
+                    modifier = Modifier.padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .background(BentoForestGreen.copy(alpha = 0.15f), RoundedCornerShape(8.dp))
+                            .padding(6.dp)
+                    ) {
+                        Icon(Icons.Default.CheckCircle, contentDescription = null, tint = BentoForestGreen, modifier = Modifier.size(18.dp))
+                    }
+                    Column {
+                        Text("TOTAL RECORDS", style = MaterialTheme.typography.labelSmall, color = BentoSubText, fontWeight = FontWeight.Bold)
+                        Text("${activityLogs.size} logs", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Black, color = BentoForestGreen)
+                    }
+                }
+            }
+            // Stats 2: Connected Devices
+            val uniqueDevicesCount = activityLogs.map { it.deviceName }.distinct().size
+            Card(
+                modifier = Modifier.weight(1.5f),
+                colors = CardDefaults.cardColors(containerColor = BentoNeutralGray),
+                border = BorderStroke(1.dp, BentoBorder)
+            ) {
+                Row(
+                    modifier = Modifier.padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .background(BentoInfoBg.copy(alpha = 0.15f), RoundedCornerShape(8.dp))
+                            .padding(6.dp)
+                    ) {
+                        Icon(Icons.Default.Settings, contentDescription = null, tint = BentoInfoText, modifier = Modifier.size(18.dp))
+                    }
+                    Column {
+                        Text("DEVICES", style = MaterialTheme.typography.labelSmall, color = BentoSubText, fontWeight = FontWeight.Bold)
+                        Text("$uniqueDevicesCount devices", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Black, color = BentoInfoText)
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(14.dp))
+
+        // Search text field
+        OutlinedTextField(
+            value = searchQuery,
+            onValueChange = { searchQuery = it },
+            modifier = Modifier.fillMaxWidth().testTag("log_search_input"),
+            placeholder = { Text("Search logs or devices...", color = BentoSubText, style = MaterialTheme.typography.bodyMedium) },
+            leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Search", tint = BentoSubText) },
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedContainerColor = BentoNeutralGray.copy(alpha = 0.5f),
+                unfocusedContainerColor = BentoNeutralGray.copy(alpha = 0.5f),
+                focusedBorderColor = BentoForestGreen,
+                unfocusedBorderColor = BentoBorder
+            ),
+            shape = RoundedCornerShape(16.dp),
+            singleLine = true
+        )
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // Filters badges row: Category
+        Text(
+            text = "Filter by Category:",
+            style = MaterialTheme.typography.labelMedium,
+            color = BentoSubText,
+            fontWeight = FontWeight.Bold
+        )
+        Spacer(modifier = Modifier.height(6.dp))
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            categories.forEach { cat ->
+                val isSelected = selectedCategoryFilter == cat
+                Box(
+                    modifier = Modifier
+                        .clip(CircleShape)
+                        .background(if (isSelected) BentoForestGreen else BentoNeutralGray)
+                        .border(1.dp, if (isSelected) BentoForestGreen else BentoBorder, CircleShape)
+                        .clickable { selectedCategoryFilter = cat }
+                        .padding(horizontal = 14.dp, vertical = 6.dp)
+                        .testTag("filter_cat_$cat")
+                ) {
+                    Text(
+                        text = cat,
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = if (isSelected) Color(0xFF0F172A) else BentoSubText
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        // Filters badges row: Action
+        Text(
+            text = "Filter by Action:",
+            style = MaterialTheme.typography.labelMedium,
+            color = BentoSubText,
+            fontWeight = FontWeight.Bold
+        )
+        Spacer(modifier = Modifier.height(6.dp))
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            actions.forEach { act ->
+                val isSelected = selectedActionFilter == act
+                val actColor = when (act) {
+                    "Add" -> BentoForestGreen
+                    "Edit" -> Color(0xFFF59E0B)
+                    "Delete" -> Color(0xFFEF4444)
+                    else -> BentoInfoText
+                }
+                Box(
+                    modifier = Modifier
+                        .clip(CircleShape)
+                        .background(if (isSelected) actColor.copy(alpha = 0.25f) else BentoNeutralGray)
+                        .border(1.dp, if (isSelected) actColor else BentoBorder, CircleShape)
+                        .clickable { selectedActionFilter = act }
+                        .padding(horizontal = 14.dp, vertical = 6.dp)
+                        .testTag("filter_act_$act")
+                ) {
+                    Text(
+                        text = act,
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = if (isSelected) actColor else BentoSubText
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(18.dp))
+
+        // Logs dynamic list display
+        if (filteredLogs.isEmpty()) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = BentoNeutralGray.copy(alpha = 0.5f)),
+                border = BorderStroke(1.dp, BentoBorder.copy(alpha = 0.5f))
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(32.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    Icon(
+                        Icons.Default.Info,
+                        contentDescription = "No logs",
+                        tint = BentoSubText,
+                        modifier = Modifier.size(36.dp)
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        text = "No recorded activity logs match the selected filter criteria",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = BentoSubText,
+                        textAlign = TextAlign.Center
+                    )
+                }
+            }
+        } else {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                filteredLogs.forEach { log ->
+                    ActivityLogItemCard(log = log)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun ActivityLogItemCard(log: ActivityLog) {
+    val (icon, tintColor) = when (log.actionType) {
+        "Add" -> Pair(Icons.Default.Add, BentoForestGreen)
+        "Delete" -> Pair(Icons.Default.Delete, Color(0xFFEF4444))
+        else -> Pair(Icons.Default.Edit, Color(0xFFF59E0B)) // Edit/Adjustment
+    }
+
+    val catIcon = when (log.category) {
+        "Product" -> Icons.Default.Build
+        "Raw Material" -> Icons.Default.List
+        "Masterbatch" -> Icons.Default.Edit
+        "Worker" -> Icons.Default.Person
+        else -> Icons.Default.CheckCircle // Attendance or general
+    }
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("activity_log_item_${log.id}"),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = BentoNeutralGray),
+        border = BorderStroke(1.dp, BentoBorder)
+    ) {
+        Column(
+            modifier = Modifier.padding(14.dp)
+        ) {
+            // Row metadata: Action icon + type, Category, device
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(24.dp)
+                            .background(tintColor.copy(alpha = 0.2f), CircleShape)
+                            .border(1.dp, tintColor, CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = icon,
+                            contentDescription = log.actionType,
+                            tint = tintColor,
+                            modifier = Modifier.size(12.dp)
+                        )
+                    }
+
+                    Text(
+                        text = log.actionType.uppercase(),
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Black,
+                        color = tintColor
+                    )
+                }
+
+                // Category badge
+                Box(
+                    modifier = Modifier
+                        .background(BentoInfoBg.copy(alpha = 0.15f), RoundedCornerShape(8.dp))
+                        .border(1.dp, BentoInfoText.copy(alpha = 0.25f), RoundedCornerShape(8.dp))
+                        .padding(horizontal = 8.dp, vertical = 2.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Icon(
+                            catIcon,
+                            contentDescription = log.category,
+                            tint = BentoInfoText,
+                            modifier = Modifier.size(10.dp)
+                        )
+                        Text(
+                            text = log.category,
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = BentoInfoText
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Main description
+            Text(
+                text = log.description,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Medium,
+                color = Color.White
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            HorizontalDivider(
+                color = BentoBorder.copy(alpha = 0.4f)
+            )
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Footer info: device + timestamp
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Device name
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Icon(
+                        Icons.Default.Settings,
+                        contentDescription = "Device",
+                        tint = BentoSubText,
+                        modifier = Modifier.size(12.dp)
+                    )
+                    Text(
+                        text = log.deviceName,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = BentoSubText
+                    )
+                }
+
+                // Ethiopian DateTime
+                Text(
+                    text = log.ethiopianDateTime,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = BentoForestGreen,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
     }
 }

@@ -77,3 +77,15 @@ data class WorkerAttendance(
     val date: String = "", // "yyyy-MM-dd"
     val status: String = "" // "On Duty", "Absent", "Left" (resigned), "Sunday Off"
 )
+
+// --- ACTIVITY LOGS (Firestore Managed) ---
+data class ActivityLog(
+    val id: String = "",
+    val timestamp: Long = 0,
+    val ethiopianDateTime: String = "",
+    val category: String = "", // "Product", "Raw Material", "Masterbatch", "Worker", "Attendance"
+    val actionType: String = "", // "Add", "Edit", "Delete"
+    val description: String = "",
+    val deviceName: String = ""
+)
+

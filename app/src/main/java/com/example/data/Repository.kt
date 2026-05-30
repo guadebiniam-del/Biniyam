@@ -105,6 +105,18 @@ class InventoryRepository {
     }
 
     // --- PRODUCTS ---
+    val allActivityLogsFlow: Flow<List<ActivityLog>> = getCollectionFlow("activity_logs", ActivityLog::class.java)
+        .map { list -> list.sortedByDescending { it.timestamp } }
+
+    suspend fun insertActivityLog(log: ActivityLog) {
+        val idToUse = if (log.id.isEmpty()) java.util.UUID.randomUUID().toString() else log.id
+        val updatedMessage = log.copy(
+            id = idToUse,
+            timestamp = if (log.timestamp == 0L) System.currentTimeMillis() else log.timestamp
+        )
+        db.collection("activity_logs").document(idToUse).set(updatedMessage).awaitTask()
+    }
+
     val allProductsFlow: Flow<List<Product>> = getCollectionFlow("products", Product::class.java)
         .map { list -> list.sortedByDescending { it.id } }
 
