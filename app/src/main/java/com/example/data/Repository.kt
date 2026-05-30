@@ -87,14 +87,7 @@ class InventoryRepository {
                     )
                     products.forEach { insertProduct(it) }
 
-                    // Pre-populate Workers
-                    val workers = listOf(
-                        Worker(id = 1, name = "Abebe Kebede", joinDate = "2026-01-10"),
-                        Worker(id = 2, name = "Chala Gerba", joinDate = "2026-02-15"),
-                        Worker(id = 3, name = "Soliana Yared", joinDate = "2026-03-01"),
-                        Worker(id = 4, name = "Anwar Adem", joinDate = "2026-04-05")
-                    )
-                    workers.forEach { insertWorker(it) }
+                    // Pre-populate Workers seeding removed per user request
                     
                     Log.d("InventoryRepository", "Seeding default data completed successfully.")
                 }

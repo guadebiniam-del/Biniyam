@@ -380,7 +380,7 @@ fun DashboardScreen(
                                 modifier = Modifier.fillMaxWidth(),
                                 shape = RoundedCornerShape(12.dp),
                                 colors = CardDefaults.cardColors(
-                                    containerColor = Color.White
+                                    containerColor = BentoNeutralGray
                                 ),
                                 border = BorderStroke(1.dp, BentoBorder)
                             ) {
@@ -1197,9 +1197,9 @@ fun BentoGridOverviewPanel(
                     }
                 }
                   // --- ROW 3: WORKERS ON DUTY (SPAN-6) ---
-        val workingCount = attendanceList.count { it.status == "On Duty" }.let { if (it > 0) it else 28 }
-        val breakCount = attendanceList.count { it.status == "On Break" }.let { if (it > 0) it else 3 }
-        val absCount = attendanceList.count { it.status == "Absent" }.let { if (it > 0) it else 0 }
+        val workingCount = attendanceList.count { it.status == "On Duty" }
+        val absCount = attendanceList.count { it.status == "Absent" }
+        val sundayOffCount = attendanceList.count { it.status == "Sunday Off" }
 
         Card(
             onClick = onWorkersTabSelect,
@@ -1218,10 +1218,8 @@ fun BentoGridOverviewPanel(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Row(
-                    modifier = Modifier.wrapContentSize(),
-                    horizontalArrangement = Arrangement.spacedBy((-12).dp)
-                ) {
+                val activeWorkers = workers.filter { it.isActive }
+                if (activeWorkers.isEmpty()) {
                     Box(
                         modifier = Modifier
                             .size(36.dp)
@@ -1229,38 +1227,66 @@ fun BentoGridOverviewPanel(
                             .border(2.dp, BentoNeutralGray, CircleShape),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text("AK", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = BentoForestGreen)
+                        Icon(
+                            Icons.Default.Person,
+                            contentDescription = null,
+                            tint = BentoForestGreen,
+                            modifier = Modifier.size(16.dp)
+                        )
                     }
-                    Box(
-                        modifier = Modifier
-                            .size(36.dp)
-                            .background(BentoForestGreen.copy(alpha = 0.3f), CircleShape)
-                            .border(2.dp, BentoNeutralGray, CircleShape),
-                        contentAlignment = Alignment.Center
+                } else {
+                    Row(
+                        modifier = Modifier.wrapContentSize(),
+                        horizontalArrangement = Arrangement.spacedBy((-12).dp)
                     ) {
-                        Text("JS", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = BentoForestGreen)
-                    }
-                    Box(
-                        modifier = Modifier
-                            .size(36.dp)
-                            .background(BentoForestGreen, CircleShape)
-                            .border(2.dp, BentoNeutralGray, CircleShape),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        val rosterSizeStr = if (workers.isNotEmpty()) "+${workers.size}" else "+26"
-                        Text(rosterSizeStr, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = Color.White)
+                        val previewWorkers = activeWorkers.take(2)
+                        previewWorkers.forEachIndexed { index, wk ->
+                            val initials = if (wk.name.isNotBlank()) {
+                                val parts = wk.name.trim().split("\\s+".toRegex())
+                                if (parts.size >= 2) {
+                                    (parts[0].take(1) + parts[1].take(1)).uppercase()
+                                } else {
+                                    parts[0].take(2).uppercase()
+                                }
+                            } else {
+                                "?"
+                            }
+                            Box(
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .background(BentoForestGreen.copy(alpha = if (index == 0) 0.15f else 0.3f), CircleShape)
+                                    .border(2.dp, BentoNeutralGray, CircleShape),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = initials,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = BentoForestGreen
+                                )
+                            }
+                        }
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .background(BentoForestGreen, CircleShape)
+                                .border(2.dp, BentoNeutralGray, CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text("+${activeWorkers.size}", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = Color.White)
+                        }
                     }
                 }
 
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = "$workingCount Workers On Duty",
+                        text = "$workingCount Worker(s) On Duty",
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.ExtraBold,
                         color = BentoForestGreen
                     )
                     Text(
-                        text = "$breakCount on break • $absCount absent today",
+                        text = "$absCount absent • $sundayOffCount on Sunday off",
                         style = MaterialTheme.typography.labelSmall,
                         color = BentoSubText,
                         fontWeight = FontWeight.Medium
@@ -1773,7 +1799,7 @@ fun WorkerRowItem(
             // If active, show stats range of that worker
             if (stats != null && worker.isActive) {
                 Text(
-                    text = "Scope Stats - On Duty: ${stats.daysOnDuty} days | Absent: ${stats.daysAbsent} days | Sun Off: ${stats.daysSundayOff}",
+                    text = "Attendance - On Duty: ${stats.daysOnDuty} days | Absent: ${stats.daysAbsent} days | Sun Off: ${stats.daysSundayOff}",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     overflow = TextOverflow.Ellipsis,
