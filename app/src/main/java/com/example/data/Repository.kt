@@ -1,49 +1,194 @@
 package com.example.data
 
+import android.util.Log
+import com.google.firebase.firestore.FirebaseFirestore
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
+import kotlin.random.Random
 
-class InventoryRepository(private val dao: InventoryDao) {
+class InventoryRepository {
+
+    private val db = FirebaseFirestore.getInstance()
+
+    // Task awaiting helper for standard play-services Task
+    private suspend fun <T> com.google.android.gms.tasks.Task<T>.awaitTask(): T = suspendCancellableCoroutine { continuation ->
+        addOnCompleteListener { task ->
+            if (task.isSuccessful) {
+                continuation.resume(task.result)
+            } else {
+                continuation.resumeWithException(task.exception ?: RuntimeException("Firestore transaction task failed"))
+            }
+        }
+    }
+
+    // Helper to generate a unique positive 31-bit random integer ID to avoid collisions
+    private fun generateUniqueId(): Int {
+        return java.util.UUID.randomUUID().hashCode() and 0x7FFFFFFF
+    }
+
+    // Generic snapshot listener converted to a Flow for real-time sync across all devices
+    private fun <T : Any> getCollectionFlow(collectionPath: String, clazz: Class<T>): Flow<List<T>> = callbackFlow {
+        val listener = db.collection(collectionPath)
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    close(error)
+                    return@addSnapshotListener
+                }
+                if (snapshot != null) {
+                    val items = snapshot.documents.mapNotNull { doc ->
+                        doc.toObject(clazz)
+                    }
+                    trySend(items)
+                }
+            }
+        awaitClose { listener.remove() }
+    }
+
+    // On init, check if db has products yet. If empty, seed default enterprise resources.
+    init {
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val checkSnapshot = db.collection("products").limit(1).get().awaitTask()
+                if (checkSnapshot.isEmpty) {
+                    Log.d("InventoryRepository", "Firestore collections are empty. Seeding defaults...")
+                    
+                    // Pre-populate Raw Materials
+                    val rawMaterials = listOf(
+                        RawMaterial("LD", 1200.0),
+                        RawMaterial("HD", 850.0),
+                        RawMaterial("Waste", 2400.0)
+                    )
+                    rawMaterials.forEach { insertRawMaterial(it) }
+
+                    // Pre-populate Masterbatches
+                    val masterbatches = listOf(
+                        Masterbatch(id = 1, color = "Black", currentStock = 150.0),
+                        Masterbatch(id = 2, color = "White", currentStock = 120.0),
+                        Masterbatch(id = 3, color = "Red", currentStock = 50.0),
+                        Masterbatch(id = 4, color = "Blue", currentStock = 60.0),
+                        Masterbatch(id = 5, color = "Green", currentStock = 45.0),
+                        Masterbatch(id = 6, color = "Yellow", currentStock = 30.0)
+                    )
+                    masterbatches.forEach { insertMasterbatch(it) }
+
+                    // Pre-populate Products
+                    val products = listOf(
+                        Product(id = 1, name = "Shopping Bag (Standard)", size = "30x40", color = "Red", counter = 500, piecesPerBag = 100, bagWeightKg = 0.25, currentStock = 120),
+                        Product(id = 2, name = "Industrial Waste Bag", size = "40x50", color = "Black", counter = 600, piecesPerBag = 120, bagWeightKg = 0.35, currentStock = 85),
+                        Product(id = 3, name = "Heavy Carrier Bag", size = "50x60", color = "Blue", counter = 800, piecesPerBag = 150, bagWeightKg = 0.5, currentStock = 40)
+                    )
+                    products.forEach { insertProduct(it) }
+
+                    // Pre-populate Workers
+                    val workers = listOf(
+                        Worker(id = 1, name = "Abebe Kebede", joinDate = "2026-01-10"),
+                        Worker(id = 2, name = "Chala Gerba", joinDate = "2026-02-15"),
+                        Worker(id = 3, name = "Soliana Yared", joinDate = "2026-03-01"),
+                        Worker(id = 4, name = "Anwar Adem", joinDate = "2026-04-05")
+                    )
+                    workers.forEach { insertWorker(it) }
+                    
+                    Log.d("InventoryRepository", "Seeding default data completed successfully.")
+                }
+            } catch (e: Exception) {
+                Log.e("InventoryRepository", "Error seeding Firestore defaults: ${e.message}", e)
+            }
+        }
+    }
 
     // --- PRODUCTS ---
-    val allProductsFlow: Flow<List<Product>> = dao.getAllProductsFlow()
-    val allProductTransactionsFlow: Flow<List<ProductTransaction>> = dao.getAllProductTransactionsFlow()
+    val allProductsFlow: Flow<List<Product>> = getCollectionFlow("products", Product::class.java)
+        .map { list -> list.sortedByDescending { it.id } }
 
-    suspend fun getAllProducts(): List<Product> = dao.getAllProducts()
+    val allProductTransactionsFlow: Flow<List<ProductTransaction>> = getCollectionFlow("product_transactions", ProductTransaction::class.java)
+        .map { list -> list.sortedWith(compareByDescending<ProductTransaction> { it.date }.thenByDescending { it.id }) }
 
-    suspend fun insertProduct(product: Product): Long = dao.insertProduct(product)
+    suspend fun getAllProducts(): List<Product> {
+        return try {
+            db.collection("products").get().awaitTask().documents.mapNotNull { it.toObject(Product::class.java) }
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
 
-    suspend fun updateProduct(product: Product) = dao.updateProduct(product)
+    suspend fun insertProduct(product: Product): Long {
+        val idToUse = if (product.id == 0) generateUniqueId() else product.id
+        val updatedProduct = product.copy(id = idToUse)
+        db.collection("products").document(idToUse.toString()).set(updatedProduct).awaitTask()
+        return idToUse.toLong()
+    }
 
-    suspend fun deleteProduct(product: Product) = dao.deleteProduct(product)
+    suspend fun updateProduct(product: Product) {
+        db.collection("products").document(product.id.toString()).set(product).awaitTask()
+    }
+
+    suspend fun deleteProduct(product: Product) {
+        db.collection("products").document(product.id.toString()).delete().awaitTask()
+    }
+
+    suspend fun getProductById(id: Int): Product? {
+        return try {
+            db.collection("products").document(id.toString()).get().awaitTask().toObject(Product::class.java)
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    suspend fun getProductTransactionsForDate(date: String): List<ProductTransaction> {
+        return try {
+            db.collection("product_transactions")
+                .whereEqualTo("date", date)
+                .get()
+                .awaitTask()
+                .documents
+                .mapNotNull { doc -> doc.toObject(ProductTransaction::class.java) }
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
+
+    suspend fun insertProductTransaction(transaction: ProductTransaction): Long {
+        val idToUse = if (transaction.id == 0) generateUniqueId() else transaction.id
+        val updated = transaction.copy(id = idToUse)
+        db.collection("product_transactions").document(idToUse.toString()).set(updated).awaitTask()
+        return idToUse.toLong()
+    }
 
     suspend fun addProductTransactionAndUpdateStock(transaction: ProductTransaction) {
-        val existingList = dao.getProductTransactionsForDate(transaction.date)
+        val existingList = getProductTransactionsForDate(transaction.date)
         val existing = existingList.find { it.productId == transaction.productId }
 
         if (existing != null) {
-            val product = dao.getProductById(transaction.productId)
+            val product = getProductById(transaction.productId)
             if (product != null) {
                 val oldNet = existing.fabricated - existing.sold + existing.adjusted
                 val newNet = transaction.fabricated - transaction.sold + transaction.adjusted
                 val diff = newNet - oldNet
                 val newStock = maxOf(0, product.currentStock + diff)
-                dao.updateProduct(product.copy(currentStock = newStock))
+                updateProduct(product.copy(currentStock = newStock))
             }
-            dao.insertProductTransaction(transaction.copy(id = existing.id))
+            insertProductTransaction(transaction.copy(id = existing.id))
         } else {
-            dao.insertProductTransaction(transaction)
-            val product = dao.getProductById(transaction.productId)
+            insertProductTransaction(transaction)
+            val product = getProductById(transaction.productId)
             if (product != null) {
                 val netAdjustment = transaction.fabricated - transaction.sold + transaction.adjusted
                 val newStock = maxOf(0, product.currentStock + netAdjustment)
-                dao.updateProduct(product.copy(currentStock = newStock))
+                updateProduct(product.copy(currentStock = newStock))
             }
         }
     }
 
     suspend fun adjustProductStockDirect(productId: Int, adjustedValue: Int, notes: String, date: String) {
-        val product = dao.getProductById(productId)
+        val product = getProductById(productId)
         if (product != null) {
             val transaction = ProductTransaction(
                 productId = productId,
@@ -53,128 +198,295 @@ class InventoryRepository(private val dao: InventoryDao) {
                 adjusted = adjustedValue,
                 notes = notes
             )
-            dao.insertProductTransaction(transaction)
+            insertProductTransaction(transaction)
             val newStock = maxOf(0, product.currentStock + adjustedValue)
-            dao.updateProduct(product.copy(currentStock = newStock))
+            updateProduct(product.copy(currentStock = newStock))
         }
     }
 
-
     // --- RAW MATERIALS ---
-    val allRawMaterialsFlow: Flow<List<RawMaterial>> = dao.getAllRawMaterialsFlow()
-    val allRawMaterialTransactionsFlow: Flow<List<RawMaterialTransaction>> = dao.getAllRawMaterialTransactionsFlow()
+    val allRawMaterialsFlow: Flow<List<RawMaterial>> = getCollectionFlow("raw_materials", RawMaterial::class.java)
 
-    suspend fun insertRawMaterial(rawMaterial: RawMaterial) = dao.insertRawMaterial(rawMaterial)
+    val allRawMaterialTransactionsFlow: Flow<List<RawMaterialTransaction>> = getCollectionFlow("raw_material_transactions", RawMaterialTransaction::class.java)
+        .map { list -> list.sortedWith(compareByDescending<RawMaterialTransaction> { it.date }.thenByDescending { it.id }) }
+
+    suspend fun insertRawMaterial(rawMaterial: RawMaterial) {
+        db.collection("raw_materials").document(rawMaterial.type).set(rawMaterial).awaitTask()
+    }
+
+    suspend fun updateRawMaterial(rawMaterial: RawMaterial) {
+        db.collection("raw_materials").document(rawMaterial.type).set(rawMaterial).awaitTask()
+    }
+
+    suspend fun getRawMaterialByType(type: String): RawMaterial? {
+        return try {
+            db.collection("raw_materials").document(type).get().awaitTask().toObject(RawMaterial::class.java)
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    suspend fun getRawMaterialTransactionsForDate(date: String): List<RawMaterialTransaction> {
+        return try {
+            db.collection("raw_material_transactions")
+                .whereEqualTo("date", date)
+                .get()
+                .awaitTask()
+                .documents
+                .mapNotNull { it.toObject(RawMaterialTransaction::class.java) }
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
+
+    suspend fun insertRawMaterialTransaction(transaction: RawMaterialTransaction): Long {
+        val idToUse = if (transaction.id == 0) generateUniqueId() else transaction.id
+        val updated = transaction.copy(id = idToUse)
+        db.collection("raw_material_transactions").document(idToUse.toString()).set(updated).awaitTask()
+        return idToUse.toLong()
+    }
 
     suspend fun addRawMaterialTransactionAndUpdateStock(transaction: RawMaterialTransaction) {
-        val existingList = dao.getRawMaterialTransactionsForDate(transaction.date)
+        val existingList = getRawMaterialTransactionsForDate(transaction.date)
         val existing = existingList.find { it.materialType == transaction.materialType }
 
         if (existing != null) {
-            val material = dao.getRawMaterialByType(transaction.materialType)
+            val material = getRawMaterialByType(transaction.materialType)
             if (material != null) {
                 val oldNet = existing.added - existing.used
                 val newNet = transaction.added - transaction.used
                 val diff = newNet - oldNet
                 val newStock = maxOf(0.0, material.currentStock + diff)
-                dao.updateRawMaterial(material.copy(currentStock = newStock))
+                updateRawMaterial(material.copy(currentStock = newStock))
             }
-            dao.insertRawMaterialTransaction(transaction.copy(id = existing.id))
+            insertRawMaterialTransaction(transaction.copy(id = existing.id))
         } else {
-            dao.insertRawMaterialTransaction(transaction)
-            val material = dao.getRawMaterialByType(transaction.materialType)
+            insertRawMaterialTransaction(transaction)
+            val material = getRawMaterialByType(transaction.materialType)
             if (material != null) {
                 val netChange = transaction.added - transaction.used
                 val newStock = maxOf(0.0, material.currentStock + netChange)
-                dao.updateRawMaterial(material.copy(currentStock = newStock))
+                updateRawMaterial(material.copy(currentStock = newStock))
             } else {
                 val initialStock = maxOf(0.0, transaction.added - transaction.used)
-                dao.insertRawMaterial(RawMaterial(type = transaction.materialType, currentStock = initialStock))
+                insertRawMaterial(RawMaterial(type = transaction.materialType, currentStock = initialStock))
             }
         }
     }
 
-
     // --- MASTERBATCH ---
-    val allMasterbatchesFlow: Flow<List<Masterbatch>> = dao.getAllMasterbatchesFlow()
-    val allMasterbatchTransactionsFlow: Flow<List<MasterbatchTransaction>> = dao.getAllMasterbatchTransactionsFlow()
+    val allMasterbatchesFlow: Flow<List<Masterbatch>> = getCollectionFlow("masterbatches", Masterbatch::class.java)
+        .map { list -> list.sortedByDescending { it.id } }
 
-    suspend fun insertMasterbatch(masterbatch: Masterbatch): Long = dao.insertMasterbatch(masterbatch)
+    val allMasterbatchTransactionsFlow: Flow<List<MasterbatchTransaction>> = getCollectionFlow("masterbatch_transactions", MasterbatchTransaction::class.java)
+        .map { list -> list.sortedWith(compareByDescending<MasterbatchTransaction> { it.date }.thenByDescending { it.id }) }
 
-    suspend fun updateMasterbatch(masterbatch: Masterbatch) = dao.updateMasterbatch(masterbatch)
+    suspend fun insertMasterbatch(masterbatch: Masterbatch): Long {
+        val idToUse = if (masterbatch.id == 0) generateUniqueId() else masterbatch.id
+        val updated = masterbatch.copy(id = idToUse)
+        db.collection("masterbatches").document(idToUse.toString()).set(updated).awaitTask()
+        return idToUse.toLong()
+    }
 
-    suspend fun deleteMasterbatch(masterbatch: Masterbatch) = dao.deleteMasterbatch(masterbatch)
+    suspend fun updateMasterbatch(masterbatch: Masterbatch) {
+        db.collection("masterbatches").document(masterbatch.id.toString()).set(masterbatch).awaitTask()
+    }
+
+    suspend fun deleteMasterbatch(masterbatch: Masterbatch) {
+        db.collection("masterbatches").document(masterbatch.id.toString()).delete().awaitTask()
+    }
+
+    suspend fun getMasterbatchById(id: Int): Masterbatch? {
+        return try {
+            db.collection("masterbatches").document(id.toString()).get().awaitTask().toObject(Masterbatch::class.java)
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    suspend fun getMasterbatchTransactionsForDate(date: String): List<MasterbatchTransaction> {
+        return try {
+            db.collection("masterbatch_transactions")
+                .whereEqualTo("date", date)
+                .get()
+                .awaitTask()
+                .documents
+                .mapNotNull { it.toObject(MasterbatchTransaction::class.java) }
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
+
+    suspend fun insertMasterbatchTransaction(transaction: MasterbatchTransaction): Long {
+        val idToUse = if (transaction.id == 0) generateUniqueId() else transaction.id
+        val updated = transaction.copy(id = idToUse)
+        db.collection("masterbatch_transactions").document(idToUse.toString()).set(updated).awaitTask()
+        return idToUse.toLong()
+    }
 
     suspend fun addMasterbatchTransactionAndUpdateStock(transaction: MasterbatchTransaction) {
-        val existingList = dao.getMasterbatchTransactionsForDate(transaction.date)
+        val existingList = getMasterbatchTransactionsForDate(transaction.date)
         val existing = existingList.find { it.masterbatchId == transaction.masterbatchId }
 
         if (existing != null) {
-            val mb = dao.getMasterbatchById(transaction.masterbatchId)
+            val mb = getMasterbatchById(transaction.masterbatchId)
             if (mb != null) {
                 val oldNet = existing.bought - existing.used
                 val newNet = transaction.bought - transaction.used
                 val diff = newNet - oldNet
                 val newStock = maxOf(0.0, mb.currentStock + diff)
-                dao.updateMasterbatch(mb.copy(currentStock = newStock))
+                updateMasterbatch(mb.copy(currentStock = newStock))
             }
-            dao.insertMasterbatchTransaction(transaction.copy(id = existing.id))
+            insertMasterbatchTransaction(transaction.copy(id = existing.id))
         } else {
-            dao.insertMasterbatchTransaction(transaction)
-            val masterbatch = dao.getMasterbatchById(transaction.masterbatchId)
+            insertMasterbatchTransaction(transaction)
+            val masterbatch = getMasterbatchById(transaction.masterbatchId)
             if (masterbatch != null) {
                 val netChange = transaction.bought - transaction.used
                 val newStock = maxOf(0.0, masterbatch.currentStock + netChange)
-                dao.updateMasterbatch(masterbatch.copy(currentStock = newStock))
+                updateMasterbatch(masterbatch.copy(currentStock = newStock))
             }
         }
     }
-
 
     // --- WORKERS ---
-    val allWorkersFlow: Flow<List<Worker>> = dao.getAllWorkersFlow()
-    val allAttendanceFlow: Flow<List<WorkerAttendance>> = dao.getAllAttendanceFlow()
+    val allWorkersFlow: Flow<List<Worker>> = getCollectionFlow("workers", Worker::class.java)
+        .map { list -> list.sortedBy { it.name } }
 
-    suspend fun getAllWorkers(): List<Worker> = dao.getAllWorkers()
+    val allAttendanceFlow: Flow<List<WorkerAttendance>> = getCollectionFlow("worker_attendance", WorkerAttendance::class.java)
+        .map { list -> list.sortedWith(compareByDescending<WorkerAttendance> { it.date }.thenByDescending { it.id }) }
 
-    suspend fun insertWorker(worker: Worker): Long = dao.insertWorker(worker)
+    suspend fun getAllWorkers(): List<Worker> {
+        return try {
+            db.collection("workers").get().awaitTask().documents.mapNotNull { it.toObject(Worker::class.java) }
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
 
-    suspend fun updateWorker(worker: Worker) = dao.updateWorker(worker)
+    suspend fun insertWorker(worker: Worker): Long {
+        val idToUse = if (worker.id == 0) generateUniqueId() else worker.id
+        val updated = worker.copy(id = idToUse)
+        db.collection("workers").document(idToUse.toString()).set(updated).awaitTask()
+        return idToUse.toLong()
+    }
+
+    suspend fun updateWorker(worker: Worker) {
+        db.collection("workers").document(worker.id.toString()).set(worker).awaitTask()
+    }
+
+    suspend fun getWorkerById(id: Int): Worker? {
+        return try {
+            db.collection("workers").document(id.toString()).get().awaitTask().toObject(Worker::class.java)
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    suspend fun deleteAttendanceForWorkerOnDate(workerId: Int, date: String) {
+        try {
+            val querySnap = db.collection("worker_attendance")
+                .whereEqualTo("workerId", workerId)
+                .whereEqualTo("date", date)
+                .get()
+                .awaitTask()
+            for (doc in querySnap.documents) {
+                doc.reference.delete().awaitTask()
+            }
+        } catch (e: Exception) {
+            Log.e("InventoryRepository", "Error deleting attendance record: ${e.message}")
+        }
+    }
+
+    suspend fun getAttendanceForDate(date: String): List<WorkerAttendance> {
+        return try {
+            db.collection("worker_attendance")
+                .whereEqualTo("date", date)
+                .get()
+                .awaitTask()
+                .documents
+                .mapNotNull { it.toObject(WorkerAttendance::class.java) }
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
+
+    fun getAttendanceForDateFlow(date: String): Flow<List<WorkerAttendance>> = callbackFlow {
+        val listener = db.collection("worker_attendance")
+            .whereEqualTo("date", date)
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    close(error)
+                    return@addSnapshotListener
+                }
+                if (snapshot != null) {
+                    val items = snapshot.documents.mapNotNull { doc ->
+                        doc.toObject(WorkerAttendance::class.java)
+                    }
+                    trySend(items)
+                }
+            }
+        awaitClose { listener.remove() }
+    }
 
     suspend fun recordAttendance(attendance: WorkerAttendance) {
-        // Delete existing attendance for this worker on this date to overwrite
-        dao.deleteAttendanceForWorkerOnDate(attendance.workerId, attendance.date)
-        // Record new attendance
-        dao.insertAttendance(attendance)
+        deleteAttendanceForWorkerOnDate(attendance.workerId, attendance.date)
 
-        // If the worker has "Left" permanently, we also update their status in the Main Workers list
+        val idToUse = if (attendance.id == 0) generateUniqueId() else attendance.id
+        val updated = attendance.copy(id = idToUse)
+        db.collection("worker_attendance").document(idToUse.toString()).set(updated).awaitTask()
+
         if (attendance.status == "Left") {
-            val worker = dao.getWorkerById(attendance.workerId)
+            val worker = getWorkerById(attendance.workerId)
             if (worker != null && worker.isActive) {
-                dao.updateWorker(worker.copy(isActive = false, leaveDate = attendance.date))
+                updateWorker(worker.copy(isActive = false, leaveDate = attendance.date))
             }
         } else if (attendance.status == "On Duty") {
-            // Re-activate if they were inactive but are now marked on duty
-            val worker = dao.getWorkerById(attendance.workerId)
+            val worker = getWorkerById(attendance.workerId)
             if (worker != null && !worker.isActive) {
-                dao.updateWorker(worker.copy(isActive = true, leaveDate = null))
+                updateWorker(worker.copy(isActive = true, leaveDate = null))
             }
         }
     }
 
-    suspend fun getAttendanceForDate(date: String): List<WorkerAttendance> = dao.getAttendanceForDate(date)
+    // --- RANGE & ANALYTICAL QUERIES (Filtered custom-sorted in-memory for offline performance and zero complex indexes) ---
+    suspend fun getAttendanceForRange(startDate: String, endDate: String): List<WorkerAttendance> {
+        return try {
+            db.collection("worker_attendance").get().awaitTask().documents
+                .mapNotNull { it.toObject(WorkerAttendance::class.java) }
+                .filter { it.date in startDate..endDate }
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
 
-    fun getAttendanceForDateFlow(date: String): Flow<List<WorkerAttendance>> = dao.getAttendanceForDateFlow(date)
+    suspend fun getRawMaterialTransactionsForRange(startDate: String, endDate: String): List<RawMaterialTransaction> {
+        return try {
+            db.collection("raw_material_transactions").get().awaitTask().documents
+                .mapNotNull { it.toObject(RawMaterialTransaction::class.java) }
+                .filter { it.date in startDate..endDate }
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
 
-    suspend fun getAttendanceForRange(startDate: String, endDate: String): List<WorkerAttendance> =
-        dao.getAttendanceForRange(startDate, endDate)
-        
-    suspend fun getRawMaterialTransactionsForRange(startDate: String, endDate: String): List<RawMaterialTransaction> =
-        dao.getRawMaterialTransactionsForRange(startDate, endDate)
+    suspend fun getMasterbatchTransactionsForRange(startDate: String, endDate: String): List<MasterbatchTransaction> {
+        return try {
+            db.collection("masterbatch_transactions").get().awaitTask().documents
+                .mapNotNull { it.toObject(MasterbatchTransaction::class.java) }
+                .filter { it.date in startDate..endDate }
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
 
-    suspend fun getMasterbatchTransactionsForRange(startDate: String, endDate: String): List<MasterbatchTransaction> =
-        dao.getMasterbatchTransactionsForRange(startDate, endDate)
-
-    suspend fun getProductTransactionsForRange(startDate: String, endDate: String): List<ProductTransaction> =
-        dao.getProductTransactionsForRange(startDate, endDate)
+    suspend fun getProductTransactionsForRange(startDate: String, endDate: String): List<ProductTransaction> {
+        return try {
+            db.collection("product_transactions").get().awaitTask().documents
+                .mapNotNull { it.toObject(ProductTransaction::class.java) }
+                .filter { it.date in startDate..endDate }
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
 }

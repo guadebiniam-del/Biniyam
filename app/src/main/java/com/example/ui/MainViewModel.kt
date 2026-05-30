@@ -14,8 +14,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val repository: InventoryRepository
 
     init {
-        val database = AppDatabase.getDatabase(application, viewModelScope)
-        repository = InventoryRepository(database.inventoryDao())
+        repository = InventoryRepository()
     }
 
     // --- SENSITIVE DATE MANAGEMENT ---
