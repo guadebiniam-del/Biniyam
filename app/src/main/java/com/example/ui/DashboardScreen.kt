@@ -73,13 +73,13 @@ fun DashboardScreen(
             modifier = Modifier
                 .padding(innerPadding)
                 .fillMaxSize()
-                .background(BentoBg)
+                .background(Brush.verticalGradient(listOf(BentoBg, Color(0xFF050B14))))
         ) {
             // --- BENTO GRID STYLE INTEGRATED HEADER ---
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 12.dp)
+                    .padding(horizontal = 16.dp, vertical = 14.dp)
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -87,33 +87,44 @@ fun DashboardScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = "ANWAR",
+                                style = MaterialTheme.typography.displayMedium,
+                                fontWeight = FontWeight.Black,
+                                color = Color.White,
+                                letterSpacing = (-1).sp
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            // Glowing status dot - representing safe operational connection
+                            Box(
+                                modifier = Modifier
+                                    .padding(vertical = 4.dp)
+                                    .size(8.dp)
+                                    .background(BentoForestGreen, CircleShape)
+                            )
+                        }
                         Text(
-                            text = "Anwar",
-                            style = MaterialTheme.typography.headlineLarge,
-                            fontWeight = FontWeight.Black,
-                            color = BentoForestGreen,
-                            letterSpacing = (-0.5).sp
-                        )
-                        Text(
-                            text = "PLASTIC RECYCLE CO.",
+                            text = "RECYCLING OPERATIONS CONSOLE",
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.Bold,
                             color = BentoSubText,
-                            letterSpacing = 1.sp
+                            letterSpacing = 1.5.sp
                         )
                     }
 
                     // Soft Green Modern Rounded Icon Badge
                     Box(
                         modifier = Modifier
-                            .background(BentoSoftGreen, RoundedCornerShape(16.dp))
+                            .background(BentoSoftGreen.copy(alpha = 0.15f), RoundedCornerShape(12.dp))
+                            .border(1.dp, BentoForestGreen.copy(alpha = 0.3f), RoundedCornerShape(12.dp))
                             .padding(8.dp)
                     ) {
                         Icon(
                             Icons.Default.Home,
                             contentDescription = "Factory Hub",
                             tint = BentoForestGreen,
-                            modifier = Modifier.size(24.dp)
+                            modifier = Modifier.size(22.dp)
                         )
                     }
                 }
@@ -136,12 +147,12 @@ fun DashboardScreen(
                     Row(
                         modifier = Modifier
                             .clickable { showDatePickerDialog = true }
-                            .background(Color.White, RoundedCornerShape(12.dp))
+                            .background(Color(0xFF1E293B).copy(alpha = 0.5f), RoundedCornerShape(12.dp))
                             .border(1.dp, BentoBorder, RoundedCornerShape(12.dp))
-                            .padding(horizontal = 14.dp, vertical = 6.dp)
+                            .padding(horizontal = 14.dp, vertical = 7.dp)
                             .testTag("select_date_chip"),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Icon(
                             Icons.Default.DateRange,
@@ -151,7 +162,7 @@ fun DashboardScreen(
                         )
                         Text(
                             text = formatDateFriendly(selectedDate),
-                            style = MaterialTheme.typography.labelLarge,
+                            style = MaterialTheme.typography.bodyMedium,
                             fontWeight = FontWeight.Bold,
                             color = BentoTextDark
                         )
@@ -175,24 +186,35 @@ fun DashboardScreen(
                     val tabsList = listOf("Daily Overview", "Inventory", "Workers")
                     tabsList.forEach { tabName ->
                         val isSelected = activeTab == tabName
-                        val containerBg = if (isSelected) BentoForestGreen else Color.White
-                        val contentColor = if (isSelected) Color.White else BentoSubText
-                        val borderModifier = if (isSelected) Modifier else Modifier.border(1.dp, BentoBorder, CircleShape)
+                        
+                        // Premium color animation sequence
+                        val animatedBgColor by androidx.compose.animation.animateColorAsState(
+                            targetValue = if (isSelected) BentoForestGreen else Color(0xFF1E293B).copy(alpha = 0.5f),
+                            label = "tab_pill_bg"
+                        )
+                        val animatedTextColor by androidx.compose.animation.animateColorAsState(
+                            targetValue = if (isSelected) Color(0xFF0F172A) else BentoSubText,
+                            label = "tab_pill_text"
+                        )
+                        val animatedBorderColor by androidx.compose.animation.animateColorAsState(
+                            targetValue = if (isSelected) BentoForestGreen else BentoBorder,
+                            label = "tab_pill_border"
+                        )
 
                         Box(
                             modifier = Modifier
                                 .clip(CircleShape)
-                                .background(containerBg)
+                                .background(animatedBgColor)
                                 .clickable { activeTab = tabName }
-                                .then(borderModifier)
-                                .padding(horizontal = 16.dp, vertical = 8.dp)
+                                .border(1.dp, animatedBorderColor, CircleShape)
+                                .padding(horizontal = 18.dp, vertical = 8.dp)
                                 .testTag("tab_pill_$tabName")
                         ) {
                             Text(
                                 text = tabName,
                                 style = MaterialTheme.typography.labelLarge,
-                                fontWeight = FontWeight.Bold,
-                                color = contentColor
+                                fontWeight = FontWeight.Black,
+                                color = animatedTextColor
                             )
                         }
                     }
@@ -624,9 +646,9 @@ fun BentoGridOverviewPanel(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(16.dp),
             colors = CardDefaults.cardColors(
-                containerColor = if (isSunday) Color(0xFFFEF2F2) else Color(0xFFF0FDF4)
+                containerColor = if (isSunday) BentoAlertBg.copy(alpha = 0.15f) else BentoLightGreen.copy(alpha = 0.15f)
             ),
-            border = BorderStroke(1.dp, if (isSunday) Color(0xFFFCA5A5) else Color(0xFFFFE4E6).copy(alpha = 0.5f))
+            border = BorderStroke(1.dp, if (isSunday) BentoAlertBg.copy(alpha = 0.4f) else BentoForestGreen.copy(alpha = 0.4f))
         ) {
             Row(
                 modifier = Modifier
@@ -639,7 +661,7 @@ fun BentoGridOverviewPanel(
                     modifier = Modifier
                         .size(32.dp)
                         .background(
-                            if (isSunday) Color(0xFFFEE2E2) else Color(0xFFDCFCE7),
+                            if (isSunday) BentoAlertBg.copy(alpha = 0.3f) else BentoForestGreen.copy(alpha = 0.15f),
                             CircleShape
                         ),
                     contentAlignment = Alignment.Center
@@ -654,12 +676,12 @@ fun BentoGridOverviewPanel(
                         text = if (isSunday) "SUNDAY BREAK — OPERATIONS PAUSED" else "ACTIVE SHIFT RECORD",
                         style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.ExtraBold,
-                        color = if (isSunday) Color(0xFF991B1B) else Color(0xFF166534)
+                        color = if (isSunday) BentoAlertText else BentoForestGreen
                     )
                     Text(
                         text = if (isSunday) "All years work schedule operates Monday-Saturday. Enjoy your weekly rest!" else "Fill industrial bag production, weights, sales numbers and stock targets seamlessly.",
                         style = MaterialTheme.typography.labelSmall,
-                        color = if (isSunday) Color(0xFF7F1D1D) else Color(0xFF14532D)
+                        color = BentoSubText
                     )
                 }
             }
@@ -673,26 +695,26 @@ fun BentoGridOverviewPanel(
             Card(
                 modifier = Modifier.weight(1f),
                 shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(containerColor = BentoLightGreen),
-                border = BorderStroke(1.dp, BentoInnerBorder)
+                colors = CardDefaults.cardColors(containerColor = BentoLightGreen.copy(alpha = 0.2f)),
+                border = BorderStroke(1.dp, BentoForestGreen.copy(alpha = 0.3f))
             ) {
                 Column(modifier = Modifier.padding(14.dp)) {
                     Text("TOTAL PRODUCED", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.ExtraBold, color = BentoForestGreen)
                     Spacer(modifier = Modifier.height(4.dp))
-                    Text("${todayKgProduced.toInt()} KG", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Black, color = BentoForestGreen)
+                    Text("${todayKgProduced.toInt()} KG", style = MaterialTheme.typography.displayMedium, fontWeight = FontWeight.Black, color = BentoForestGreen)
                     Text("Fabricated Today", style = MaterialTheme.typography.labelSmall, color = BentoSubText)
                 }
             }
             Card(
                 modifier = Modifier.weight(1f),
                 shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(containerColor = BentoInfoBg),
-                border = BorderStroke(1.dp, Color(0xFFD1E4FF))
+                colors = CardDefaults.cardColors(containerColor = BentoInfoBg.copy(alpha = 0.2f)),
+                border = BorderStroke(1.dp, BentoInfoText.copy(alpha = 0.3f))
             ) {
                 Column(modifier = Modifier.padding(14.dp)) {
                     Text("TOTAL SOLD", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.ExtraBold, color = BentoInfoText)
                     Spacer(modifier = Modifier.height(4.dp))
-                    Text("${todayKgSold.toInt()} KG", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Black, color = BentoInfoText)
+                    Text("${todayKgSold.toInt()} KG", style = MaterialTheme.typography.displayMedium, fontWeight = FontWeight.Black, color = BentoInfoText)
                     Text("Shipped Today", style = MaterialTheme.typography.labelSmall, color = BentoSubText)
                 }
             }
@@ -702,7 +724,7 @@ fun BentoGridOverviewPanel(
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(24.dp),
-            colors = CardDefaults.cardColors(containerColor = Color(0xFFF7F8F6)),
+            colors = CardDefaults.cardColors(containerColor = BentoNeutralGray),
             border = BorderStroke(1.dp, BentoBorder)
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
@@ -720,13 +742,13 @@ fun BentoGridOverviewPanel(
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text("WEEKLY TOTALS", style = MaterialTheme.typography.labelSmall, color = BentoSubText, fontWeight = FontWeight.Bold)
-                        Text("${weekKg.toInt()} kg", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.ExtraBold, color = BentoTextDark)
+                        Text("${weekKg.toInt()} kg", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.ExtraBold, color = BentoTextDark)
                         Text("$weekBags bags fabricated", style = MaterialTheme.typography.labelSmall, color = BentoSubText)
                     }
                     Box(modifier = Modifier.width(1.dp).height(50.dp).background(BentoBorder))
                     Column(modifier = Modifier.weight(1f)) {
                         Text("MONTHLY TOTALS", style = MaterialTheme.typography.labelSmall, color = BentoSubText, fontWeight = FontWeight.Bold)
-                        Text("${monthKg.toInt()} kg", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.ExtraBold, color = BentoTextDark)
+                        Text("${monthKg.toInt()} kg", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.ExtraBold, color = BentoTextDark)
                         Text("$monthBags bags fabricated", style = MaterialTheme.typography.labelSmall, color = BentoSubText)
                     }
                 }
@@ -739,7 +761,7 @@ fun BentoGridOverviewPanel(
                 .fillMaxWidth()
                 .testTag("shift_sheet_card"),
             shape = RoundedCornerShape(24.dp),
-            colors = CardDefaults.cardColors(containerColor = Color.White),
+            colors = CardDefaults.cardColors(containerColor = BentoNeutralGray),
             border = BorderStroke(1.dp, BentoBorder)
         ) {
             Column(
@@ -817,7 +839,7 @@ fun BentoGridOverviewPanel(
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(containerColor = Color(0xFFFBFDFA)),
+                        colors = CardDefaults.cardColors(containerColor = BentoBg.copy(alpha = 0.5f)),
                         border = BorderStroke(1.dp, BentoBorder.copy(alpha = 0.5f))
                     ) {
                         Column(
@@ -843,8 +865,8 @@ fun BentoGridOverviewPanel(
                                     ) {
                                         Box(
                                             modifier = Modifier
-                                                .background(BentoLightGreen, RoundedCornerShape(4.dp))
-                                                .padding(horizontal = 4.dp, vertical = 2.dp)
+                                                .background(BentoLightGreen.copy(alpha = 0.3f), RoundedCornerShape(6.dp))
+                                                .padding(horizontal = 6.dp, vertical = 2.dp)
                                         ) {
                                             Text("Size: ${product.size}", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = BentoForestGreen)
                                         }
@@ -901,8 +923,8 @@ fun BentoGridOverviewPanel(
                                         modifier = Modifier.height(48.dp).fillMaxWidth().testTag("sheet_fab_input_${product.id}"),
                                         shape = RoundedCornerShape(8.dp),
                                         colors = OutlinedTextFieldDefaults.colors(
-                                            focusedContainerColor = Color.White,
-                                            unfocusedContainerColor = Color.White,
+                                            focusedContainerColor = BentoNeutralGray,
+                                            unfocusedContainerColor = BentoNeutralGray,
                                             focusedBorderColor = BentoForestGreen,
                                             unfocusedBorderColor = BentoBorder
                                         )
@@ -928,8 +950,8 @@ fun BentoGridOverviewPanel(
                                         modifier = Modifier.height(48.dp).fillMaxWidth().testTag("sheet_sold_input_${product.id}"),
                                         shape = RoundedCornerShape(8.dp),
                                         colors = OutlinedTextFieldDefaults.colors(
-                                            focusedContainerColor = Color.White,
-                                            unfocusedContainerColor = Color.White,
+                                            focusedContainerColor = BentoNeutralGray,
+                                            unfocusedContainerColor = BentoNeutralGray,
                                             focusedBorderColor = BentoForestGreen,
                                             unfocusedBorderColor = BentoBorder
                                         )
@@ -949,7 +971,7 @@ fun BentoGridOverviewPanel(
                                             .size(36.dp)
                                             .clip(RoundedCornerShape(8.dp))
                                             .background(
-                                                if (isSaved) Color(0xFFDCFCE7) else BentoForestGreen
+                                                if (isSaved) Color(0xFF065F46) else BentoForestGreen
                                             ).testTag("sheet_save_btn_${product.id}")
                                     ) {
                                         Icon(
@@ -968,7 +990,11 @@ fun BentoGridOverviewPanel(
                 // Card total summation line
                 HorizontalDivider(color = BentoBorder.copy(alpha = 0.5f))
                 Column(
-                    modifier = Modifier.fillMaxWidth().background(Color(0xFFF1F5F0), RoundedCornerShape(12.dp)).padding(12.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(BentoLightGreen.copy(alpha = 0.15f), RoundedCornerShape(12.dp))
+                        .border(1.dp, BentoForestGreen.copy(alpha = 0.2f), RoundedCornerShape(12.dp))
+                        .padding(12.dp),
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     Text("DAILY SHEET GRAND TOTALS", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Black, color = BentoForestGreen)
@@ -1009,7 +1035,7 @@ fun BentoGridOverviewPanel(
                     .height(180.dp)
                     .testTag("bento_feedstock_card"),
                 shape = RoundedCornerShape(24.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
+                colors = CardDefaults.cardColors(containerColor = BentoNeutralGray),
                 border = BorderStroke(1.dp, BentoBorder)
             ) {
                 Column(
@@ -1072,7 +1098,8 @@ fun BentoGridOverviewPanel(
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .background(Color(0xFFF1F3EE), RoundedCornerShape(8.dp))
+                            .background(BentoLightGreen.copy(alpha = 0.15f), RoundedCornerShape(8.dp))
+                            .border(1.dp, BentoForestGreen.copy(alpha = 0.15f), RoundedCornerShape(8.dp))
                             .padding(vertical = 4.dp),
                         contentAlignment = Alignment.Center
                     ) {
@@ -1081,7 +1108,7 @@ fun BentoGridOverviewPanel(
                             text = "${String.format("%.1ft", totalStockKg)} Total Stock",
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.Bold,
-                            color = BentoTextDark
+                            color = BentoForestGreen
                         )
                     }
                 }
@@ -1094,7 +1121,7 @@ fun BentoGridOverviewPanel(
                     .height(180.dp)
                     .testTag("bento_masterbatch_card"),
                 shape = RoundedCornerShape(24.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
+                colors = CardDefaults.cardColors(containerColor = BentoNeutralGray),
                 border = BorderStroke(1.dp, BentoBorder)
             ) {
                 val totalMasterbatchUsed = masterbatches.sumOf { mb -> stats.masterbatchSummary[mb.id]?.used ?: 0.0 }
@@ -1121,8 +1148,8 @@ fun BentoGridOverviewPanel(
                         Box(
                             modifier = Modifier
                                 .size(50.dp)
-                                .border(4.dp, BentoLightGreen, CircleShape)
-                                .border(2.dp, Color.White, CircleShape),
+                                .border(3.dp, BentoForestGreen.copy(alpha = 0.4f), CircleShape)
+                                .border(1.5.dp, BentoForestGreen, CircleShape),
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
@@ -1158,10 +1185,7 @@ fun BentoGridOverviewPanel(
                         Text("Refill", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
                     }
                 }
-            }
-        }
-
-        // --- ROW 3: WORKERS ON DUTY (SPAN-6) ---
+                  // --- ROW 3: WORKERS ON DUTY (SPAN-6) ---
         val workingCount = attendanceList.count { it.status == "On Duty" }.let { if (it > 0) it else 28 }
         val breakCount = attendanceList.count { it.status == "On Break" }.let { if (it > 0) it else 3 }
         val absCount = attendanceList.count { it.status == "Absent" }.let { if (it > 0) it else 0 }
@@ -1173,7 +1197,8 @@ fun BentoGridOverviewPanel(
                 .height(84.dp)
                 .testTag("bento_workers_banner_card"),
             shape = RoundedCornerShape(24.dp),
-            colors = CardDefaults.cardColors(containerColor = BentoNeutralGray)
+            colors = CardDefaults.cardColors(containerColor = BentoNeutralGray),
+            border = BorderStroke(1.dp, BentoBorder)
         ) {
             Row(
                 modifier = Modifier
@@ -1189,7 +1214,7 @@ fun BentoGridOverviewPanel(
                     Box(
                         modifier = Modifier
                             .size(36.dp)
-                            .background(BentoSoftGreen, CircleShape)
+                            .background(BentoForestGreen.copy(alpha = 0.15f), CircleShape)
                             .border(2.dp, BentoNeutralGray, CircleShape),
                         contentAlignment = Alignment.Center
                     ) {
@@ -1198,7 +1223,7 @@ fun BentoGridOverviewPanel(
                     Box(
                         modifier = Modifier
                             .size(36.dp)
-                            .background(Color(0xFFB5C9A7), CircleShape)
+                            .background(BentoForestGreen.copy(alpha = 0.3f), CircleShape)
                             .border(2.dp, BentoNeutralGray, CircleShape),
                         contentAlignment = Alignment.Center
                     ) {
@@ -1233,7 +1258,7 @@ fun BentoGridOverviewPanel(
 
                 Box(
                     modifier = Modifier
-                        .background(Color.White, RoundedCornerShape(14.dp))
+                        .background(BentoForestGreen.copy(alpha = 0.15f), RoundedCornerShape(14.dp))
                         .padding(8.dp)
                 ) {
                     Icon(
@@ -1258,8 +1283,8 @@ fun BentoGridOverviewPanel(
                     .height(72.dp)
                     .testTag("bento_adjustments_card"),
                 shape = RoundedCornerShape(24.dp),
-                colors = CardDefaults.cardColors(containerColor = BentoAlertBg),
-                border = BorderStroke(1.dp, Color(0xFFF9D4D1))
+                colors = CardDefaults.cardColors(containerColor = BentoAlertBg.copy(alpha = 0.15f)),
+                border = BorderStroke(1.dp, BentoAlertBg.copy(alpha = 0.4f))
             ) {
                 Row(
                     modifier = Modifier
@@ -1270,7 +1295,7 @@ fun BentoGridOverviewPanel(
                 ) {
                     Box(
                         modifier = Modifier
-                            .background(Color(0xFFFFDAD6), RoundedCornerShape(10.dp))
+                            .background(BentoAlertBg.copy(alpha = 0.3f), RoundedCornerShape(10.dp))
                             .padding(6.dp)
                     ) {
                         Icon(
@@ -1292,7 +1317,7 @@ fun BentoGridOverviewPanel(
                             text = badgeTextValue,
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.Bold,
-                            color = Color(0xFF93000A)
+                            color = BentoAlertText
                         )
                     }
                 }
@@ -1305,8 +1330,8 @@ fun BentoGridOverviewPanel(
                     .height(72.dp)
                     .testTag("bento_sales_card"),
                 shape = RoundedCornerShape(24.dp),
-                colors = CardDefaults.cardColors(containerColor = BentoInfoBg),
-                border = BorderStroke(1.dp, Color(0xFFB1CCF8))
+                colors = CardDefaults.cardColors(containerColor = BentoInfoBg.copy(alpha = 0.15f)),
+                border = BorderStroke(1.dp, BentoInfoText.copy(alpha = 0.4f))
             ) {
                 Row(
                     modifier = Modifier
@@ -1317,7 +1342,7 @@ fun BentoGridOverviewPanel(
                 ) {
                     Box(
                         modifier = Modifier
-                            .background(Color(0xFFD1E4FF), RoundedCornerShape(10.dp))
+                            .background(BentoInfoBg.copy(alpha = 0.3f), RoundedCornerShape(10.dp))
                             .padding(6.dp)
                     ) {
                         Icon(
@@ -1342,6 +1367,7 @@ fun BentoGridOverviewPanel(
                         )
                     }
                 }
+            }  }
             }
         }
     }
@@ -1416,11 +1442,9 @@ fun ProductStockCard(
         modifier = Modifier
             .fillMaxWidth()
             .testTag("product_card_${product.id}"),
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        ),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = BentoNeutralGray),
+        border = BorderStroke(1.dp, BentoBorder)
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
             Row(
@@ -1433,27 +1457,32 @@ fun ProductStockCard(
                         text = product.name,
                         style = MaterialTheme.typography.bodyLarge,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = BentoTextDark
                     )
+                    Spacer(modifier = Modifier.height(4.dp))
                     Row(
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        AssistChip(
-                            onClick = {},
-                            label = { Text("Size: ${product.size}") },
-                            colors = AssistChipDefaults.assistChipColors(labelColor = MaterialTheme.colorScheme.onSurfaceVariant)
-                        )
-                        AssistChip(
-                            onClick = {},
-                            label = { Text("Color: ${product.color}") },
-                            colors = AssistChipDefaults.assistChipColors(labelColor = MaterialTheme.colorScheme.onSurfaceVariant)
-                        )
+                        Box(
+                            modifier = Modifier
+                                .background(BentoLightGreen.copy(alpha = 0.2f), RoundedCornerShape(6.dp))
+                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                        ) {
+                            Text("Size: ${product.size}", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = BentoForestGreen)
+                        }
+                        Box(
+                            modifier = Modifier
+                                .background(BentoInfoBg.copy(alpha = 0.2f), RoundedCornerShape(6.dp))
+                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                        ) {
+                            Text("Color: ${product.color}", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = BentoInfoText)
+                        }
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(
                             text = "1 Bag = ${product.bagWeightKg} kg",
                             style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = BentoSubText
                         )
                     }
                 }
@@ -1463,59 +1492,57 @@ fun ProductStockCard(
                     Icon(
                         Icons.Default.Delete,
                         contentDescription = "Remove Product",
-                        tint = MaterialTheme.colorScheme.error.copy(alpha = 0.6f),
+                        tint = BentoAlertText.copy(alpha = 0.6f),
                         modifier = Modifier.size(18.dp)
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(10.dp))
 
             // Stats breakdown
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(
-                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
-                        RoundedCornerShape(8.dp)
-                    )
+                    .background(BentoBg.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
+                    .border(1.dp, BentoBorder.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
                     .padding(8.dp),
                 horizontalArrangement = Arrangement.SpaceAround
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("FABRICATED", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("FABRICATED", style = MaterialTheme.typography.labelSmall, color = BentoSubText, fontWeight = FontWeight.Bold)
                     Text(
                         text = "+${stats.fabricated} bags",
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary
+                        color = BentoForestGreen
                     )
                 }
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("SOLD", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("SOLD", style = MaterialTheme.typography.labelSmall, color = BentoSubText, fontWeight = FontWeight.Bold)
                     Text(
                         text = "-${stats.sold} bags",
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.error
+                        color = BentoAlertText
                     )
                 }
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("ADJUSTED", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("ADJUSTED", style = MaterialTheme.typography.labelSmall, color = BentoSubText, fontWeight = FontWeight.Bold)
                     Text(
                         text = "${if (stats.adjusted >= 0) "+" else ""}${stats.adjusted}",
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.Bold,
-                        color = if (stats.adjusted >= 0) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.error
+                        color = if (stats.adjusted >= 0) BentoTextDark else BentoAlertText
                     )
                 }
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("IN STOCK", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("IN STOCK", style = MaterialTheme.typography.labelSmall, color = BentoSubText, fontWeight = FontWeight.Bold)
                     Text(
                         text = "${product.currentStock} bags",
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.ExtraBold,
-                        color = if (product.currentStock > 10) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
+                        color = if (product.currentStock > 10) BentoForestGreen else BentoAlertText
                     )
                 }
             }
@@ -1531,8 +1558,8 @@ fun ProductStockCard(
                     .testTag("record_product_btn_${product.id}"),
                 shape = RoundedCornerShape(8.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                    containerColor = BentoLightGreen,
+                    contentColor = BentoForestGreen
                 ),
                 contentPadding = PaddingValues(0.dp)
             ) {
@@ -1555,16 +1582,14 @@ fun RawMaterialMiniCard(
 ) {
     Card(
         modifier = modifier.testTag("raw_material_card_${type}"),
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        ),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = BentoNeutralGray),
+        border = BorderStroke(1.dp, BentoBorder)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(8.dp)
+                .padding(10.dp)
         ) {
             // Header
             Row(
@@ -1576,7 +1601,7 @@ fun RawMaterialMiniCard(
                     text = type,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Black,
-                    color = MaterialTheme.colorScheme.primary
+                    color = BentoForestGreen
                 )
                 IconButton(
                     onClick = onRecordClick,
@@ -1585,7 +1610,7 @@ fun RawMaterialMiniCard(
                     Icon(
                         Icons.Default.Add,
                         contentDescription = "Add log",
-                        tint = MaterialTheme.colorScheme.primary,
+                        tint = BentoForestGreen,
                         modifier = Modifier.size(16.dp)
                     )
                 }
@@ -1594,30 +1619,30 @@ fun RawMaterialMiniCard(
             Spacer(modifier = Modifier.height(4.dp))
 
             // Current stock
-            Text("Left in Stock:", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("Left in Stock:", style = MaterialTheme.typography.labelSmall, color = BentoSubText)
             Text(
                 text = "${rawMaterial.currentStock.toInt()} kg",
                 style = MaterialTheme.typography.bodyLarge,
                 fontWeight = FontWeight.Black,
-                color = MaterialTheme.colorScheme.onSurface
+                color = BentoTextDark
             )
 
             HorizontalDivider(
-                modifier = Modifier.padding(vertical = 4.dp),
-                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                modifier = Modifier.padding(vertical = 6.dp),
+                color = BentoBorder.copy(alpha = 0.5f)
             )
 
             // Dynamic Stats for scope
             Text(
                 text = "Used: -${used.toInt()} kg",
                 style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.error,
+                color = BentoAlertText,
                 fontWeight = FontWeight.SemiBold
             )
             Text(
                 text = "Added: +${added.toInt()} kg",
                 style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.primary,
+                color = BentoForestGreen,
                 fontWeight = FontWeight.SemiBold
             )
         }
@@ -1635,11 +1660,9 @@ fun MasterbatchCard(
         modifier = Modifier
             .fillMaxWidth()
             .testTag("masterbatch_card_${masterbatch.id}"),
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        ),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = BentoNeutralGray),
+        border = BorderStroke(1.dp, BentoBorder)
     ) {
         Row(
             modifier = Modifier
@@ -1655,7 +1678,7 @@ fun MasterbatchCard(
                         color = getMasterbatchColor(masterbatch.color),
                         shape = CircleShape
                     )
-                    .border(1.dp, MaterialTheme.colorScheme.outlineVariant, CircleShape)
+                    .border(1.5.dp, BentoBorder, CircleShape)
             )
 
             Spacer(modifier = Modifier.width(12.dp))
@@ -1665,7 +1688,7 @@ fun MasterbatchCard(
                     text = "${masterbatch.color} Pigment Masterbatch",
                     style = MaterialTheme.typography.bodyLarge,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
+                    color = BentoTextDark
                 )
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(16.dp),
@@ -1674,18 +1697,18 @@ fun MasterbatchCard(
                     Text(
                         text = "Used: -${stats.used.toInt()} kg",
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.error
+                        color = BentoAlertText
                     )
                     Text(
                         text = "Bought: +${stats.bought.toInt()} kg",
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.primary
+                        color = BentoForestGreen
                     )
                     Text(
                         text = "Stock: ${masterbatch.currentStock.toInt()} kg left",
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = BentoTextDark
                     )
                 }
             }
@@ -1696,7 +1719,7 @@ fun MasterbatchCard(
                     Icon(
                         Icons.Default.Add,
                         contentDescription = "Add activity log",
-                        tint = MaterialTheme.colorScheme.primary,
+                        tint = BentoForestGreen,
                         modifier = Modifier.size(20.dp)
                     )
                 }
@@ -1704,7 +1727,7 @@ fun MasterbatchCard(
                     Icon(
                         Icons.Default.Delete,
                         contentDescription = "Delete",
-                        tint = MaterialTheme.colorScheme.error.copy(alpha = 0.5f),
+                        tint = BentoAlertText.copy(alpha = 0.6f),
                         modifier = Modifier.size(18.dp)
                     )
                 }
