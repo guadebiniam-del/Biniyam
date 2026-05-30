@@ -510,35 +510,18 @@ fun BentoGridOverviewPanel(
     val allTransactions = viewModel.allProductTransactions.collectAsStateWithLifecycle().value
 
     // Let's compute weekly and monthly targets based on selectedDateStr and allTransactions
-    val sdf = remember { SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()) }
-    val calendar = remember(selectedDateStr) {
-        Calendar.getInstance().apply {
-            try {
-                val refDate = sdf.parse(selectedDateStr)
-                if (refDate != null) time = refDate
-            } catch (e: Exception) {}
-        }
+    val isSunday = remember(selectedDateStr) {
+        val parts = selectedDateStr.split("-")
+        val ethYear = parts.getOrNull(0)?.toIntOrNull() ?: 2018
+        val ethMonth = parts.getOrNull(1)?.toIntOrNull() ?: 9
+        val ethDay = parts.getOrNull(2)?.toIntOrNull() ?: 22
+        val jdn = EthiopianCalendarHelper.ethiopianToJdn(ethYear, ethMonth, ethDay)
+        (jdn + 1) % 7 == 0
     }
-
-    // Is today Sunday?
-    val isSunday = calendar.get(Calendar.DAY_OF_WEEK) == Calendar.SUNDAY
 
     // Calculate Week Range for Week totals
     val (weekBags, weekKg) = remember(allTransactions, products, selectedDateStr) {
-        val calWeek = Calendar.getInstance().apply {
-            try {
-                val refDate = sdf.parse(selectedDateStr)
-                if (refDate != null) time = refDate
-            } catch (e: Exception) {}
-            firstDayOfWeek = Calendar.MONDAY
-            set(Calendar.DAY_OF_WEEK, Calendar.MONDAY)
-        }
-        val startStr = sdf.format(calWeek.time)
-        val endStr = Calendar.getInstance().apply {
-            time = calWeek.time
-            add(Calendar.DATE, 6)
-        }.let { sdf.format(it.time) }
-
+        val (startStr, endStr) = EthiopianCalendarHelper.getRangeForEthiopianPeriod(selectedDateStr, "WEEKLY")
         val weekTrans = allTransactions.filter { it.date in startStr..endStr }
         val bags = weekTrans.sumOf { it.fabricated }
         val kg = weekTrans.sumOf { t ->
@@ -550,19 +533,7 @@ fun BentoGridOverviewPanel(
 
     // Calculate Month Range for Month totals
     val (monthBags, monthKg) = remember(allTransactions, products, selectedDateStr) {
-        val calMonth = Calendar.getInstance().apply {
-            try {
-                val refDate = sdf.parse(selectedDateStr)
-                if (refDate != null) time = refDate
-            } catch (e: Exception) {}
-            set(Calendar.DAY_OF_MONTH, 1)
-        }
-        val startStr = sdf.format(calMonth.time)
-        val endStr = Calendar.getInstance().apply {
-            time = calMonth.time
-            set(Calendar.DAY_OF_MONTH, calMonth.getActualMaximum(Calendar.DAY_OF_MONTH))
-        }.let { sdf.format(it.time) }
-
+        val (startStr, endStr) = EthiopianCalendarHelper.getRangeForEthiopianPeriod(selectedDateStr, "MONTHLY")
         val monthTrans = allTransactions.filter { it.date in startStr..endStr }
         val bags = monthTrans.sumOf { it.fabricated }
         val kg = monthTrans.sumOf { t ->
@@ -2244,79 +2215,257 @@ fun DatePickerFallbackDialog(
     onDismiss: () -> Unit,
     onDateConfirm: (String) -> Unit
 ) {
-    var yearStr by remember { mutableStateOf(currentDate.split("-").getOrElse(0) { "2026" }) }
-    var monthStr by remember { mutableStateOf(currentDate.split("-").getOrElse(1) { "05" }) }
-    var dayStr by remember { mutableStateOf(currentDate.split("-").getOrElse(2) { "29" }) }
+    val initialParts = currentDate.split("-")
+    var y by remember { mutableStateOf(initialParts.getOrNull(0)?.toIntOrNull() ?: 2018) }
+    var m by remember { mutableStateOf(initialParts.getOrNull(1)?.toIntOrNull() ?: 9) }
+    var d by remember { mutableStateOf(initialParts.getOrNull(2)?.toIntOrNull() ?: 22) }
+
+    val todayParts = remember { EthiopianCalendarHelper.getTodayEthiopianString().split("-") }
+    val todayYear = todayParts.getOrNull(0)?.toIntOrNull() ?: 2018
+    val todayMonth = todayParts.getOrNull(1)?.toIntOrNull() ?: 9
+    val todayDay = todayParts.getOrNull(2)?.toIntOrNull() ?: 22
+
+    val maxDay = remember(y, m) {
+        if (m == 13) {
+            if (EthiopianCalendarHelper.isEthiopianLeapYear(y)) 6 else 5
+        } else {
+            30
+        }
+    }
+
+    LaunchedEffect(maxDay) {
+        if (d > maxDay) {
+            d = maxDay
+        }
+    }
+
+    val startWeekday = remember(y, m) {
+        val firstDayJdn = EthiopianCalendarHelper.ethiopianToJdn(y, m, 1)
+        (firstDayJdn + 1) % 7
+    }
 
     Dialog(onDismissRequest = onDismiss) {
         Card(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(16.dp),
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+            shape = RoundedCornerShape(24.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.White),
+            border = BorderStroke(1.dp, BentoBorder)
         ) {
             Column(
-                modifier = Modifier.padding(16.dp),
+                modifier = Modifier.padding(18.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
                 Text(
-                    "Set Calendar Day Tracker",
+                    text = "የቀን መምረጫ (Date Picker)",
                     style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.Bold,
+                    color = BentoForestGreen
                 )
 
+                // Month / Year selector header
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    OutlinedTextField(
-                        value = yearStr,
-                        onValueChange = { yearStr = it },
-                        label = { Text("Year") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        modifier = Modifier
-                            .weight(1f)
-                            .testTag("dp_year")
-                    )
-                    OutlinedTextField(
-                        value = monthStr,
-                        onValueChange = { monthStr = it },
-                        label = { Text("Month") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        modifier = Modifier
-                            .weight(1f)
-                            .testTag("dp_month")
-                    )
-                    OutlinedTextField(
-                        value = dayStr,
-                        onValueChange = { dayStr = it },
-                        label = { Text("Day") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        modifier = Modifier
-                            .weight(1f)
-                            .testTag("dp_day")
-                    )
-                }
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End,
+                    horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    TextButton(onClick = onDismiss) { Text("Cancel") }
-                    Button(
+                    IconButton(
                         onClick = {
-                            val y = yearStr.toIntOrNull() ?: 2026
-                            val m = (monthStr.toIntOrNull() ?: 5).coerceIn(1, 12)
-                            val d = (dayStr.toIntOrNull() ?: 29).coerceIn(1, 31)
-                            val formatted = String.format("%04d-%02d-%02d", y, m, d)
-                            onDateConfirm(formatted)
-                        },
-                        modifier = Modifier.testTag("dp_submit")
+                            if (m == 1) {
+                                m = 13
+                                y--
+                            } else {
+                                m--
+                            }
+                        }
                     ) {
-                        Text("Apply")
+                        Icon(
+                            imageVector = Icons.Default.KeyboardArrowLeft,
+                            contentDescription = "Previous Month",
+                            tint = BentoForestGreen
+                        )
+                    }
+
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        val currentMonthName = EthiopianCalendarHelper.ETHIOPIAN_MONTHS.getOrNull(m - 1) ?: ""
+                        Text(
+                            text = currentMonthName,
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Black,
+                            color = BentoTextDark
+                        )
+                        Text(
+                            text = "$y ዓ.ም.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = BentoSubText
+                        )
+                    }
+
+                    IconButton(
+                        onClick = {
+                            if (m == 13) {
+                                m = 1
+                                y++
+                            } else {
+                                m++
+                            }
+                        }
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.KeyboardArrowRight,
+                            contentDescription = "Next Month",
+                            tint = BentoForestGreen
+                        )
+                    }
+                }
+
+                // Quick Year shifting
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterHorizontally),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    OutlinedButton(
+                        onClick = { if (y > 2000) y-- },
+                        modifier = Modifier.height(32.dp).testTag("dp_prev_year_btn"),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = BentoForestGreen),
+                        border = BorderStroke(1.dp, BentoBorder),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                    ) {
+                        Text("-1 ዓመት", style = MaterialTheme.typography.labelSmall)
+                    }
+                    OutlinedButton(
+                        onClick = { if (y < 2100) y++ },
+                        modifier = Modifier.height(32.dp).testTag("dp_next_year_btn"),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = BentoForestGreen),
+                        border = BorderStroke(1.dp, BentoBorder),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                    ) {
+                        Text("+1 ዓመት", style = MaterialTheme.typography.labelSmall)
+                    }
+                }
+
+                HorizontalDivider(color = BentoBorder.copy(alpha = 0.5f))
+
+                // Short weekdays block
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    val amharicShortWeekdays = listOf("እሁድ", "ሰኞ", "ማክሰኞ", "ረቡዕ", "ሐሙስ", "አርብ", "ቅዳሜ")
+                    amharicShortWeekdays.forEach { wd ->
+                        Text(
+                            text = wd.take(3), // Limit width safely
+                            modifier = Modifier.weight(1f),
+                            textAlign = TextAlign.Center,
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = BentoSubText
+                        )
+                    }
+                }
+
+                // Grid of Days
+                val totalSlots = startWeekday + maxDay
+                val rowsCount = (totalSlots + 6) / 7
+
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    for (r in 0 until rowsCount) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            for (c in 0 until 7) {
+                                val slotIndex = r * 7 + c
+                                if (slotIndex < startWeekday || slotIndex >= totalSlots) {
+                                    Spacer(modifier = Modifier.weight(1f))
+                                } else {
+                                    val dayNum = slotIndex - startWeekday + 1
+                                    val isSelectedDay = (dayNum == d)
+                                    val isToday = (y == todayYear && m == todayMonth && dayNum == todayDay)
+
+                                    Box(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .aspectRatio(1f)
+                                            .clip(CircleShape)
+                                            .background(
+                                                when {
+                                                    isSelectedDay -> BentoForestGreen
+                                                    isToday -> BentoSoftGreen
+                                                    else -> Color.Transparent
+                                                }
+                                            )
+                                            .border(
+                                                width = if (isToday && !isSelectedDay) 1.dp else 0.dp,
+                                                color = if (isToday && !isSelectedDay) BentoForestGreen else Color.Transparent,
+                                                shape = CircleShape
+                                            )
+                                            .clickable {
+                                                d = dayNum
+                                            },
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = dayNum.toString(),
+                                            style = MaterialTheme.typography.bodySmall,
+                                            fontWeight = if (isSelectedDay || isToday) FontWeight.Bold else FontWeight.Normal,
+                                            color = when {
+                                                isSelectedDay -> Color.White
+                                                isToday -> BentoForestGreen
+                                                else -> BentoTextDark
+                                            }
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                HorizontalDivider(color = BentoBorder.copy(alpha = 0.5f))
+
+                // Bottom actions row
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    TextButton(
+                        onClick = {
+                            y = todayYear
+                            m = todayMonth
+                            d = todayDay
+                        },
+                        modifier = Modifier.testTag("dp_today_btn")
+                    ) {
+                        Text("ዛሬ (Today)", color = BentoForestGreen, fontWeight = FontWeight.Bold)
+                    }
+
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        TextButton(onClick = onDismiss) {
+                            Text("Cancel", color = BentoSubText)
+                        }
+                        Button(
+                            onClick = {
+                                val formatted = String.format(Locale.US, "%04d-%02d-%02d", y, m, d)
+                                onDateConfirm(formatted)
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = BentoForestGreen),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.testTag("dp_submit")
+                        ) {
+                            Text("Apply")
+                        }
                     }
                 }
             }
@@ -2328,24 +2477,17 @@ fun DatePickerFallbackDialog(
 // --- UTILITIES & COLOR CONVERTERS ---
 
 private fun shiftDate(viewModel: MainViewModel, currentDateStr: String, offsetDays: Int) {
-    val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
     try {
-        val date = sdf.parse(currentDateStr) ?: Date()
-        val calendar = Calendar.getInstance()
-        calendar.time = date
-        calendar.add(Calendar.DATE, offsetDays)
-        viewModel.updateSelectedDate(sdf.format(calendar.time))
+        val newDate = EthiopianCalendarHelper.shiftEthiopianDate(currentDateStr, offsetDays)
+        viewModel.updateSelectedDate(newDate)
     } catch (e: Exception) {
         // Safe fall back
     }
 }
 
 private fun formatDateFriendly(dateStr: String): String {
-    val inputSdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
-    val outputSdf = SimpleDateFormat("EEE, MMM dd, yyyy", Locale.getDefault())
     return try {
-        val date = inputSdf.parse(dateStr) ?: return dateStr
-        outputSdf.format(date)
+        EthiopianCalendarHelper.formatEthiopianDateFriendly(dateStr)
     } catch (e: Exception) {
         dateStr
     }

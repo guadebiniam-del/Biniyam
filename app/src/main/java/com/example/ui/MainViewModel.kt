@@ -18,8 +18,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     // --- SENSITIVE DATE MANAGEMENT ---
-    private val dateFormatter = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
-    val selectedDate = MutableStateFlow(dateFormatter.format(Date()))
+    val selectedDate = MutableStateFlow(EthiopianCalendarHelper.getTodayEthiopianString())
 
     // --- STATE FLOWS FROM REPOSITORY ---
     val allProducts: StateFlow<List<Product>> = repository.allProductsFlow
@@ -317,47 +316,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     // Common Date Utilities inside App
     private fun getRangeForPeriod(referenceDateStr: String, period: ReportPeriod): Pair<String, String> {
-        val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
-        val calendar = Calendar.getInstance()
-        try {
-            val refDate = sdf.parse(referenceDateStr) ?: Date()
-            calendar.time = refDate
-        } catch (e: Exception) {
-            // fallback
+        val periodTypeStr = when (period) {
+            ReportPeriod.Daily -> "DAILY"
+            ReportPeriod.Weekly -> "WEEKLY"
+            ReportPeriod.Monthly -> "MONTHLY"
+            ReportPeriod.Yearly -> "YEARLY"
         }
-
-        return when (period) {
-            ReportPeriod.Daily -> {
-                Pair(referenceDateStr, referenceDateStr)
-            }
-            ReportPeriod.Weekly -> {
-                // Set first day of week. Sunday is index 1.
-                // Go to start of week (Monday or Sunday as preferred. Let's make Monday start of week and Sunday end)
-                calendar.firstDayOfWeek = Calendar.MONDAY
-                calendar.set(Calendar.DAY_OF_WEEK, Calendar.MONDAY)
-                val start = sdf.format(calendar.time)
-                // Go to next Sunday
-                calendar.add(Calendar.DATE, 6)
-                val end = sdf.format(calendar.time)
-                Pair(start, end)
-            }
-            ReportPeriod.Monthly -> {
-                calendar.set(Calendar.DAY_OF_MONTH, 1)
-                val start = sdf.format(calendar.time)
-                calendar.set(Calendar.DAY_OF_MONTH, calendar.getActualMaximum(Calendar.DAY_OF_MONTH))
-                val end = sdf.format(calendar.time)
-                Pair(start, end)
-            }
-            ReportPeriod.Yearly -> {
-                calendar.set(Calendar.MONTH, Calendar.JANUARY)
-                calendar.set(Calendar.DAY_OF_MONTH, 1)
-                val start = sdf.format(calendar.time)
-                calendar.set(Calendar.MONTH, Calendar.DECEMBER)
-                calendar.set(Calendar.DAY_OF_MONTH, 31)
-                val end = sdf.format(calendar.time)
-                Pair(start, end)
-            }
-        }
+        return EthiopianCalendarHelper.getRangeForEthiopianPeriod(referenceDateStr, periodTypeStr)
     }
 }
 
