@@ -1,5 +1,5 @@
 {
-  "name": "Anwar Plastic Recycle",
+  "name": "ANWAR",
   "description": "Daily inventory and workers tracking app for Anwar Plastic Recycle Company",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
