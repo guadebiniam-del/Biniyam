@@ -1794,12 +1794,12 @@ fun ProductStockCard(
         modifier = Modifier
             .fillMaxWidth()
             .testTag("product_card_${product.id}"),
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(14.dp),
         colors = CardDefaults.cardColors(
             containerColor = Color(0x3B1E293B) // Premium translucent space-gray glass effect
         ),
         border = BorderStroke(
-            width = 1.5.dp,
+            width = 1.dp,
             brush = Brush.verticalGradient(
                 listOf(
                     Color(0xFF10B981), // Glowing Emerald
@@ -1808,7 +1808,8 @@ fun ProductStockCard(
             )
         )
     ) {
-        Column(modifier = Modifier.padding(12.dp)) {
+        Column(modifier = Modifier.padding(8.dp)) {
+            // Header Row: Product Name & Clear Prominent Stock Badge
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -1817,107 +1818,120 @@ fun ProductStockCard(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = product.name,
-                        style = MaterialTheme.typography.bodyLarge,
+                        style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.Bold,
-                        color = BentoTextDark
+                        color = BentoTextDark,
+                        maxLines = 1,
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                     )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = "${product.size} • ${product.color} • ${product.bagWeightKg}kg",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontSize = 9.sp,
+                        color = BentoSubText,
+                        maxLines = 1,
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(4.dp))
+
+                // High Contrast Stock Badge
+                Box(
+                    modifier = Modifier
+                        .background(
+                            color = if (product.currentStock > 10) Color(0xFF064E3B) else Color(0xFF7F1D1D),
+                            shape = RoundedCornerShape(8.dp)
+                        )
+                        .border(
+                            0.5.dp, 
+                            if (product.currentStock > 10) Color(0xFF10B981) else Color(0xFFEF4444), 
+                            RoundedCornerShape(8.dp)
+                        )
+                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                ) {
+                    Text(
+                        text = "${product.currentStock} BAGS",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Black,
+                        color = if (product.currentStock > 10) Color(0xFF34D399) else Color(0xFFFCA5A5)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(6.dp))
+
+            // Stats breakdown (Horizontal row of 4 columns, readable and all on 1 line)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color(0xFF090D16), RoundedCornerShape(8.dp))
+                    .border(0.5.dp, BentoBorder.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
+                    .padding(vertical = 4.dp, horizontal = 2.dp),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                val statsList = listOf(
+                    Triple("FABRICATED", "+${stats.fabricated}", BentoForestGreen),
+                    Triple("SOLD", "-${stats.sold}", BentoAlertText),
+                    Triple("ADJUSTED", "${if (stats.adjusted >= 0) "+" else ""}${stats.adjusted}", if (stats.adjusted >= 0) Color.White else BentoAlertText),
+                    Triple("IN STOCK", "${product.currentStock}", BentoGold)
+                )
+
+                statsList.forEachIndexed { index, (label, value, color) ->
+                    if (index > 0) {
+                        Box(
+                            modifier = Modifier
+                                .width(0.5.dp)
+                                .height(14.dp)
+                                .background(BentoBorder.copy(alpha = 0.2f))
+                        )
+                    }
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.weight(1f)
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .background(BentoLightGreen.copy(alpha = 0.2f), RoundedCornerShape(6.dp))
-                                .padding(horizontal = 6.dp, vertical = 2.dp)
-                        ) {
-                            Text("Size: ${product.size}", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = BentoForestGreen)
-                        }
-                        Box(
-                            modifier = Modifier
-                                .background(BentoInfoBg.copy(alpha = 0.2f), RoundedCornerShape(6.dp))
-                                .padding(horizontal = 6.dp, vertical = 2.dp)
-                        ) {
-                            Text("Color: ${product.color}", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = BentoInfoText)
-                        }
-                        Spacer(modifier = Modifier.width(4.dp))
                         Text(
-                            text = "1 Bag = ${product.bagWeightKg} kg",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = BentoSubText
+                            text = label,
+                            fontSize = 6.8.sp,
+                            color = BentoSubText,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            letterSpacing = (-0.2).sp
+                        )
+                        Spacer(modifier = Modifier.height(1.dp))
+                        Text(
+                            text = value,
+                            fontSize = 9.5.sp,
+                            fontWeight = FontWeight.Black,
+                            color = color,
+                            maxLines = 1
                         )
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(6.dp))
 
-            // Stats breakdown
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(BentoBg.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
-                    .border(1.dp, BentoBorder.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
-                    .padding(8.dp),
-                horizontalArrangement = Arrangement.SpaceAround
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("FABRICATED", style = MaterialTheme.typography.labelSmall, color = BentoSubText, fontWeight = FontWeight.Bold)
-                    Text(
-                        text = "+${stats.fabricated} bags",
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = BentoForestGreen
-                    )
-                }
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("SOLD", style = MaterialTheme.typography.labelSmall, color = BentoSubText, fontWeight = FontWeight.Bold)
-                    Text(
-                        text = "-${stats.sold} bags",
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = BentoAlertText
-                    )
-                }
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("ADJUSTED", style = MaterialTheme.typography.labelSmall, color = BentoSubText, fontWeight = FontWeight.Bold)
-                    Text(
-                        text = "${if (stats.adjusted >= 0) "+" else ""}${stats.adjusted}",
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = if (stats.adjusted >= 0) BentoTextDark else BentoAlertText
-                    )
-                }
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("IN STOCK", style = MaterialTheme.typography.labelSmall, color = BentoSubText, fontWeight = FontWeight.Bold)
-                    Text(
-                        text = "${product.currentStock} bags",
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = if (product.currentStock > 10) BentoForestGreen else BentoAlertText
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // Action row
+            // Action row scaled down to be compact and space-saving
             Button(
                 onClick = onRecordClick,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(36.dp)
+                    .height(28.dp)
                     .testTag("record_product_btn_${product.id}"),
-                shape = RoundedCornerShape(8.dp),
+                shape = RoundedCornerShape(6.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = BentoLightGreen,
                     contentColor = BentoForestGreen
                 ),
                 contentPadding = PaddingValues(0.dp)
             ) {
-                Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
-                Spacer(modifier = Modifier.width(4.dp))
-                Text("Record Today's Activity", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+                Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(14.dp))
+                Spacer(modifier = Modifier.width(3.dp))
+                Text("Record Entry", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
             }
         }
     }
