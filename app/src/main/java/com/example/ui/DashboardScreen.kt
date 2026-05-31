@@ -33,6 +33,11 @@ import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.data.*
 import com.example.ui.theme.*
+import com.example.R
+import com.example.BuildConfig
+import kotlinx.coroutines.launch
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.RequestBody.Companion.toRequestBody
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -166,7 +171,8 @@ fun DashboardScreen(
                                 Triple("Daily Overview", Icons.Default.Home, "Console"),
                                 Triple("Inventory", Icons.Default.List, "Inventory"),
                                 Triple("Workers", Icons.Default.Person, "Workers"),
-                                Triple("Activity Log", Icons.Default.Star, "Logs")
+                                Triple("Activity Log", Icons.Default.Star, "Logs"),
+                                Triple("BINIYAM", Icons.Default.Face, "BINIYAM")
                             )
                             navItems.forEach { (tabName, icon, label) ->
                                 val isSelected = activeTab == tabName
@@ -259,6 +265,16 @@ fun DashboardScreen(
                                 }
                                 Column {
                                     Row(verticalAlignment = Alignment.CenterVertically) {
+                                        androidx.compose.foundation.Image(
+                                            painter = androidx.compose.ui.res.painterResource(id = R.drawable.img_anwar_logo),
+                                            contentDescription = "Anwar Company Logo",
+                                            modifier = Modifier
+                                                .size(38.dp)
+                                                .clip(CircleShape)
+                                                .border(1.5.dp, BentoGold, CircleShape),
+                                            contentScale = androidx.compose.ui.layout.ContentScale.Crop
+                                        )
+                                        Spacer(modifier = Modifier.width(10.dp))
                                         Text(
                                             text = "ANWAR",
                                             style = MaterialTheme.typography.displayMedium,
@@ -355,7 +371,7 @@ fun DashboardScreen(
             AnimatedContent(
                 targetState = activeTab,
                 transitionSpec = {
-                    val tabsList = listOf("Daily Overview", "Inventory", "Workers", "Activity Log")
+                    val tabsList = listOf("Daily Overview", "Inventory", "Workers", "Activity Log", "BINIYAM")
                     val initialIndex = tabsList.indexOf(initialState)
                     val targetIndex = tabsList.indexOf(targetState)
                     if (targetIndex > initialIndex) {
@@ -602,6 +618,17 @@ fun DashboardScreen(
                                 )
                             }
                         }
+                    }
+                    "BINIYAM" -> {
+                        BiniyamBotScreen(
+                            viewModel = viewModel,
+                            stats = stats,
+                            products = products,
+                            rawMaterials = rawMaterials,
+                            masterbatches = masterbatches,
+                            workers = workers,
+                            modifier = Modifier.fillMaxSize()
+                        )
                     }
                 }
             }
@@ -3440,17 +3467,19 @@ fun AnwarSplashScreen(onFinished: () -> Unit) {
             // Pulsing Anwar Logo Badge
             Box(
                 modifier = Modifier
-                    .size(120.dp)
-                    .background(Color(0xFF0F172A), shape = CircleShape)
-                    .border(2.dp, Color(0xFF10B981), shape = CircleShape)
-                    .padding(24.dp),
+                    .size(130.dp)
+                    .background(Color.Black, shape = CircleShape)
+                    .border(2.dp, BentoGold, shape = CircleShape)
+                    .padding(3.dp),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    imageVector = Icons.Default.Refresh, // High tech industrial looping / recycling icon
-                    contentDescription = null,
-                    tint = Color(0xFF10B981),
-                    modifier = Modifier.size(64.dp)
+                androidx.compose.foundation.Image(
+                    painter = androidx.compose.ui.res.painterResource(id = R.drawable.img_anwar_logo),
+                    contentDescription = "Anwar Company Logo",
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clip(CircleShape),
+                    contentScale = androidx.compose.ui.layout.ContentScale.Crop
                 )
             }
             Spacer(modifier = Modifier.height(24.dp))
@@ -3496,6 +3525,544 @@ fun AnwarSplashScreen(onFinished: () -> Unit) {
                     letterSpacing = 1.sp
                 )
             }
+        }
+    }
+}
+
+
+// --- BINIYAM CHAT SCREEN COMPOSABLE ---
+
+data class ChatMessage(
+    val id: String = java.util.UUID.randomUUID().toString(),
+    val sender: String, // "user" or "model"
+    val text: String,
+    val timestamp: Long = System.currentTimeMillis()
+)
+
+@Composable
+fun BiniyamBotScreen(
+    viewModel: MainViewModel,
+    stats: AggregatedStats,
+    products: List<Product>,
+    rawMaterials: List<RawMaterial>,
+    masterbatches: List<Masterbatch>,
+    workers: List<Worker>,
+    modifier: Modifier = Modifier
+) {
+    val haptic = LocalHapticFeedback.current
+    var inputText by remember { mutableStateOf("") }
+    val messages = remember {
+        mutableStateListOf<ChatMessage>().apply {
+            add(
+                ChatMessage(
+                    sender = "model",
+                    text = "ሰላም! ሰላም! እኔ ቢኒያም (BINIYAM) እባላለሁ - የአንዋር ፕላስቲክ መልሶ ማምረቻ ኩባንያ (Anwar Plastic Recycle) ብቸኛ ዲጂታል ረዳት። በቢኒያም የተሠራሁት እኔ፣ ስለ ምርት ሂደቶች፣ ስለ ክምችት መጠን (Stock)፣ ስለ ጥሬ ዕቃዎች እና ስለ ሠራተኞቻችን በማንኛውም ሰዓት በ አማርኛ ወይም በእንግሊዝኛ መረጃ መስጠት እችላለሁ። ዛሬ በምን ልርዳዎት?\n\nHello! I am BINIYAM, the official AI assistant of Anwar Plastic Recycle. Created by Biniyam, I am here to help you manage and answer any questions regarding our production sheets, worker attendance, raw materials, and stock balances in both Amharic and English. How can I assist you today?"
+                )
+            )
+        }
+    }
+    var isThinking by remember { mutableStateOf(false) }
+    
+    // Auto scroll state
+    val listState = androidx.compose.foundation.lazy.rememberLazyListState()
+    LaunchedEffect(messages.size) {
+        if (messages.isNotEmpty()) {
+            listState.animateScrollToItem(messages.size - 1)
+        }
+    }
+
+    val coroutineScope = rememberCoroutineScope()
+
+    // Suggested quick actions
+    val suggestions = listOf(
+        "የአሁኑን የክምችት መጠን ማጠቃለያ ስጠኝ" to "ያለውን የክምችት (Stock) ሁኔታ በዝርዝር ንገረኝ።",
+        "የዛሬው ምርትና ሽያጭ እንዴት ነው?" to "የዛሬውን የምርት እና የሽያጭ ሁኔታ (Fabricated and Sold) አጠቃላይ መረጃ ስጠኝ።",
+        "ስለ ጥሬ ዕቃዎች (Raw Materials) ንገረኝ" to "ወቅታዊ ያለውን የጥሬ ዕቃዎች ደረጃ (LD, HD, Waste Stock) ንገረኝ።",
+        "የሠራተኞች ሁኔታ እንዴት ነው?" to "በድርጅቱ ውስጥ ያሉትን የሠራተኞች ሁኔታ እና መገኘታቸውን ንገረኝ።"
+    )
+
+    fun sendMessage(textToSend: String) {
+        if (textToSend.isBlank() || isThinking) return
+        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+        
+        messages.add(ChatMessage(sender = "user", text = textToSend))
+        isThinking = true
+        inputText = ""
+
+        coroutineScope.launch {
+            val liveDate = viewModel.selectedDate.value
+            val systemPrompt = generateSystemPrompt(
+                products = products,
+                rawMaterials = rawMaterials,
+                masterbatches = masterbatches,
+                workers = workers,
+                activeDate = liveDate,
+                stats = stats
+            )
+            
+            // Build chat query history for the bot context
+            val historyList = messages.drop(1).dropLast(1).map { Pair(it.sender, it.text) }
+
+            val response = GeminiBotService.getGeminiResponse(
+                systemPrompt = systemPrompt,
+                userPrompt = textToSend,
+                history = historyList
+            )
+
+            messages.add(ChatMessage(sender = "model", text = response))
+            isThinking = false
+        }
+    }
+
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .background(Color(0xFF04060C)) // Ultra luxury jet black background
+            .padding(12.dp)
+    ) {
+        // AI Profile Card (Apple Style Glassmorphic)
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 12.dp)
+                .background(
+                    color = Color(0xFF0F172A).copy(alpha = 0.5f),
+                    shape = RoundedCornerShape(24.dp)
+                )
+                .border(1.dp, BentoForestGreen.copy(alpha = 0.4f), RoundedCornerShape(24.dp))
+                .padding(16.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                // Robot Icon Wrapper with subtle gold aura indicator
+                Box(
+                    modifier = Modifier
+                        .size(54.dp)
+                        .background(Color.Black, shape = CircleShape)
+                        .border(1.5.dp, BentoGold, CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Face,
+                        contentDescription = "BINIYAM robot",
+                        tint = BentoForestGreen,
+                        modifier = Modifier.size(32.dp)
+                    )
+                    // Live green pulse dot
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(2.dp)
+                            .size(10.dp)
+                            .background(Color(0xFF10B981), CircleShape)
+                            .border(1.5.dp, Color.Black, CircleShape)
+                    )
+                }
+
+                Column {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = "BINIYAM AI",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Black,
+                            color = Color.White
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Box(
+                            modifier = Modifier
+                                .background(BentoForestGreen.copy(alpha = 0.2f), RoundedCornerShape(6.dp))
+                                .border(0.5.dp, BentoForestGreen, RoundedCornerShape(6.dp))
+                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                        ) {
+                            Text(
+                                text = "OFFICIAL BOT",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = BentoForestGreen
+                            )
+                        }
+                    }
+                    Text(
+                        text = "Authorized assistant owned by Biniyam",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = BentoSubText
+                    )
+                }
+            }
+        }
+
+        // Messages List Area
+        androidx.compose.foundation.lazy.LazyColumn(
+            state = listState,
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth()
+                .padding(horizontal = 4.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+            contentPadding = PaddingValues(bottom = 12.dp)
+        ) {
+            items(messages) { message ->
+                val isMe = message.sender == "user"
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = if (isMe) Arrangement.End else Arrangement.Start
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .widthIn(max = 290.dp)
+                            .background(
+                                color = if (isMe) Color(0xFF1F2937) else Color(0xFF03311E).copy(alpha = 0.25f),
+                                shape = RoundedCornerShape(
+                                    topStart = 18.dp,
+                                    topEnd = 18.dp,
+                                    bottomStart = if (isMe) 18.dp else 4.dp,
+                                    bottomEnd = if (isMe) 4.dp else 18.dp
+                                )
+                            )
+                            .border(
+                                width = 1.dp,
+                                color = if (isMe) Color(0xFF374151) else BentoForestGreen.copy(alpha = 0.4f),
+                                shape = RoundedCornerShape(
+                                    topStart = 18.dp,
+                                    topEnd = 18.dp,
+                                    bottomStart = if (isMe) 18.dp else 4.dp,
+                                    bottomEnd = if (isMe) 4.dp else 18.dp
+                                )
+                            )
+                            .padding(14.dp)
+                    ) {
+                        Column {
+                            if (!isMe) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                    modifier = Modifier.padding(bottom = 4.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Face,
+                                        contentDescription = null,
+                                        tint = BentoGold,
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                    Text(
+                                        text = "BINIYAM AI",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = BentoGold
+                                    )
+                                }
+                            }
+                            Text(
+                                text = message.text,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = Color.White,
+                                lineHeight = 20.sp
+                            )
+                        }
+                    }
+                }
+            }
+
+            if (isThinking) {
+                item {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 4.dp),
+                        horizontalArrangement = Arrangement.Start
+                    ) {
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = Color(0xFF090D16)),
+                            border = BorderStroke(1.dp, BentoForestGreen.copy(alpha = 0.3f)),
+                            shape = RoundedCornerShape(16.dp),
+                            modifier = Modifier.padding(2.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(14.dp),
+                                    strokeWidth = 2.dp,
+                                    color = BentoForestGreen
+                                )
+                                Text(
+                                    text = "BINIYAM is analyzing terminal...",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = BentoSubText,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Suggestions Horizontal Scroll (when idle)
+        if (!isThinking) {
+            androidx.compose.foundation.lazy.LazyRow(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                contentPadding = PaddingValues(horizontal = 4.dp)
+            ) {
+                items(suggestions) { (label, promptText) ->
+                    Box(
+                        modifier = Modifier
+                            .background(Color(0xFF0C101B), shape = RoundedCornerShape(16.dp))
+                            .border(0.5.dp, BentoForestGreen.copy(alpha = 0.5f), shape = RoundedCornerShape(16.dp))
+                            .clickable {
+                                sendMessage(promptText)
+                            }
+                            .padding(horizontal = 12.dp, vertical = 8.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Icon(Icons.Default.Star, contentDescription = null, tint = BentoGold, modifier = Modifier.size(12.dp))
+                            Text(
+                                text = label,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Color.White,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        // Input Box area
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 4.dp, vertical = 6.dp)
+                .background(Color(0xFF0C101B), RoundedCornerShape(24.dp))
+                .border(1.dp, BentoForestGreen.copy(alpha = 0.5f), RoundedCornerShape(24.dp))
+                .padding(horizontal = 8.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            TextField(
+                value = inputText,
+                onValueChange = { inputText = it },
+                placeholder = {
+                    Text(
+                        "ቢኒያምን ይጠይቁ / Ask BINIYAM...",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = BentoSubText
+                    )
+                },
+                modifier = Modifier
+                    .weight(1f)
+                    .testTag("biniyam_input"),
+                colors = TextFieldDefaults.colors(
+                    focusedContainerColor = Color.Transparent,
+                    unfocusedContainerColor = Color.Transparent,
+                    disabledContainerColor = Color.Transparent,
+                    focusedIndicatorColor = Color.Transparent,
+                    unfocusedIndicatorColor = Color.Transparent,
+                    focusedTextColor = Color.White,
+                    unfocusedTextColor = Color.White
+                ),
+                maxLines = 3,
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Text
+                )
+            )
+
+            IconButton(
+                onClick = { sendMessage(inputText) },
+                enabled = inputText.isNotBlank() && !isThinking,
+                modifier = Modifier.testTag("biniyam_send_btn")
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Send,
+                    contentDescription = "Send prompt button",
+                    tint = if (inputText.isNotBlank() && !isThinking) BentoForestGreen else BentoSubText,
+                    modifier = Modifier.size(22.dp)
+                )
+            }
+        }
+        Spacer(modifier = Modifier.height(84.dp)) // padding for floating active bar
+    }
+}
+
+// System Prompt Helper for Biniyam context injection
+private fun generateSystemPrompt(
+    products: List<Product>,
+    rawMaterials: List<RawMaterial>,
+    masterbatches: List<Masterbatch>,
+    workers: List<Worker>,
+    activeDate: String,
+    stats: AggregatedStats
+): String {
+    val sb = StringBuilder()
+    sb.append("You are BINIYAM, the official AI chat assistant of Anwar Plastic Recycle Company. ")
+    sb.append("You are owned and created by Biniyam, the chief administrator and owner of the company.\n")
+    sb.append("Your duty is to answer questions about the production, inventory stock, raw materials, masterbatches, and workers of the company. ")
+    sb.append("You must answer in a helpful, friendly, and extremely professional manner. ")
+    sb.append("You are fully bilingual and can speak, understand, and write perfectly in both Amharic (አማርኛ) and English. Always reply in the language the user asks you in, or mix them gracefully if appropriate (such as explaining Amharic terms in English or vice-versa).\n\n")
+    
+    sb.append("=== CURRENT LIVE DATA IN THE PLASTIC RECYCLING SYSTEM ===\n")
+    sb.append("Active Ethiopian Calendar Date: $activeDate\n\n")
+    
+    sb.append("1. PRODUCTS STOCK IN INVENTORY:\n")
+    if (products.isEmpty()) {
+        sb.append("- No products registered in system yet.\n")
+    } else {
+        products.forEach { p ->
+            sb.append("- Name: ${p.name}, Size: ${p.size}, Color: ${p.color}, Current Stock: ${p.currentStock} bags (Counter: ${p.counter}, Pieces/Bag: ${p.piecesPerBag}, Bag Weight: ${p.bagWeightKg} kg, ID: ${p.id})\n")
+        }
+    }
+    sb.append("\n")
+
+    sb.append("2. RAW MATERIALS LEVEL:\n")
+    if (rawMaterials.isEmpty()) {
+        sb.append("- No raw materials recorded.\n")
+    } else {
+        rawMaterials.forEach { r ->
+            sb.append("- Material Type: ${r.type}, Current Stock Level: ${r.currentStock} kg\n")
+        }
+    }
+    sb.append("\n")
+
+    sb.append("3. MASTERBATCH PIGMENTS BASE:\n")
+    if (masterbatches.isEmpty()) {
+        sb.append("- No masterbatches registered.\n")
+    } else {
+        masterbatches.forEach { m ->
+            sb.append("- Color: ${m.color}, Current Stock: ${m.currentStock} kg (ID: ${m.id})\n")
+        }
+    }
+    sb.append("\n")
+
+    sb.append("4. WORKERS ON DUTY:\n")
+    if (workers.isEmpty()) {
+        sb.append("- No workers registered in system.\n")
+    } else {
+        val activeCount = workers.count { it.isActive }
+        sb.append("- Total Registered Workers: ${workers.size} (Active: $activeCount)\n")
+        workers.forEach { w ->
+            sb.append("  * Name: ${w.name}, Join Date: ${w.joinDate}, Status: ${if (w.isActive) "Active" else "Left"}\n")
+        }
+    }
+    sb.append("\n")
+
+    sb.append("5. RECENT AGGREGATED METRICS (Production sheets performance from ${stats.startDate} to ${stats.endDate}):\n")
+    sb.append("- Total Fabricated Products: ${stats.totalFabricated} bags\n")
+    sb.append("- Total Sold Products: ${stats.totalSold} bags\n")
+    sb.append("- Total Adjusted Products: ${stats.totalAdjusted} bags\n")
+    sb.append("- LD Material (Used: ${stats.ldUsed} kg, Added: ${stats.ldAdded} kg)\n")
+    sb.append("- HD Material (Used: ${stats.hdUsed} kg, Added: ${stats.hdAdded} kg)\n")
+    sb.append("- Waste/West Material (Used: ${stats.wasteUsed} kg, Added: ${stats.wasteAdded} kg)\n\n")
+
+    sb.append("=== INSTRUCTIONS ===\n")
+    sb.append("- Be conversational and write clearly. Maintain an elegant, premium look.\n")
+    sb.append("- When asked who owns you or Biniyam, always reply clearly and with pride that Biniyam is your creator and owner, who also owns Anwar Plastic Recycle Company.\n")
+    sb.append("- In Amharic, write using perfect, polite Amharic (e.g. use 'ይችላሉ', 'እባክዎን', 'እንኳን ደህና መጡ').")
+    
+    return sb.toString()
+}
+
+
+// Network service for direct REST call using OkHttp and native org.json
+object GeminiBotService {
+    private val client = okhttp3.OkHttpClient.Builder()
+        .connectTimeout(60, java.util.concurrent.TimeUnit.SECONDS)
+        .readTimeout(60, java.util.concurrent.TimeUnit.SECONDS)
+        .writeTimeout(60, java.util.concurrent.TimeUnit.SECONDS)
+        .build()
+
+    suspend fun getGeminiResponse(systemPrompt: String, userPrompt: String, history: List<Pair<String, String>> = emptyList()): String = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+        val apiKey = BuildConfig.GEMINI_API_KEY
+        if (apiKey.isBlank() || apiKey == "MY_GEMINI_API_KEY") {
+            return@withContext "አዝናለሁ! የቢኒያም AI ሰርቨር ቁልፍ (Gemini API Key) በሲስተሙ ውስጥ አልተገኘም። እባክዎን በ AI Studio Secrets በኩል 'GEMINI_API_KEY' ማስገባትዎን ያረጋግጡ።\n\nSorry, the Gemini API Key is missing or not configured in Secrets. Please configure GEMINI_API_KEY in active Secrets to enable AI queries."
+        }
+
+        val url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=$apiKey"
+
+        try {
+            val requestJson = org.json.JSONObject()
+            val contentsArray = org.json.JSONArray()
+
+            // Map and add previous history
+            for (turn in history) {
+                val roleName = if (turn.first == "user") "user" else "model"
+                val turnObj = org.json.JSONObject()
+                turnObj.put("role", roleName)
+                
+                val partsArr = org.json.JSONArray()
+                val partObj = org.json.JSONObject()
+                partObj.put("text", turn.second)
+                partsArr.put(partObj)
+                
+                turnObj.put("parts", partsArr)
+                contentsArray.put(turnObj)
+            }
+
+            // Add the newest query
+            val newestTurn = org.json.JSONObject()
+            newestTurn.put("role", "user")
+            val partsArr = org.json.JSONArray()
+            val partObj = org.json.JSONObject()
+            partObj.put("text", userPrompt)
+            partsArr.put(partObj)
+            newestTurn.put("parts", partsArr)
+            contentsArray.put(newestTurn)
+
+            requestJson.put("contents", contentsArray)
+
+            // Inject system instruction if provided
+            if (systemPrompt.isNotBlank()) {
+                val systemInstructionObj = org.json.JSONObject()
+                val sPartsArr = org.json.JSONArray()
+                val sPartObj = org.json.JSONObject()
+                sPartObj.put("text", systemPrompt)
+                sPartsArr.put(sPartObj)
+                systemInstructionObj.put("parts", sPartsArr)
+                requestJson.put("systemInstruction", systemInstructionObj)
+            }
+
+            // Force dynamic response
+            val configObj = org.json.JSONObject()
+            configObj.put("temperature", 0.5f)
+            requestJson.put("generationConfig", configObj)
+
+            val mediaType = "application/json; charset=utf-8".toMediaType()
+            val requestBody = requestJson.toString().toRequestBody(mediaType)
+
+            val request = okhttp3.Request.Builder()
+                .url(url)
+                .post(requestBody)
+                .build()
+
+            client.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) {
+                    return@withContext "ስህተት ተፈጥሯል (Error Code: ${response.code})። እባክዎን ቆይተው እንደገና ይሞክሩ።\nConnection failed with code: ${response.code}."
+                }
+
+                val bodyStr = response.body?.string() ?: return@withContext "Error: System received an empty response body"
+                val responseJson = org.json.JSONObject(bodyStr)
+                val candidates = responseJson.optJSONArray("candidates")
+                if (candidates != null && candidates.length() > 0) {
+                    val candidate = candidates.getJSONObject(0)
+                    val contentObj = candidate.optJSONObject("content")
+                    val partsList = contentObj?.optJSONArray("parts")
+                    if (partsList != null && partsList.length() > 0) {
+                        return@withContext partsList.getJSONObject(0).optString("text", "No readable reply received.")
+                    }
+                }
+                "ቢኒያም መልስ መስጠት አልቻለም (Unexpected payload format)።"
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            "ለመገናኘት አልተቻለም (Connection Failed): ${e.localizedMessage ?: "አልታወቀም "}"
         }
     }
 }
