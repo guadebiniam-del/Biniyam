@@ -52,23 +52,48 @@ class InventoryRepository {
         awaitClose { listener.remove() }
     }
 
-    // On init, check if db has products yet. If empty, seed default enterprise resources.
+    // On init, check and seed default materials/colors if empty, and delete default products/workers actively
     init {
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                val checkSnapshot = db.collection("products").limit(1).get().awaitTask()
-                if (checkSnapshot.isEmpty) {
-                    Log.d("InventoryRepository", "Firestore collections are empty. Seeding defaults...")
-                    
-                    // Pre-populate Raw Materials
+                // Active Clean-up of default fake products if they exist in Firestore
+                val defaultProductNames = listOf("heavy carrier bag", "industrial waste bag", "shopping bag", "mobile")
+                val productsQuery = db.collection("products").get().awaitTask()
+                for (doc in productsQuery.documents) {
+                    val name = doc.getString("name")?.lowercase()?.trim() ?: ""
+                    if (defaultProductNames.any { name == it || name.contains(it) }) {
+                        doc.reference.delete().awaitTask()
+                        Log.d("InventoryRepository", "Deleted default product: $name")
+                    }
+                }
+
+                // Active Clean-up of default fake workers if they exist in Firestore
+                val defaultWorkerNames = listOf("abebe kebede", "anwar adem", "chala gerba", "soliana yared")
+                val workersQuery = db.collection("workers").get().awaitTask()
+                for (doc in workersQuery.documents) {
+                    val name = doc.getString("name")?.lowercase()?.trim() ?: ""
+                    if (defaultWorkerNames.any { name == it || name.contains(it) }) {
+                        doc.reference.delete().awaitTask()
+                        Log.d("InventoryRepository", "Deleted default worker: $name")
+                    }
+                }
+
+                // Seed Raw Materials if empty
+                val rmSnapshot = db.collection("raw_materials").limit(1).get().awaitTask()
+                if (rmSnapshot.isEmpty) {
+                    Log.d("InventoryRepository", "Raw materials collections are empty. Seeding defaults...")
                     val rawMaterials = listOf(
                         RawMaterial("LD", 1200.0),
                         RawMaterial("HD", 850.0),
                         RawMaterial("Waste", 2400.0)
                     )
                     rawMaterials.forEach { insertRawMaterial(it) }
+                }
 
-                    // Pre-populate Masterbatches
+                // Seed Masterbatches if empty
+                val mbSnapshot = db.collection("masterbatches").limit(1).get().awaitTask()
+                if (mbSnapshot.isEmpty) {
+                    Log.d("InventoryRepository", "Masterbatches collections are empty. Seeding defaults...")
                     val masterbatches = listOf(
                         Masterbatch(id = 1, color = "Black", currentStock = 150.0),
                         Masterbatch(id = 2, color = "White", currentStock = 120.0),
@@ -78,21 +103,11 @@ class InventoryRepository {
                         Masterbatch(id = 6, color = "Yellow", currentStock = 30.0)
                     )
                     masterbatches.forEach { insertMasterbatch(it) }
-
-                    // Pre-populate Products
-                    val products = listOf(
-                        Product(id = 1, name = "Shopping Bag (Standard)", size = "30x40", color = "Red", counter = 500, piecesPerBag = 100, bagWeightKg = 0.25, currentStock = 120),
-                        Product(id = 2, name = "Industrial Waste Bag", size = "40x50", color = "Black", counter = 600, piecesPerBag = 120, bagWeightKg = 0.35, currentStock = 85),
-                        Product(id = 3, name = "Heavy Carrier Bag", size = "50x60", color = "Blue", counter = 800, piecesPerBag = 150, bagWeightKg = 0.5, currentStock = 40)
-                    )
-                    products.forEach { insertProduct(it) }
-
-                    // Pre-populate Workers seeding removed per user request
-                    
-                    Log.d("InventoryRepository", "Seeding default data completed successfully.")
                 }
+
+                Log.d("InventoryRepository", "Database check and cleanup completed successfully.")
             } catch (e: Exception) {
-                Log.e("InventoryRepository", "Error seeding Firestore defaults: ${e.message}", e)
+                Log.e("InventoryRepository", "Error running database setup/cleanup: ${e.message}", e)
             }
         }
     }
