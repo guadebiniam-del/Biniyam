@@ -23,6 +23,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -280,8 +281,7 @@ fun DashboardScreen(
                                     ProductStockCard(
                                         product = product,
                                         stats = pStats,
-                                        onRecordClick = { selectedProductForActivity = product },
-                                        onDeleteClick = { viewModel.deleteProduct(product) }
+                                        onRecordClick = { selectedProductForActivity = product }
                                     )
                                     Spacer(modifier = Modifier.height(8.dp))
                                 }
@@ -491,6 +491,10 @@ fun DashboardScreen(
             onDismiss = { selectedProductForActivity = null },
             onSave = { fabricated, sold, adjusted, notes ->
                 viewModel.recordProductDailyActivity(product.id, fabricated, sold, adjusted, notes)
+                selectedProductForActivity = null
+            },
+            onDelete = {
+                viewModel.deleteProduct(product)
                 selectedProductForActivity = null
             }
         )
@@ -1472,8 +1476,7 @@ fun InventoryHeaderSection(
 fun ProductStockCard(
     product: Product,
     stats: ProductAggStats,
-    onRecordClick: () -> Unit,
-    onDeleteClick: () -> Unit
+    onRecordClick: () -> Unit
 ) {
     Card(
         modifier = Modifier
@@ -1522,16 +1525,6 @@ fun ProductStockCard(
                             color = BentoSubText
                         )
                     }
-                }
-
-                // Close/Delete Action trigger
-                IconButton(onClick = onDeleteClick) {
-                    Icon(
-                        Icons.Default.Delete,
-                        contentDescription = "Remove Product",
-                        tint = BentoAlertText.copy(alpha = 0.6f),
-                        modifier = Modifier.size(18.dp)
-                    )
                 }
             }
 
@@ -2086,12 +2079,14 @@ fun AddWorkerDialog(
 fun RecordProductActivityDialog(
     product: Product,
     onDismiss: () -> Unit,
-    onSave: (fabricated: Int, sold: Int, adjusted: Int, notes: String) -> Unit
+    onSave: (fabricated: Int, sold: Int, adjusted: Int, notes: String) -> Unit,
+    onDelete: () -> Unit
 ) {
     var fabStr by remember { mutableStateOf("") }
     var soldStr by remember { mutableStateOf("") }
     var adjStr by remember { mutableStateOf("") }
     var notes by remember { mutableStateOf("") }
+    var showDeletePinPrompt by remember { mutableStateOf(false) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -2156,9 +2151,88 @@ fun RecordProductActivityDialog(
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                TextButton(
+                    onClick = { showDeletePinPrompt = true },
+                    colors = ButtonDefaults.textButtonColors(contentColor = Color(0xFFEF4444)),
+                    modifier = Modifier.testTag("delete_product_trigger_btn")
+                ) {
+                    Icon(Icons.Default.Delete, contentDescription = "Delete Product", modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Delete Product")
+                }
+                TextButton(onClick = onDismiss) { Text("Cancel") }
+            }
         }
     )
+
+    if (showDeletePinPrompt) {
+        var pinInput by remember { mutableStateOf("") }
+        var pinError by remember { mutableStateOf<String?>(null) }
+
+        AlertDialog(
+            onDismissRequest = { showDeletePinPrompt = false },
+            title = { Text("Confirm Product Deletion", fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(
+                        text = "Deleting '${product.name}' is permanent. To prevent accidental deletion, please enter the administrator PIN (1234):",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    OutlinedTextField(
+                        value = pinInput,
+                        onValueChange = { 
+                            pinInput = it
+                            pinError = null
+                        },
+                        label = { Text("Security PIN") },
+                        placeholder = { Text("••••") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                        visualTransformation = PasswordVisualTransformation(),
+                        singleLine = true,
+                        isError = pinError != null,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("delete_pin_input")
+                    )
+                    if (pinError != null) {
+                        Text(
+                            text = pinError!!,
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        if (pinInput == "1234") {
+                            showDeletePinPrompt = false
+                            onDelete()
+                        } else {
+                            pinError = "Incorrect PIN. Deletion denied."
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444)),
+                    modifier = Modifier.testTag("delete_confirm_btn")
+                ) {
+                    Text("Confirm Delete", color = Color.White)
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { showDeletePinPrompt = false }
+                ) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
 }
 
 @Composable
