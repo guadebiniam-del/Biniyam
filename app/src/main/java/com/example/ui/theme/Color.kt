@@ -4,21 +4,23 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 
 // --- Anwar Bento Grid Color Palette (Premium Slate Industrial Theme) ---
-val BentoBg = Color(0xFF0F172A) // Sleek Slate-900 Dark Industrial Base
-val BentoTextDark = Color(0xFFF8FAFC) // Slate-50 for high contrast dark mode text
+val BentoBg = Color(0xFF000000) // Deep absolute black for luxury feel
+val BentoTextDark = Color(0xFFFFFFFF) // Pristine high contrast white
 val BentoForestGreen = Color(0xFF10B981) // Glowing Mint Emerald
-val BentoLightGreen = Color(0xFF022C22) // Ultra-deep slate emerald accent
-val BentoSoftGreen = Color(0xFF059669) // Tech Emerald Active Accent
-val BentoBorder = Color(0xFF334155) // Slate-700 High-Tech border lines
-val BentoInnerBorder = Color(0xFF1E293B) // Dark Border Lines
-val BentoNeutralGray = Color(0xFF1E293B) // Slate-800 Card Container Fills
+val BentoLightGreen = Color(0xFF064E3B) // Rich deep glass emerald
+val BentoSoftGreen = Color(0xFF34D399) // Liquid neon emerald
+val BentoBorder = Color(0xFF1E1E1E) // High-precision luxury dark border
+val BentoInnerBorder = Color(0xFF111111) // Inner subtle bounds
+val BentoNeutralGray = Color(0xFF1E293B) // Slate card Container Fill
+val BentoGold = Color(0xFFD4AF37) // Liquid luxury gold
+val BentoGoldLight = Color(0xFFF5E28F) // Soft glowing gold
+val BentoSubText = Color(0xFF94A3B8)
 
 // Accent Alerts & Info
 val BentoAlertBg = Color(0xFF7F1D1D) // Industrial Fire/Orange Warning
 val BentoAlertText = Color(0xFFFECACA) 
 val BentoInfoBg = Color(0xFF1E3A8A) // deep electric industrial status blue
 val BentoInfoText = Color(0xFFBFDBFE)
-val BentoSubText = Color(0xFF94A3B8) // Slate-400 for secondary descriptions
 
 // Premium Industrial Gradient Brushes
 val GradientCarbon = Brush.linearGradient(

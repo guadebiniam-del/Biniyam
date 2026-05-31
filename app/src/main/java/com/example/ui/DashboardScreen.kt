@@ -1,9 +1,7 @@
 package com.example.ui
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.spring
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
+import androidx.compose.animation.*
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -20,6 +18,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -56,6 +57,11 @@ fun DashboardScreen(
     // Active tab selection matching the Bento Grid HTML design: Daily Overview, Inventory, Workers, Activity Log
     var activeTab by remember { mutableStateOf("Daily Overview") }
 
+    // Luxury animations and haptics states
+    var showSplash by remember { mutableStateOf(true) }
+    var showSidebar by remember { mutableStateOf(false) }
+    val haptic = LocalHapticFeedback.current
+
     // Dialog trigger states
     var showAddProductDialog by remember { mutableStateOf(false) }
     var showAddMasterbatchDialog by remember { mutableStateOf(false) }
@@ -67,69 +73,233 @@ fun DashboardScreen(
     // Date picker state toggle
     var showDatePickerDialog by remember { mutableStateOf(false) }
 
-    Scaffold(
-        containerColor = BentoBg,
-        modifier = modifier.fillMaxSize()
-    ) { innerPadding ->
-        Column(
-            modifier = Modifier
-                .padding(innerPadding)
-                .fillMaxSize()
-                .background(Brush.verticalGradient(listOf(BentoBg, Color(0xFF050B14))))
-        ) {
-            // --- BENTO GRID STYLE INTEGRATED HEADER ---
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 14.dp)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                text = "ANWAR",
-                                style = MaterialTheme.typography.displayMedium,
-                                fontWeight = FontWeight.Black,
-                                color = Color.White,
-                                letterSpacing = (-1).sp
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            // Glowing status dot - representing safe operational connection
-                            Box(
-                                modifier = Modifier
-                                    .padding(vertical = 4.dp)
-                                    .size(8.dp)
-                                    .background(BentoForestGreen, CircleShape)
+    if (showSplash) {
+        AnwarSplashScreen(onFinished = { showSplash = false })
+    } else {
+        Box(modifier = Modifier.fillMaxSize()) {
+            Scaffold(
+                containerColor = BentoBg,
+                modifier = modifier.fillMaxSize(),
+                floatingActionButton = {
+                    // Pulsing FAB matching requirement (8)
+                    val infiniteTransition = rememberInfiniteTransition(label = "pulse")
+                    val pulseScale by infiniteTransition.animateFloat(
+                        initialValue = 1f,
+                        targetValue = 1.15f,
+                        animationSpec = infiniteRepeatable(
+                            animation = tween(1200, easing = FastOutSlowInEasing),
+                            repeatMode = RepeatMode.Reverse
+                        ),
+                        label = "pulse_scale"
+                    )
+                    val pulseAlpha by infiniteTransition.animateFloat(
+                        initialValue = 0.6f,
+                        targetValue = 0f,
+                        animationSpec = infiniteRepeatable(
+                            animation = tween(1200, easing = FastOutSlowInEasing),
+                            repeatMode = RepeatMode.Reverse
+                        ),
+                        label = "pulse_alpha"
+                    )
+
+                    Box(contentAlignment = Alignment.Center) {
+                        // Expanding pulse circle
+                        Box(
+                            modifier = Modifier
+                                .size(64.dp * pulseScale)
+                                .background(BentoForestGreen.copy(alpha = pulseAlpha), CircleShape)
+                        )
+                        FloatingActionButton(
+                            onClick = {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                if (activeTab == "Inventory") {
+                                    showAddProductDialog = true
+                                } else if (activeTab == "Workers") {
+                                    showAddWorkerDialog = true
+                                } else {
+                                    showAddProductDialog = true
+                                }
+                            },
+                            containerColor = BentoForestGreen,
+                            contentColor = Color.Black,
+                            shape = CircleShape,
+                            modifier = Modifier
+                                .size(56.dp)
+                                .testTag("pulse_fab")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Add,
+                                contentDescription = "Quick Add Operation",
+                                modifier = Modifier.size(28.dp)
                             )
                         }
-                        Text(
-                            text = "RECYCLING OPERATIONS CONSOLE",
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = BentoSubText,
-                            letterSpacing = 1.5.sp
-                        )
                     }
-
-                    // Soft Green Modern Rounded Icon Badge
+                },
+                bottomBar = {
+                    // Glowing Custom Bottom Bar matching requirement (2)
                     Box(
                         modifier = Modifier
-                            .background(BentoSoftGreen.copy(alpha = 0.15f), RoundedCornerShape(12.dp))
-                            .border(1.dp, BentoForestGreen.copy(alpha = 0.3f), RoundedCornerShape(12.dp))
-                            .padding(8.dp)
+                            .fillMaxWidth()
+                            .padding(12.dp)
+                            .background(
+                                Color(0xFF0C101B).copy(alpha = 0.85f),
+                                shape = RoundedCornerShape(24.dp)
+                            )
+                            .border(
+                                1.dp,
+                                Brush.verticalGradient(
+                                    listOf(
+                                        Color.White.copy(alpha = 0.12f),
+                                        Color.Transparent
+                                    )
+                                ),
+                                shape = RoundedCornerShape(24.dp)
+                            )
+                            .padding(vertical = 4.dp, horizontal = 12.dp)
                     ) {
-                        Icon(
-                            Icons.Default.Home,
-                            contentDescription = "Factory Hub",
-                            tint = BentoForestGreen,
-                            modifier = Modifier.size(22.dp)
-                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceAround,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            val navItems = listOf(
+                                Triple("Daily Overview", Icons.Default.Home, "Console"),
+                                Triple("Inventory", Icons.Default.List, "Inventory"),
+                                Triple("Workers", Icons.Default.Person, "Workers"),
+                                Triple("Activity Log", Icons.Default.Star, "Logs")
+                            )
+                            navItems.forEach { (tabName, icon, label) ->
+                                val isSelected = activeTab == tabName
+                                val animatedIconTint by animateColorAsState(
+                                    targetValue = if (isSelected) BentoForestGreen else Color(0xFF64748B),
+                                    label = "nav_icon_tint"
+                                )
+                                val animatedTextTint by animateColorAsState(
+                                    targetValue = if (isSelected) Color.White else Color(0xFF64748B),
+                                    label = "nav_text_tint"
+                                )
+
+                                Column(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .clickable {
+                                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                            activeTab = tabName
+                                        }
+                                        .padding(horizontal = 14.dp, vertical = 6.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.Center
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        if (isSelected) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(36.dp)
+                                                    .background(
+                                                        Brush.radialGradient(
+                                                            listOf(
+                                                                BentoForestGreen.copy(alpha = 0.35f),
+                                                                Color.Transparent
+                                                            )
+                                                        )
+                                                    )
+                                            )
+                                        }
+                                        Icon(
+                                            imageVector = icon,
+                                            contentDescription = label,
+                                            tint = animatedIconTint,
+                                            modifier = Modifier.size(22.dp)
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Text(
+                                        text = label,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = animatedTextTint,
+                                        fontWeight = if (isSelected) FontWeight.Black else FontWeight.Bold
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
+            ) { innerPadding ->
+                Column(
+                    modifier = Modifier
+                        .padding(innerPadding)
+                        .fillMaxSize()
+                        .background(Brush.verticalGradient(listOf(BentoBg, Color(0xFF04060C))))
+                ) {
+                    // --- BENTO GRID STYLE INTEGRATED HEADER ---
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 14.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                IconButton(
+                                    onClick = {
+                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                        showSidebar = true
+                                    },
+                                    modifier = Modifier.padding(end = 8.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Menu,
+                                        contentDescription = "Menu Sidebar",
+                                        tint = BentoGold, // Premium gold hamburger menu icon
+                                        modifier = Modifier.size(28.dp)
+                                    )
+                                }
+                                Column {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text(
+                                            text = "ANWAR",
+                                            style = MaterialTheme.typography.displayMedium,
+                                            fontWeight = FontWeight.Black,
+                                            color = Color.White,
+                                            letterSpacing = (-1).sp
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        // Glowing status dot - representing safe operational connection
+                                        Box(
+                                            modifier = Modifier
+                                                .padding(vertical = 4.dp)
+                                                .size(8.dp)
+                                                .background(BentoForestGreen, CircleShape)
+                                        )
+                                    }
+                                    Text(
+                                        text = "RECYCLING OPERATIONS CONSOLE",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = BentoSubText,
+                                        letterSpacing = 1.5.sp
+                                    )
+                                }
+                            }
+
+                            // Soft Green Modern Rounded Icon Badge
+                            Box(
+                                modifier = Modifier
+                                    .background(BentoSoftGreen.copy(alpha = 0.15f), RoundedCornerShape(12.dp))
+                                    .border(1.dp, BentoForestGreen.copy(alpha = 0.3f), RoundedCornerShape(12.dp))
+                                    .padding(8.dp)
+                            ) {
+                                Icon(
+                                    Icons.Default.Home,
+                                    contentDescription = "Factory Hub",
+                                    tint = BentoForestGreen,
+                                    modifier = Modifier.size(22.dp)
+                                )
+                            }
+                        }
 
                 Spacer(modifier = Modifier.height(12.dp))
 
@@ -179,243 +349,168 @@ fun DashboardScreen(
                 }
 
                 Spacer(modifier = Modifier.height(14.dp))
-
-                // Horizontal scrollable Tab Category Tags
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    val tabsList = listOf("Daily Overview", "Inventory", "Workers", "Activity Log")
-                    tabsList.forEach { tabName ->
-                        val isSelected = activeTab == tabName
-                        
-                        // Premium color animation sequence
-                        val animatedBgColor by androidx.compose.animation.animateColorAsState(
-                            targetValue = if (isSelected) BentoForestGreen else Color(0xFF1E293B).copy(alpha = 0.5f),
-                            label = "tab_pill_bg"
-                        )
-                        val animatedTextColor by androidx.compose.animation.animateColorAsState(
-                            targetValue = if (isSelected) Color(0xFF0F172A) else BentoSubText,
-                            label = "tab_pill_text"
-                        )
-                        val animatedBorderColor by androidx.compose.animation.animateColorAsState(
-                            targetValue = if (isSelected) BentoForestGreen else BentoBorder,
-                            label = "tab_pill_border"
-                        )
-
-                        Box(
-                            modifier = Modifier
-                                .clip(CircleShape)
-                                .background(animatedBgColor)
-                                .clickable { activeTab = tabName }
-                                .border(1.dp, animatedBorderColor, CircleShape)
-                                .padding(horizontal = 18.dp, vertical = 8.dp)
-                                .testTag("tab_pill_$tabName")
-                        ) {
-                            Text(
-                                text = tabName,
-                                style = MaterialTheme.typography.labelLarge,
-                                fontWeight = FontWeight.Black,
-                                color = animatedTextColor
-                            )
-                        }
-                    }
-                }
             }
 
             // --- DETAILED LAYOUT ROUTING BASED ON CHOSEN BENTO SEGMENT ---
-            if (activeTab == "Daily Overview") {
-                // RENDER GORGEOUS COMPACT MAIN BENTO GRID FOR DAILY REPORT KPI METRICS
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f)
-                        .verticalScroll(rememberScrollState())
-                ) {
-                    BentoGridOverviewPanel(
-                        stats = stats,
-                        products = products,
-                        rawMaterials = rawMaterials,
-                        masterbatches = masterbatches,
-                        attendanceList = attendanceList,
-                        workers = workers,
-                        onWorkersTabSelect = { activeTab = "Workers" },
-                        onProductClick = { selectedProductForActivity = it },
-                        onRawMaterialClick = { selectedRawMaterialForActivity = it },
-                        onMasterbatchClick = { selectedMasterbatchForActivity = it },
-                        reportPeriod = reportPeriod,
-                        onPeriodSelect = { viewModel.setReportPeriod(it) },
-                        viewModel = viewModel
-                    )
-                }
-            } else {
-                LazyColumn(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f)
-                        .padding(horizontal = 12.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
-                    contentPadding = PaddingValues(bottom = 24.dp)
-                ) {
-                    if (activeTab == "Inventory") {
-                        // --- SECTION 1: PRODUCTS INVENTORY ---
-                        item {
-                            InventoryHeaderSection(
-                                title = "PRODUCTS INVENTORY",
-                                subtitle = "Daily fabricated bags, sales and on-hand stocks",
-                                icon = Icons.Default.List,
-                                onAddClick = { showAddProductDialog = true },
-                                addButtonText = "+ Add Product",
-                                addBtnTag = "add_product_section_btn"
+            AnimatedContent(
+                targetState = activeTab,
+                transitionSpec = {
+                    val tabsList = listOf("Daily Overview", "Inventory", "Workers", "Activity Log")
+                    val initialIndex = tabsList.indexOf(initialState)
+                    val targetIndex = tabsList.indexOf(targetState)
+                    if (targetIndex > initialIndex) {
+                        slideInHorizontally(animationSpec = spring(stiffness = Spring.StiffnessMediumLow)) { it } + fadeIn() togetherWith
+                                slideOutHorizontally(animationSpec = spring(stiffness = Spring.StiffnessMediumLow)) { -it } + fadeOut()
+                    } else {
+                        slideInHorizontally(animationSpec = spring(stiffness = Spring.StiffnessMediumLow)) { -it } + fadeIn() togetherWith
+                                slideOutHorizontally(animationSpec = spring(stiffness = Spring.StiffnessMediumLow)) { it } + fadeOut()
+                    }
+                },
+                label = "smooth_screen_switch",
+                modifier = Modifier.weight(1f).fillMaxWidth()
+            ) { targetScreen ->
+                when (targetScreen) {
+                    "Daily Overview" -> {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .fillMaxHeight()
+                                .verticalScroll(rememberScrollState())
+                        ) {
+                            BentoGridOverviewPanel(
+                                stats = stats,
+                                products = products,
+                                rawMaterials = rawMaterials,
+                                masterbatches = masterbatches,
+                                attendanceList = attendanceList,
+                                workers = workers,
+                                onWorkersTabSelect = { activeTab = "Workers" },
+                                onProductClick = { selectedProductForActivity = it },
+                                onRawMaterialClick = { selectedRawMaterialForActivity = it },
+                                onMasterbatchClick = { selectedMasterbatchForActivity = it },
+                                reportPeriod = reportPeriod,
+                                onPeriodSelect = { viewModel.setReportPeriod(it) },
+                                viewModel = viewModel
                             )
+                        }
+                    }
+                    "Inventory" -> {
+                        LazyColumn(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .fillMaxHeight()
+                                .padding(horizontal = 12.dp),
+                            verticalArrangement = Arrangement.spacedBy(16.dp),
+                            contentPadding = PaddingValues(bottom = 90.dp) // extra padding for bottom navigation
+                        ) {
+                            // --- SECTION 1: PRODUCTS INVENTORY ---
+                            item {
+                                InventoryHeaderSection(
+                                    title = "PRODUCTS INVENTORY",
+                                    subtitle = "Daily fabricated bags, sales and on-hand stocks",
+                                    icon = Icons.Default.List,
+                                    onAddClick = { showAddProductDialog = true },
+                                    addButtonText = "+ Add Product",
+                                    addBtnTag = "add_product_section_btn"
+                                )
 
-                            Spacer(modifier = Modifier.height(8.dp))
+                                Spacer(modifier = Modifier.height(12.dp))
 
-                            if (products.isEmpty()) {
-                                EmptyStatePlaceholder("No products defined. Click + Add Product to start.")
-                            } else {
-                                products.forEach { product ->
-                                    val pStats = stats.productSummary[product.id] ?: ProductAggStats(product.id, 0, 0, 0)
-                                    ProductStockCard(
-                                        product = product,
-                                        stats = pStats,
-                                        onRecordClick = { selectedProductForActivity = product }
-                                    )
-                                    Spacer(modifier = Modifier.height(8.dp))
+                                if (products.isEmpty()) {
+                                    EmptyStatePlaceholder("No products defined. Click + Add Product to start.")
+                                } else {
+                                    val chunkedProducts = products.chunked(2)
+                                    chunkedProducts.forEach { rowProducts ->
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                        ) {
+                                            rowProducts.forEach { product ->
+                                                val pStats = stats.productSummary[product.id] ?: ProductAggStats(product.id, 0, 0, 0)
+                                                Box(modifier = Modifier.weight(1f)) {
+                                                    ProductStockCard(
+                                                        product = product,
+                                                        stats = pStats,
+                                                        onRecordClick = { selectedProductForActivity = product }
+                                                    )
+                                                }
+                                            }
+                                            if (rowProducts.size < 2) {
+                                                Spacer(modifier = Modifier.weight(1f))
+                                            }
+                                        }
+                                        Spacer(modifier = Modifier.height(10.dp))
+                                    }
                                 }
                             }
-                        }
 
-                        // --- SECTION 2: RAW MATERIALS ---
-                        item {
-                            InventoryHeaderSection(
-                                title = "RAW MATERIALSFEEDSTOCK",
-                                subtitle = "Daily feedstock consumption and arrivals",
-                                icon = Icons.Default.Build,
-                                onAddClick = null
-                            )
+                            // --- SECTION 2: RAW MATERIALSFEEDSTOCK ---
+                            item {
+                                InventoryHeaderSection(
+                                    title = "RAW MATERIALSFEEDSTOCK",
+                                    subtitle = "Daily feedstock consumption and arrivals",
+                                    icon = Icons.Default.Build,
+                                    onAddClick = null
+                                )
 
-                            Spacer(modifier = Modifier.height(8.dp))
+                                Spacer(modifier = Modifier.height(8.dp))
 
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                val materials = listOf("LD", "HD", "Waste")
-                                materials.forEach { mType ->
-                                    val materialObj = rawMaterials.find { it.type.uppercase() == mType.uppercase() }
-                                        ?: RawMaterial(mType, 0.0)
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    val materials = listOf("LD", "HD", "Waste")
+                                    materials.forEach { mType ->
+                                        val materialObj = rawMaterials.find { it.type.uppercase() == mType.uppercase() }
+                                            ?: RawMaterial(mType, 0.0)
 
-                                    val used = when (mType) {
-                                        "LD" -> stats.ldUsed
-                                        "HD" -> stats.hdUsed
-                                        else -> stats.wasteUsed
-                                    }
-                                    val added = when (mType) {
-                                        "LD" -> stats.ldAdded
-                                        "HD" -> stats.hdAdded
-                                        else -> stats.wasteAdded
-                                    }
+                                        val used = when (mType) {
+                                            "LD" -> stats.ldUsed
+                                            "HD" -> stats.hdUsed
+                                            else -> stats.wasteUsed
+                                        }
+                                        val added = when (mType) {
+                                            "LD" -> stats.ldAdded
+                                            "HD" -> stats.hdAdded
+                                            else -> stats.wasteAdded
+                                        }
 
-                                    RawMaterialMiniCard(
-                                        modifier = Modifier.weight(1f),
-                                        type = mType,
-                                        rawMaterial = materialObj,
-                                        used = used,
-                                        added = added,
-                                        onRecordClick = { selectedRawMaterialForActivity = materialObj }
-                                    )
-                                }
-                            }
-                        }
-
-                        // --- SECTION 3: MASTERBATCH COLOR TRACKING ---
-                        item {
-                            InventoryHeaderSection(
-                                title = "MASTERBATCH COLOR AGENTS",
-                                subtitle = "Industrial pigments used in extrusion process",
-                                icon = Icons.Default.Star,
-                                onAddClick = { showAddMasterbatchDialog = true },
-                                addButtonText = "+ Pigment Color",
-                                addBtnTag = "add_masterbatch_section_btn"
-                            )
-
-                            Spacer(modifier = Modifier.height(8.dp))
-
-                            if (masterbatches.isEmpty()) {
-                                EmptyStatePlaceholder("No Masterbatch colors added. Click + Pigment Color.")
-                            } else {
-                                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    masterbatches.forEach { mb ->
-                                        val mbStats = stats.masterbatchSummary[mb.id] ?: MasterbatchAggStats(mb.id, 0.0, 0.0)
-                                        MasterbatchCard(
-                                            masterbatch = mb,
-                                            stats = mbStats,
-                                            onRecordClick = { selectedMasterbatchForActivity = mb },
-                                            onDeleteClick = { viewModel.deleteMasterbatch(mb) }
+                                        RawMaterialMiniCard(
+                                            modifier = Modifier.weight(1f),
+                                            type = mType,
+                                            rawMaterial = materialObj,
+                                            used = used,
+                                            added = added,
+                                            onRecordClick = { selectedRawMaterialForActivity = materialObj }
                                         )
                                     }
                                 }
                             }
-                        }
-                    }
 
-                    if (activeTab == "Workers") {
-                        // --- SECTION 4: WORKERS CONTROLLER ---
-                        item {
-                            InventoryHeaderSection(
-                                title = "WORKERS CONTROLLER",
-                                subtitle = "Schedule tracking. Sunday off, attendance lists",
-                                icon = Icons.Default.Person,
-                                onAddClick = { showAddWorkerDialog = true },
-                                addButtonText = "+ Add Worker",
-                                addBtnTag = "add_worker_section_btn"
-                            )
+                            // --- SECTION 3: MASTERBATCH COLOR TRACKING ---
+                            item {
+                                InventoryHeaderSection(
+                                    title = "MASTERBATCH COLOR AGENTS",
+                                    subtitle = "Industrial pigments used in extrusion process",
+                                    icon = Icons.Default.Star,
+                                    onAddClick = { showAddMasterbatchDialog = true },
+                                    addButtonText = "+ Pigment Color",
+                                    addBtnTag = "add_masterbatch_section_btn"
+                                )
 
-                            Spacer(modifier = Modifier.height(8.dp))
+                                Spacer(modifier = Modifier.height(8.dp))
 
-                            Card(
-                                modifier = Modifier.fillMaxWidth(),
-                                shape = RoundedCornerShape(12.dp),
-                                colors = CardDefaults.cardColors(
-                                    containerColor = BentoNeutralGray
-                                ),
-                                border = BorderStroke(1.dp, BentoBorder)
-                            ) {
-                                Column(modifier = Modifier.padding(12.dp)) {
-                                    Text(
-                                        text = "Daily Roster: ${formatDateFriendly(selectedDate)}",
-                                        style = MaterialTheme.typography.titleSmall,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = BentoForestGreen
-                                    )
-                                    Text(
-                                        text = "Work shift active 24/7. Tap icons to mark attendance state for today.",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = BentoSubText,
-                                        modifier = Modifier.padding(bottom = 8.dp)
-                                    )
-
-                                    if (workers.isEmpty()) {
-                                        EmptyStatePlaceholder("No workers registered yet.")
-                                    } else {
-                                        workers.forEach { worker ->
-                                            val stat = workerStats.find { it.workerId == worker.id }
-                                            val currentAttendanceOnDate = attendanceList.find { it.workerId == worker.id }
-
-                                            WorkerRowItem(
-                                                worker = worker,
-                                                stats = stat,
-                                                activeAttendance = currentAttendanceOnDate,
-                                                onStatusSelect = { status ->
-                                                    viewModel.markWorkerAttendance(worker.id, status)
-                                                }
-                                            )
-                                            HorizontalDivider(
-                                                color = BentoBorder.copy(alpha = 0.5f),
-                                                modifier = Modifier.padding(vertical = 4.dp)
+                                if (masterbatches.isEmpty()) {
+                                    EmptyStatePlaceholder("No Masterbatch colors added. Click + Pigment Color.")
+                                } else {
+                                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        masterbatches.forEach { mb ->
+                                            val mbStats = stats.masterbatchSummary[mb.id] ?: MasterbatchAggStats(mb.id, 0.0, 0.0)
+                                            MasterbatchCard(
+                                                masterbatch = mb,
+                                                stats = mbStats,
+                                                onRecordClick = { selectedMasterbatchForActivity = mb },
+                                                onDeleteClick = { viewModel.deleteMasterbatch(mb) }
                                             )
                                         }
                                     }
@@ -423,15 +518,204 @@ fun DashboardScreen(
                             }
                         }
                     }
+                    "Workers" -> {
+                        LazyColumn(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .fillMaxHeight()
+                                .padding(horizontal = 12.dp),
+                            verticalArrangement = Arrangement.spacedBy(16.dp),
+                            contentPadding = PaddingValues(bottom = 90.dp)
+                        ) {
+                            item {
+                                InventoryHeaderSection(
+                                    title = "WORKERS CONTROLLER",
+                                    subtitle = "Schedule tracking. Sunday off, attendance lists",
+                                    icon = Icons.Default.Person,
+                                    onAddClick = { showAddWorkerDialog = true },
+                                    addButtonText = "+ Add Worker",
+                                    addBtnTag = "add_worker_section_btn"
+                                )
 
-                    if (activeTab == "Activity Log") {
-                        item {
-                            ActivityLogSection(
-                                activityLogs = activityLogs
-                            )
+                                Spacer(modifier = Modifier.height(8.dp))
+
+                                Card(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(12.dp),
+                                    colors = CardDefaults.cardColors(
+                                        containerColor = BentoNeutralGray
+                                    ),
+                                    border = BorderStroke(1.dp, BentoBorder)
+                                ) {
+                                    Column(modifier = Modifier.padding(12.dp)) {
+                                        Text(
+                                            text = "Daily Roster: ${formatDateFriendly(selectedDate)}",
+                                            style = MaterialTheme.typography.titleSmall,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = BentoForestGreen
+                                        )
+                                        Text(
+                                            text = "Work shift active 24/7. Tap icons to mark attendance state for today.",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = BentoSubText,
+                                            modifier = Modifier.padding(bottom = 8.dp)
+                                        )
+
+                                        if (workers.isEmpty()) {
+                                            EmptyStatePlaceholder("No workers registered yet.")
+                                        } else {
+                                            workers.forEach { worker ->
+                                                val stat = workerStats.find { it.workerId == worker.id }
+                                                val currentAttendanceOnDate = attendanceList.find { it.workerId == worker.id }
+
+                                                WorkerRowItem(
+                                                    worker = worker,
+                                                    stats = stat,
+                                                    activeAttendance = currentAttendanceOnDate,
+                                                    onStatusSelect = { status ->
+                                                        viewModel.markWorkerAttendance(worker.id, status)
+                                                    }
+                                                )
+                                                HorizontalDivider(
+                                                    color = BentoBorder.copy(alpha = 0.5f),
+                                                    modifier = Modifier.padding(vertical = 4.dp)
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    "Activity Log" -> {
+                        LazyColumn(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .fillMaxHeight()
+                                .padding(horizontal = 12.dp),
+                            verticalArrangement = Arrangement.spacedBy(16.dp),
+                            contentPadding = PaddingValues(bottom = 90.dp)
+                        ) {
+                            item {
+                                ActivityLogSection(
+                                    activityLogs = activityLogs
+                                )
+                            }
                         }
                     }
                 }
+            }
+        }
+    }
+
+        // --- CUSTOM SLIDE-IN SIDEBAR DRAWER (Tesla / Apple-like) ---
+        AnimatedVisibility(
+            visible = showSidebar,
+            enter = fadeIn(),
+            exit = fadeOut()
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.7f))
+                    .clickable { showSidebar = false } // tap background to close
+            )
+        }
+
+        val sidebarWidth = 280.dp
+        val sidebarOffset by animateDpAsState(
+            targetValue = if (showSidebar) 0.dp else (-280).dp,
+            animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+            label = "sidebar_slide"
+        )
+
+        Box(
+            modifier = Modifier
+                .fillMaxHeight()
+                .width(sidebarWidth)
+                .offset(x = sidebarOffset)
+                .background(Color(0xFF030712)) // Deep luxury slate/black carbon color
+                .border(BorderStroke(1.dp, BentoBorder))
+                .clickable(enabled = false) {} // block click propagation
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(24.dp)
+                    .statusBarsPadding()
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text(
+                            text = "ANWAR",
+                            style = MaterialTheme.typography.headlineLarge,
+                            fontWeight = FontWeight.Black,
+                            color = Color.White,
+                            letterSpacing = 1.sp
+                        )
+                        Text(
+                            text = "PRODUCTION TERMINAL",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = BentoGold,
+                            letterSpacing = 1.sp
+                        )
+                    }
+                    IconButton(onClick = { showSidebar = false }) {
+                        Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.White)
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(32.dp))
+
+                // Sidebar navigation links
+                val sidebarItems = listOf(
+                    Triple("Shift Settings", Icons.Default.Build, "Manage industrial calendar settings"),
+                    Triple("Reports Engine", Icons.Default.Star, "Export PDF performance stats"),
+                    Triple("Device Connection", Icons.Default.CheckCircle, "Active recycling console logs"),
+                    Triple("System Secure", Icons.Default.Settings, "Platform adjustments & security options")
+                )
+
+                sidebarItems.forEach { (title, icon, desc) ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .clickable {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                showSidebar = false
+                            }
+                            .padding(vertical = 12.dp, horizontal = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(14.dp)
+                    ) {
+                        Icon(icon, contentDescription = null, tint = BentoForestGreen, modifier = Modifier.size(24.dp))
+                        Column {
+                            Text(title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold, color = Color.White)
+                            Text(desc, style = MaterialTheme.typography.labelSmall, color = BentoSubText)
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
+
+                Spacer(modifier = Modifier.weight(1f))
+
+                Text(
+                    text = "CONSOLE STABLE V3.0",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = BentoSubText,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = "SECURE PROTOCOL ACTIVE",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = BentoForestGreen,
+                    fontWeight = FontWeight.Bold
+                )
             }
         }
     }
@@ -523,6 +807,7 @@ fun DashboardScreen(
             }
         )
     }
+}
 }
 
 
@@ -716,7 +1001,7 @@ fun BentoGridOverviewPanel(
                 Column(modifier = Modifier.padding(14.dp)) {
                     Text("TOTAL PRODUCED", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.ExtraBold, color = BentoForestGreen)
                     Spacer(modifier = Modifier.height(4.dp))
-                    Text("${todayKgProduced.toInt()} KG", style = MaterialTheme.typography.displayMedium, fontWeight = FontWeight.Black, color = BentoForestGreen)
+                    AnimatedCounterText(targetValue = todayKgProduced.toInt(), suffix = " KG", style = MaterialTheme.typography.displayMedium, color = BentoForestGreen)
                     Text("Fabricated Today", style = MaterialTheme.typography.labelSmall, color = BentoSubText)
                 }
             }
@@ -729,7 +1014,7 @@ fun BentoGridOverviewPanel(
                 Column(modifier = Modifier.padding(14.dp)) {
                     Text("TOTAL SOLD", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.ExtraBold, color = BentoInfoText)
                     Spacer(modifier = Modifier.height(4.dp))
-                    Text("${todayKgSold.toInt()} KG", style = MaterialTheme.typography.displayMedium, fontWeight = FontWeight.Black, color = BentoInfoText)
+                    AnimatedCounterText(targetValue = todayKgSold.toInt(), suffix = " KG", style = MaterialTheme.typography.displayMedium, color = BentoInfoText)
                     Text("Shipped Today", style = MaterialTheme.typography.labelSmall, color = BentoSubText)
                 }
             }
@@ -1482,9 +1767,19 @@ fun ProductStockCard(
         modifier = Modifier
             .fillMaxWidth()
             .testTag("product_card_${product.id}"),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = BentoNeutralGray),
-        border = BorderStroke(1.dp, BentoBorder)
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = Color(0x3B1E293B) // Premium translucent space-gray glass effect
+        ),
+        border = BorderStroke(
+            width = 1.5.dp,
+            brush = Brush.verticalGradient(
+                listOf(
+                    Color(0xFF10B981), // Glowing Emerald
+                    Color(0xFF10B981).copy(alpha = 0.1f) // Fading glow bottom
+                )
+            )
+        )
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
             Row(
@@ -3066,6 +3361,139 @@ fun ActivityLogItemCard(log: ActivityLog) {
                     style = MaterialTheme.typography.labelSmall,
                     color = BentoForestGreen,
                     fontWeight = FontWeight.Bold
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun AnimatedCounterText(
+    targetValue: Int,
+    suffix: String = "",
+    style: androidx.compose.ui.text.TextStyle,
+    color: Color,
+    fontWeight: FontWeight = FontWeight.Bold
+) {
+    var animatedValue by remember { mutableStateOf(0) }
+    LaunchedEffect(targetValue) {
+        val animation = androidx.compose.animation.core.Animatable(0f)
+        animation.animateTo(
+            targetValue = targetValue.toFloat(),
+            animationSpec = androidx.compose.animation.core.tween(
+                durationMillis = 1500,
+                easing = androidx.compose.animation.core.FastOutSlowInEasing
+            )
+        ) {
+            animatedValue = this.value.toInt()
+        }
+    }
+    Text(
+        text = "$animatedValue$suffix",
+        style = style,
+        fontWeight = fontWeight,
+        color = color
+    )
+}
+
+@Composable
+fun AnwarSplashScreen(onFinished: () -> Unit) {
+    var progress by remember { mutableStateOf(0f) }
+    var startExitAnimation by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        // Animate progress bar from 0 to 1 over 2.2 seconds
+        val duration = 2200f
+        val steps = 50
+        val delayTime = (duration / steps).toLong()
+        for (i in 1..steps) {
+            kotlinx.coroutines.delay(delayTime)
+            progress = i / steps.toFloat()
+        }
+        startExitAnimation = true
+        kotlinx.coroutines.delay(400) // allow fadeout animation
+        onFinished()
+    }
+
+    val alpha by animateFloatAsState(
+        targetValue = if (startExitAnimation) 0f else 1f,
+        animationSpec = tween(400),
+        label = "splash_alpha"
+    )
+    val scale by animateFloatAsState(
+        targetValue = if (startExitAnimation) 0.9f else 1f,
+        animationSpec = tween(400, easing = FastOutSlowInEasing),
+        label = "splash_scale"
+    )
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black)
+            .graphicsLayer(alpha = alpha, scaleX = scale, scaleY = scale),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            // Pulsing Anwar Logo Badge
+            Box(
+                modifier = Modifier
+                    .size(120.dp)
+                    .background(Color(0xFF0F172A), shape = CircleShape)
+                    .border(2.dp, Color(0xFF10B981), shape = CircleShape)
+                    .padding(24.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Refresh, // High tech industrial looping / recycling icon
+                    contentDescription = null,
+                    tint = Color(0xFF10B981),
+                    modifier = Modifier.size(64.dp)
+                )
+            }
+            Spacer(modifier = Modifier.height(24.dp))
+            
+            Text(
+                text = "ANWAR",
+                style = MaterialTheme.typography.displayLarge,
+                fontWeight = FontWeight.Black,
+                color = Color.White,
+                letterSpacing = 2.sp
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            
+            Text(
+                text = "RECYCLING OPERATIONS CONSOLE",
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.Bold,
+                color = Color(0xFFD4AF37), // Luxury Gold
+                letterSpacing = 2.sp
+            )
+            
+            Spacer(modifier = Modifier.height(48.dp))
+            
+            // Premium linear progress indicator
+            Column(
+                modifier = Modifier.width(180.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                LinearProgressIndicator(
+                    progress = { progress },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(3.dp)
+                        .clip(CircleShape),
+                    color = Color(0xFF10B981),
+                    trackColor = Color(0xFF1E293B)
+                )
+                Spacer(modifier = Modifier.height(10.dp))
+                Text(
+                    text = "BOOTING STATUS ${(progress * 100).toInt()}%",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Color.White.copy(alpha = 0.5f),
+                    letterSpacing = 1.sp
                 )
             }
         }
