@@ -172,7 +172,7 @@ fun DashboardScreen(
                                 Triple("Inventory", Icons.Default.List, "Inventory"),
                                 Triple("Workers", Icons.Default.Person, "Workers"),
                                 Triple("Activity Log", Icons.Default.Star, "Logs"),
-                                Triple("BINIYAM", Icons.Default.Face, "BINIYAM")
+                                Triple("BINIYAM", Icons.Default.Android, "AI")
                             )
                             navItems.forEach { (tabName, icon, label) ->
                                 val isSelected = activeTab == tabName
@@ -1165,21 +1165,21 @@ fun BentoGridOverviewPanel(
 
                     Card(
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(containerColor = BentoBg.copy(alpha = 0.5f)),
-                        border = BorderStroke(1.dp, BentoBorder.copy(alpha = 0.5f))
+                        shape = RoundedCornerShape(12.dp),
+                        colors = CardDefaults.cardColors(containerColor = BentoBg.copy(alpha = 0.6f)),
+                        border = BorderStroke(1.dp, BentoBorder.copy(alpha = 0.4f))
                     ) {
                         Column(
-                            modifier = Modifier.padding(12.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                            modifier = Modifier.fillMaxWidth().padding(10.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
-                            // Product Title & Spec Indicators
+                            // Row 1: Product info & Specs (grouped tightly at the top)
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.Top
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Column {
+                                Column(modifier = Modifier.weight(1f)) {
                                     Text(
                                         text = "${product.name} (${product.color})",
                                         style = MaterialTheme.typography.bodyMedium,
@@ -1187,30 +1187,20 @@ fun BentoGridOverviewPanel(
                                         color = BentoTextDark
                                     )
                                     Row(
-                                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                        horizontalArrangement = Arrangement.spacedBy(4.dp),
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        Box(
-                                            modifier = Modifier
-                                                .background(BentoLightGreen.copy(alpha = 0.3f), RoundedCornerShape(6.dp))
-                                                .padding(horizontal = 6.dp, vertical = 2.dp)
-                                        ) {
-                                            Text("Size: ${product.size}", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = BentoForestGreen)
-                                        }
-                                        Text("•", style = MaterialTheme.typography.labelSmall, color = BentoSubText)
-                                        Text("Counter: ${product.counter}", style = MaterialTheme.typography.labelSmall, color = BentoSubText)
-                                        Text("•", style = MaterialTheme.typography.labelSmall, color = BentoSubText)
-                                        Text("${product.piecesPerBag} Pcs/Bag", style = MaterialTheme.typography.labelSmall, color = BentoSubText)
-                                        Text("•", style = MaterialTheme.typography.labelSmall, color = BentoSubText)
-                                        Text("Unit: ${product.bagWeightKg} kg", style = MaterialTheme.typography.labelSmall, color = BentoSubText)
+                                        Text(
+                                            text = "Size: ${product.size} • Unit: ${product.bagWeightKg}kg • ${product.piecesPerBag} Pcs/Bag • Counter: ${product.counter}",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = BentoSubText
+                                        )
                                     }
                                 }
-
-                                // Warehouse calculation
+                                
                                 Column(horizontalAlignment = Alignment.End) {
-                                    Text("Warehouse Remaining", style = MaterialTheme.typography.labelSmall, color = BentoSubText)
                                     Text(
-                                        text = "${product.currentStock} bags",
+                                        text = "${product.currentStock} Bags Stock",
                                         style = MaterialTheme.typography.labelSmall,
                                         fontWeight = FontWeight.Bold,
                                         color = BentoForestGreen
@@ -1223,32 +1213,30 @@ fun BentoGridOverviewPanel(
                                 }
                             }
 
-                            HorizontalDivider(color = BentoBorder.copy(alpha = 0.3f))
-
-                            // Inputs & Auto Calculations
+                            // Row 2: Inputs and quick save on the same row. Bags Produced & Bags Sold side-by-side, compact with no wasted space.
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Text("Bags Produced:", style = MaterialTheme.typography.labelSmall, color = BentoSubText)
-                                        val enteredFab = producedInput.toIntOrNull() ?: 0
-                                        if (enteredFab > 0) {
-                                            Text(" (${String.format("%.1f", enteredFab * product.bagWeightKg)} kg)", style = MaterialTheme.typography.labelSmall, color = BentoForestGreen, fontWeight = FontWeight.Bold)
-                                        }
-                                    }
-                                    Spacer(modifier = Modifier.height(2.dp))
+                                // Bags Produced Input
+                                Row(
+                                    modifier = Modifier.weight(1.0f),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    Text("Prod:", style = MaterialTheme.typography.labelSmall, color = BentoSubText, fontWeight = FontWeight.Bold)
+                                    val enteredFab = producedInput.toIntOrNull() ?: 0
+                                    val fabSuffix = if (enteredFab > 0) " (${String.format("%.1f", enteredFab * product.bagWeightKg)}k)" else ""
                                     OutlinedTextField(
                                         value = producedInput,
                                         onValueChange = { producedInput = it },
                                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                        placeholder = { Text("0", style = MaterialTheme.typography.bodySmall) },
+                                        placeholder = { Text("0" + fabSuffix, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                                         textStyle = MaterialTheme.typography.bodySmall,
                                         singleLine = true,
-                                        modifier = Modifier.height(48.dp).fillMaxWidth().testTag("sheet_fab_input_${product.id}"),
-                                        shape = RoundedCornerShape(8.dp),
+                                        modifier = Modifier.height(38.dp).weight(1.0f).testTag("sheet_fab_input_${product.id}"),
+                                        shape = RoundedCornerShape(6.dp),
                                         colors = OutlinedTextFieldDefaults.colors(
                                             focusedContainerColor = BentoNeutralGray,
                                             unfocusedContainerColor = BentoNeutralGray,
@@ -1258,24 +1246,24 @@ fun BentoGridOverviewPanel(
                                     )
                                 }
 
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Text("Bags Sold:", style = MaterialTheme.typography.labelSmall, color = BentoSubText)
-                                        val enteredSold = soldInput.toIntOrNull() ?: 0
-                                        if (enteredSold > 0) {
-                                            Text(" (${String.format("%.1f", enteredSold * product.bagWeightKg)} kg)", style = MaterialTheme.typography.labelSmall, color = BentoInfoText, fontWeight = FontWeight.Bold)
-                                        }
-                                    }
-                                    Spacer(modifier = Modifier.height(2.dp))
+                                // Bags Sold Input
+                                Row(
+                                    modifier = Modifier.weight(1.0f),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    Text("Sold:", style = MaterialTheme.typography.labelSmall, color = BentoSubText, fontWeight = FontWeight.Bold)
+                                    val enteredSold = soldInput.toIntOrNull() ?: 0
+                                    val soldSuffix = if (enteredSold > 0) " (${String.format("%.1f", enteredSold * product.bagWeightKg)}k)" else ""
                                     OutlinedTextField(
                                         value = soldInput,
                                         onValueChange = { soldInput = it },
                                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                        placeholder = { Text("0", style = MaterialTheme.typography.bodySmall) },
+                                        placeholder = { Text("0" + soldSuffix, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                                         textStyle = MaterialTheme.typography.bodySmall,
                                         singleLine = true,
-                                        modifier = Modifier.height(48.dp).fillMaxWidth().testTag("sheet_sold_input_${product.id}"),
-                                        shape = RoundedCornerShape(8.dp),
+                                        modifier = Modifier.height(38.dp).weight(1.0f).testTag("sheet_sold_input_${product.id}"),
+                                        shape = RoundedCornerShape(6.dp),
                                         colors = OutlinedTextFieldDefaults.colors(
                                             focusedContainerColor = BentoNeutralGray,
                                             unfocusedContainerColor = BentoNeutralGray,
@@ -1285,29 +1273,25 @@ fun BentoGridOverviewPanel(
                                     )
                                 }
 
-                                // Interactive Quick Save Action Button with Saved Visual State
-                                Column {
-                                    Spacer(modifier = Modifier.height(14.dp))
-                                    IconButton(
-                                        onClick = {
-                                            val fVal = producedInput.toIntOrNull() ?: 0
-                                            val sVal = soldInput.toIntOrNull() ?: 0
-                                            viewModel.recordProductDailyActivity(product.id, fVal, sVal, 0, "Daily entry update")
-                                        },
-                                        modifier = Modifier
-                                            .size(36.dp)
-                                            .clip(RoundedCornerShape(8.dp))
-                                            .background(
-                                                if (isSaved) Color(0xFF065F46) else BentoForestGreen
-                                            ).testTag("sheet_save_btn_${product.id}")
-                                    ) {
-                                        Icon(
-                                            imageVector = if (isSaved) Icons.Default.Check else Icons.Default.Done,
-                                            contentDescription = "Save values",
-                                            tint = if (isSaved) Color(0xFF15803D) else Color.White,
-                                            modifier = Modifier.size(16.dp)
-                                        )
-                                    }
+                                // Interactive Quick Save Action Button
+                                IconButton(
+                                    onClick = {
+                                        val fVal = producedInput.toIntOrNull() ?: 0
+                                        val sVal = soldInput.toIntOrNull() ?: 0
+                                        viewModel.recordProductDailyActivity(product.id, fVal, sVal, 0, "Daily entry update")
+                                    },
+                                    modifier = Modifier
+                                        .size(38.dp)
+                                        .clip(RoundedCornerShape(6.dp))
+                                        .background(if (isSaved) Color(0xFF065F46) else BentoForestGreen)
+                                        .testTag("sheet_save_btn_${product.id}")
+                                ) {
+                                    Icon(
+                                        imageVector = if (isSaved) Icons.Default.Check else Icons.Default.Done,
+                                        contentDescription = "Save values",
+                                        tint = Color.White,
+                                        modifier = Modifier.size(16.dp)
+                                    )
                                 }
                             }
                         }
@@ -1359,28 +1343,28 @@ fun BentoGridOverviewPanel(
             Card(
                 modifier = Modifier
                     .weight(0.5f)
-                    .height(180.dp)
+                    .height(144.dp)
                     .testTag("bento_feedstock_card"),
-                shape = RoundedCornerShape(24.dp),
+                shape = RoundedCornerShape(20.dp),
                 colors = CardDefaults.cardColors(containerColor = BentoNeutralGray),
                 border = BorderStroke(1.dp, BentoBorder)
             ) {
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(14.dp),
-                    verticalArrangement = Arrangement.SpaceBetween
+                        .padding(10.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     Text(
                         text = "RAW MATERIALS",
                         style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.ExtraBold,
                         color = BentoSubText,
-                        letterSpacing = 1.sp
+                        letterSpacing = 0.5.sp
                     )
 
                     Column(
-                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Row(
@@ -1388,7 +1372,7 @@ fun BentoGridOverviewPanel(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text("LDPE", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = BentoTextDark)
+                            Text("LDPE", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = BentoTextDark)
                             val added = stats.ldAdded
                             val used = stats.ldUsed
                             val diff = added - used
@@ -1402,7 +1386,7 @@ fun BentoGridOverviewPanel(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text("HDPE", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = BentoTextDark)
+                            Text("HDPE", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = BentoTextDark)
                             val added = stats.hdAdded
                             val used = stats.hdUsed
                             val diff = added - used
@@ -1416,7 +1400,7 @@ fun BentoGridOverviewPanel(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text("Waste", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = BentoSubText)
+                            Text("Waste", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = BentoSubText)
                             val totalWaste = rawMaterials.find { it.type.uppercase() == "WASTE" }?.currentStock ?: 890.0
                             Text("${totalWaste.toInt()}kg", style = MaterialTheme.typography.labelSmall, color = BentoSubText)
                         }
@@ -1425,9 +1409,9 @@ fun BentoGridOverviewPanel(
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .background(BentoLightGreen.copy(alpha = 0.15f), RoundedCornerShape(8.dp))
-                            .border(1.dp, BentoForestGreen.copy(alpha = 0.15f), RoundedCornerShape(8.dp))
-                            .padding(vertical = 4.dp),
+                            .background(BentoLightGreen.copy(alpha = 0.15f), RoundedCornerShape(6.dp))
+                            .border(1.dp, BentoForestGreen.copy(alpha = 0.15f), RoundedCornerShape(6.dp))
+                            .padding(vertical = 2.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         val totalStockKg = rawMaterials.sumOf { it.currentStock } / 1000.0
@@ -1445,9 +1429,9 @@ fun BentoGridOverviewPanel(
             Card(
                 modifier = Modifier
                     .weight(0.5f)
-                    .height(180.dp)
+                    .height(144.dp)
                     .testTag("bento_masterbatch_card"),
-                shape = RoundedCornerShape(24.dp),
+                shape = RoundedCornerShape(20.dp),
                 colors = CardDefaults.cardColors(containerColor = BentoNeutralGray),
                 border = BorderStroke(1.dp, BentoBorder)
             ) {
@@ -1455,9 +1439,9 @@ fun BentoGridOverviewPanel(
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(14.dp),
+                        .padding(10.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.SpaceBetween
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     Text(
                         text = "MASTERBATCH",
@@ -1465,35 +1449,34 @@ fun BentoGridOverviewPanel(
                         fontWeight = FontWeight.ExtraBold,
                         color = BentoSubText,
                         modifier = Modifier.align(Alignment.Start),
-                        letterSpacing = 1.sp
+                        letterSpacing = 0.5.sp
                     )
 
-                    Box(
-                        modifier = Modifier.weight(1f),
-                        contentAlignment = Alignment.Center
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(50.dp)
-                                .border(3.dp, BentoForestGreen.copy(alpha = 0.4f), CircleShape)
-                                .border(1.5.dp, BentoForestGreen, CircleShape),
+                                .size(34.dp)
+                                .border(2.dp, BentoForestGreen.copy(alpha = 0.4f), CircleShape)
+                                .border(1.1.dp, BentoForestGreen, CircleShape),
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
                                 text = "${totalMasterbatchUsed.toInt()}kg",
-                                style = MaterialTheme.typography.labelMedium,
+                                style = MaterialTheme.typography.labelSmall,
                                 fontWeight = FontWeight.ExtraBold,
                                 color = BentoForestGreen
                             )
                         }
+                        Text(
+                            text = "Used in 24h",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = BentoSubText
+                        )
                     }
-
-                    Text(
-                        text = "Used in 24h",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = BentoSubText,
-                        modifier = Modifier.padding(bottom = 6.dp)
-                    )
 
                     Button(
                         onClick = {
@@ -1503,8 +1486,8 @@ fun BentoGridOverviewPanel(
                             containerColor = BentoLightGreen,
                             contentColor = BentoForestGreen
                         ),
-                        shape = RoundedCornerShape(12.dp),
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                        shape = RoundedCornerShape(10.dp),
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(28.dp)
@@ -1512,6 +1495,8 @@ fun BentoGridOverviewPanel(
                         Text("Refill", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
                     }
                 }
+            }
+        }
                   // --- ROW 3: WORKERS ON DUTY (SPAN-6) ---
         val workingCount = attendanceList.count { it.status == "On Duty" }
         val absCount = attendanceList.count { it.status == "Absent" }
@@ -1720,7 +1705,6 @@ fun BentoGridOverviewPanel(
                         )
                     }
                 }
-            }  }
             }
         }
     }
