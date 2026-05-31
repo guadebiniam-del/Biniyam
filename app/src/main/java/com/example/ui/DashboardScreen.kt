@@ -37,6 +37,14 @@ import com.example.ui.theme.*
 import com.example.R
 import com.example.BuildConfig
 import kotlinx.coroutines.launch
+import android.content.Intent
+import android.speech.RecognizerIntent
+import android.speech.tts.TextToSpeech
+import android.widget.Toast
+import android.app.Activity
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.ui.platform.LocalContext
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.text.SimpleDateFormat
@@ -3580,8 +3588,32 @@ fun BiniyamBotScreen(
     workers: List<Worker>,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
     var inputText by remember { mutableStateOf("") }
+    
+    // Voice Input & Output states
+    var isAmharicInput by remember { mutableStateOf(true) }
+    var currentlySpeakingMsgId by remember { mutableStateOf<String?>(null) }
+    
+    // Setup Text-To-Speech instance
+    var tts by remember { mutableStateOf<TextToSpeech?>(null) }
+    var isTtsReady by remember { mutableStateOf(false) }
+
+    DisposableEffect(context) {
+        val listener = TextToSpeech.OnInitListener { status ->
+            if (status == TextToSpeech.SUCCESS) {
+                isTtsReady = true
+            }
+        }
+        val ttsInstance = TextToSpeech(context, listener)
+        tts = ttsInstance
+        onDispose {
+            ttsInstance.stop()
+            ttsInstance.shutdown()
+        }
+    }
+
     val messages = remember {
         mutableStateListOf<ChatMessage>().apply {
             add(
@@ -3593,6 +3625,116 @@ fun BiniyamBotScreen(
         }
     }
     var isThinking by remember { mutableStateOf(false) }
+
+    // Detect if text contains Ge'ez script (Amharic characters)
+    fun isAmharic(text: String): Boolean {
+        for (char in text) {
+            if (char.code in 0x1200..0x137F) {
+                return true
+            }
+        }
+        return false
+    }
+
+    // Clean up markdown tags from the text before voice pronouncement
+    fun cleanTextForTts(text: String): String {
+        return text.replace("**", "")
+            .replace("*", "")
+            .replace("###", "")
+            .replace("##", "")
+            .replace("#", "")
+            .replace("`", "")
+            .replace("_", "")
+    }
+
+    // Core read out loud speak function
+    fun speakMessage(message: ChatMessage) {
+        if (currentlySpeakingMsgId == message.id) {
+            tts?.stop()
+            currentlySpeakingMsgId = null
+            return
+        }
+        
+        tts?.stop()
+        val textToSpeak = cleanTextForTts(message.text)
+        val isAmh = isAmharic(textToSpeak)
+        
+        val ttsEngine = tts
+        if (ttsEngine != null && isTtsReady) {
+            val locale = if (isAmh) Locale("am", "ET") else Locale.US
+            val langResult = ttsEngine.setLanguage(locale)
+            if (langResult == TextToSpeech.LANG_MISSING_DATA || langResult == TextToSpeech.LANG_NOT_SUPPORTED) {
+                android.util.Log.w("BiniyamBot", "Locale $locale not fully supported/available, running default.")
+                ttsEngine.setLanguage(Locale.US)
+            }
+            
+            // Premium tone & speed adjustment
+            ttsEngine.setPitch(1.05f)
+            ttsEngine.setSpeechRate(0.95f)
+
+            ttsEngine.setOnUtteranceProgressListener(object : android.speech.tts.UtteranceProgressListener() {
+                override fun onStart(utteranceId: String?) {
+                    currentlySpeakingMsgId = message.id
+                }
+
+                override fun onDone(utteranceId: String?) {
+                    if (currentlySpeakingMsgId == message.id) {
+                        currentlySpeakingMsgId = null
+                    }
+                }
+
+                @Deprecated("Deprecated")
+                override fun onError(utteranceId: String?) {
+                    if (currentlySpeakingMsgId == message.id) {
+                        currentlySpeakingMsgId = null
+                    }
+                }
+            })
+
+            val params = android.os.Bundle().apply {
+                putString(TextToSpeech.Engine.KEY_PARAM_UTTERANCE_ID, message.id)
+            }
+            ttsEngine.speak(textToSpeak, TextToSpeech.QUEUE_FLUSH, params, message.id)
+            currentlySpeakingMsgId = message.id
+        }
+    }
+
+    // Speech-To-Text compose launcher activity result listener
+    val speechRecognizerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            val data = result.data
+            val results = data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
+            val spokenText = results?.firstOrNull() ?: ""
+            if (spokenText.isNotBlank()) {
+                inputText = spokenText
+            }
+        }
+    }
+
+    fun startVoiceInput(isAmharicSelected: Boolean) {
+        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            if (isAmharicSelected) {
+                putExtra(RecognizerIntent.EXTRA_LANGUAGE, "am-ET")
+                putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, "am-ET")
+                putExtra(RecognizerIntent.EXTRA_ONLY_RETURN_LANGUAGE_PREFERENCE, "am-ET")
+                putExtra(RecognizerIntent.EXTRA_PROMPT, "በአማርኛ ይናገሩ... / Speak Amharic...")
+            } else {
+                putExtra(RecognizerIntent.EXTRA_LANGUAGE, "en-US")
+                putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, "en-US")
+                putExtra(RecognizerIntent.EXTRA_ONLY_RETURN_LANGUAGE_PREFERENCE, "en-US")
+                putExtra(RecognizerIntent.EXTRA_PROMPT, "Speak in English...")
+            }
+        }
+        try {
+            speechRecognizerLauncher.launch(intent)
+        } catch (e: Exception) {
+            android.util.Log.e("BiniyamBot", "Speech recognition launch failed: ${e.message}")
+            Toast.makeText(context, "Speech recognizer is not available on this device", Toast.LENGTH_SHORT).show()
+        }
+    }
     
     // Auto scroll state
     val listState = androidx.compose.foundation.lazy.rememberLazyListState()
@@ -3607,7 +3749,7 @@ fun BiniyamBotScreen(
     // Suggested quick actions
     val suggestions = listOf(
         "የአሁኑን የክምችት መጠን ማጠቃለያ ስጠኝ" to "ያለውን የክምችት (Stock) ሁኔታ በዝርዝር ንገረኝ።",
-        "የዛሬው ምርትና ሽያጭ እንዴት ነው?" to "የዛሬውን የምርት እና የሽያጭ ሁኔታ (Fabricated and Sold) አጠቃላይ መረጃ ስጠኝ።",
+        "የዛሬው ምርትና ሽያጭ እንዴት ነው?" to "የዛሬውን የምርት এবং የሽያጭ ሁኔታ (Fabricated and Sold) አጠቃላይ መረጃ ስጠኝ።",
         "ስለ ጥሬ ዕቃዎች (Raw Materials) ንገረኝ" to "ወቅታዊ ያለውን የጥሬ ዕቃዎች ደረጃ (LD, HD, Waste Stock) ንገረኝ።",
         "የሠራተኞች ሁኔታ እንዴት ነው?" to "በድርጅቱ ውስጥ ያሉትን የሠራተኞች ሁኔታ እና መገኘታቸውን ንገረኝ።"
     )
@@ -3640,8 +3782,11 @@ fun BiniyamBotScreen(
                 history = historyList
             )
 
-            messages.add(ChatMessage(sender = "model", text = response))
+            val newMsg = ChatMessage(sender = "model", text = response)
+            messages.add(newMsg)
             isThinking = false
+            // Auto-speak response
+            speakMessage(newMsg)
         }
     }
 
@@ -3768,21 +3913,37 @@ fun BiniyamBotScreen(
                             if (!isMe) {
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                    modifier = Modifier.padding(bottom = 4.dp)
+                                    modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp)
                                 ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Face,
-                                        contentDescription = null,
-                                        tint = BentoGold,
-                                        modifier = Modifier.size(14.dp)
-                                    )
-                                    Text(
-                                        text = "BINIYAM AI",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        fontWeight = FontWeight.Bold,
-                                        color = BentoGold
-                                    )
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                        modifier = Modifier.weight(1f)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Face,
+                                            contentDescription = null,
+                                            tint = BentoGold,
+                                            modifier = Modifier.size(14.dp)
+                                        )
+                                        Text(
+                                            text = "BINIYAM AI",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            fontWeight = FontWeight.Bold,
+                                            color = BentoGold
+                                        )
+                                    }
+                                    IconButton(
+                                        onClick = { speakMessage(message) },
+                                        modifier = Modifier.size(24.dp).testTag("speech_speak_btn_${message.id}")
+                                    ) {
+                                        Icon(
+                                            imageVector = if (currentlySpeakingMsgId == message.id) Icons.Default.VolumeOff else Icons.Default.VolumeUp,
+                                            contentDescription = "Hear message out loud",
+                                            tint = if (currentlySpeakingMsgId == message.id) BentoGold else Color.White.copy(alpha = 0.6f),
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    }
                                 }
                             }
                             Text(
@@ -3879,6 +4040,55 @@ fun BiniyamBotScreen(
                 .padding(horizontal = 8.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            // Voice Input & Custom language toggle controls
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                modifier = Modifier.padding(end = 4.dp)
+            ) {
+                // Speech Input Target selection indicator/toggle
+                Box(
+                    modifier = Modifier
+                        .background(
+                            color = if (isAmharicInput) BentoForestGreen.copy(alpha = 0.15f) else Color(0xFF1E293B),
+                            shape = RoundedCornerShape(12.dp)
+                        )
+                        .border(
+                            width = 1.dp,
+                            color = if (isAmharicInput) BentoForestGreen else Color.Gray.copy(alpha = 0.4f),
+                            shape = RoundedCornerShape(12.dp)
+                        )
+                        .clickable {
+                            isAmharicInput = !isAmharicInput
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        }
+                        .padding(horizontal = 10.dp, vertical = 6.dp)
+                ) {
+                    Text(
+                        text = if (isAmharicInput) "አማርኛ" else "EN",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = if (isAmharicInput) BentoForestGreen else Color.White
+                    )
+                }
+
+                // Voice Mic Button
+                IconButton(
+                    onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        startVoiceInput(isAmharicInput)
+                    },
+                    modifier = Modifier.size(36.dp).testTag("biniyam_mic_btn")
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Mic,
+                        contentDescription = "Microphone voice input",
+                        tint = if (isAmharicInput) BentoForestGreen else BentoGold,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
+
             TextField(
                 value = inputText,
                 onValueChange = { inputText = it },
