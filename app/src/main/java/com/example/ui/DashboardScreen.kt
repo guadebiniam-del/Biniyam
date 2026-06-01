@@ -1175,165 +1175,262 @@ fun BentoGridOverviewPanel(
 
                     Card(
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = CardDefaults.cardColors(containerColor = BentoBg.copy(alpha = 0.6f)),
-                        border = BorderStroke(1.dp, BentoBorder.copy(alpha = 0.4f))
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = BentoBg.copy(alpha = 0.60f)),
+                        border = BorderStroke(1.5.dp, BentoBorder.copy(alpha = 0.5f))
                     ) {
                         Column(
-                            modifier = Modifier.fillMaxWidth().padding(10.dp),
-                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                            modifier = Modifier.fillMaxWidth().padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(14.dp)
                         ) {
-                            // Row 1: Product info & Specs (grouped tightly at the top)
+                            // Row 1: Header (Product Name)
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "${product.name} (${product.color})",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = BentoTextDark
+                                )
+                            }
+
+                            // Dedicated Details & Stats Sheet (Size, Pcs/Bag, Counter, KG, Stock)
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(Color(0xFF0F172A).copy(alpha = 0.5f), RoundedCornerShape(12.dp))
+                                    .border(1.dp, BentoBorder.copy(alpha = 0.3f), RoundedCornerShape(12.dp))
+                                    .padding(14.dp),
+                                verticalArrangement = Arrangement.spacedBy(10.dp) // Generous padding/spacing between each detail line
+                            ) {
+                                // 1. Size Detail
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
                                     Text(
-                                        text = "${product.name} (${product.color})",
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        fontWeight = FontWeight.Bold,
-                                        color = BentoTextDark
+                                        text = "Size",
+                                        style = MaterialTheme.typography.bodyMedium, // Slightly larger text
+                                        color = BentoSubText,
+                                        fontWeight = FontWeight.Medium
                                     )
-                                    Row(
-                                        horizontalArrangement = Arrangement.spacedBy(4.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
+                                    Text(
+                                        text = "${product.size}",
+                                        style = MaterialTheme.typography.bodyMedium, // Slightly larger text
+                                        color = Color.White,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+
+                                // 2. Unit Weight
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = "Unit Bag Weight",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = BentoSubText,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                    Text(
+                                        text = "${product.bagWeightKg} kg",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = Color.White,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+
+                                // 3. Pieces per bag
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = "Pieces Per Bag",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = BentoSubText,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                    Text(
+                                        text = "${product.piecesPerBag} Pcs/Bag",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = Color.White,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+
+                                // 4. Machine Counter Number
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = "Machine Counter",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = BentoSubText,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                    Text(
+                                        text = "${product.counter}",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = Color.White,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+
+                                // 5. Warehouse Stock Stats
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = "Current Stock Level",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = BentoSubText,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                    Column(horizontalAlignment = Alignment.End) {
                                         Text(
-                                            text = "Size: ${product.size} • Unit: ${product.bagWeightKg}kg • ${product.piecesPerBag} Pcs/Bag • Counter: ${product.counter}",
+                                            text = "${product.currentStock} Bags",
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            fontWeight = FontWeight.Bold,
+                                            color = BentoSoftGreen
+                                        )
+                                        Text(
+                                            text = "(${String.format("%.1f", product.currentStock * product.bagWeightKg)} kg)",
                                             style = MaterialTheme.typography.labelSmall,
                                             color = BentoSubText
                                         )
                                     }
                                 }
-                                
-                                Column(horizontalAlignment = Alignment.End) {
-                                    Text(
-                                        text = "${product.currentStock} Bags Stock",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        fontWeight = FontWeight.Bold,
-                                        color = BentoForestGreen
-                                    )
-                                    Text(
-                                        text = "(${String.format("%.1f", product.currentStock * product.bagWeightKg)} kg)",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = BentoSubText
-                                    )
-                                }
                             }
 
-                            // Labels and Dynamic Calculated weight suffixes
-                            Row(
+                            // Interactive Input Form Area
+                            Column(
                                 modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalAlignment = Alignment.CenterVertically
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                val enteredFab = producedInput.toIntOrNull() ?: 0
-                                val fabSuffix = if (enteredFab > 0) " (${String.format("%.1f", enteredFab * product.bagWeightKg)} kg)" else ""
-                                Text(
-                                    text = "PRODUCED$fabSuffix",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = BentoForestGreen,
-                                    fontWeight = FontWeight.Bold,
-                                    modifier = Modifier.weight(1.0f)
-                                )
-
-                                val enteredSold = soldInput.toIntOrNull() ?: 0
-                                val soldSuffix = if (enteredSold > 0) " (${String.format("%.1f", enteredSold * product.bagWeightKg)} kg)" else ""
-                                Text(
-                                    text = "SOLD$soldSuffix",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = BentoInfoText,
-                                    fontWeight = FontWeight.Bold,
-                                    modifier = Modifier.weight(1.0f)
-                                )
-                                Spacer(modifier = Modifier.width(64.dp))
-                            }
-
-                            // Row 2: Large tactile inputs and quick save on the same row.
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                // Bags Produced Input
-                                OutlinedTextField(
-                                    value = producedInput,
-                                    onValueChange = { producedInput = it },
-                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                    placeholder = { 
-                                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                            Text("0", style = TextStyle(fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color.Gray)) 
-                                        }
-                                    },
-                                    textStyle = TextStyle(fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color.White, textAlign = TextAlign.Center),
-                                    singleLine = true,
-                                    modifier = Modifier
-                                        .height(76.dp)
-                                        .weight(1.0f)
-                                        .testTag("sheet_fab_input_${product.id}"),
-                                    shape = RoundedCornerShape(12.dp),
-                                    colors = OutlinedTextFieldDefaults.colors(
-                                        focusedTextColor = Color.White,
-                                        unfocusedTextColor = Color.White,
-                                        focusedContainerColor = Color(0xFF1E293B),
-                                        unfocusedContainerColor = Color(0xFF1E293B),
-                                        focusedBorderColor = BentoForestGreen,
-                                        unfocusedBorderColor = BentoBorder,
-                                        focusedPlaceholderColor = Color.Gray,
-                                        unfocusedPlaceholderColor = Color.Gray
-                                    )
-                                )
-
-                                // Bags Sold Input
-                                OutlinedTextField(
-                                    value = soldInput,
-                                    onValueChange = { soldInput = it },
-                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                    placeholder = { 
-                                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                            Text("0", style = TextStyle(fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color.Gray)) 
-                                        }
-                                    },
-                                    textStyle = TextStyle(fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color.White, textAlign = TextAlign.Center),
-                                    singleLine = true,
-                                    modifier = Modifier
-                                        .height(76.dp)
-                                        .weight(1.0f)
-                                        .testTag("sheet_sold_input_${product.id}"),
-                                    shape = RoundedCornerShape(12.dp),
-                                    colors = OutlinedTextFieldDefaults.colors(
-                                        focusedTextColor = Color.White,
-                                        unfocusedTextColor = Color.White,
-                                        focusedContainerColor = Color(0xFF1E293B),
-                                        unfocusedContainerColor = Color(0xFF1E293B),
-                                        focusedBorderColor = BentoForestGreen,
-                                        unfocusedBorderColor = BentoBorder,
-                                        focusedPlaceholderColor = Color.Gray,
-                                        unfocusedPlaceholderColor = Color.Gray
-                                    )
-                                )
-
-                                // Interactive Quick Save Action Button
-                                IconButton(
-                                    onClick = {
-                                        val fVal = producedInput.toIntOrNull() ?: 0
-                                        val sVal = soldInput.toIntOrNull() ?: 0
-                                        viewModel.recordProductDailyActivity(product.id, fVal, sVal, 0, "Daily entry update")
-                                    },
-                                    modifier = Modifier
-                                        .size(width = 56.dp, height = 76.dp)
-                                        .clip(RoundedCornerShape(12.dp))
-                                        .background(if (isSaved) Color(0xFF065F46) else BentoForestGreen)
-                                        .testTag("sheet_save_btn_${product.id}")
+                                // Labels and Dynamic Calculated weight suffixes
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Icon(
-                                        imageVector = if (isSaved) Icons.Default.Check else Icons.Default.Done,
-                                        contentDescription = "Save values",
-                                        tint = Color.White,
-                                        modifier = Modifier.size(28.dp)
+                                    val enteredFab = producedInput.toIntOrNull() ?: 0
+                                    val fabSuffix = if (enteredFab > 0) " (${String.format("%.1f", enteredFab * product.bagWeightKg)} kg)" else ""
+                                    Text(
+                                        text = "PRODUCED$fabSuffix",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = BentoForestGreen,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.weight(1.0f)
                                     )
+
+                                    val enteredSold = soldInput.toIntOrNull() ?: 0
+                                    val soldSuffix = if (enteredSold > 0) " (${String.format("%.1f", enteredSold * product.bagWeightKg)} kg)" else ""
+                                    Text(
+                                        text = "SOLD$soldSuffix",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = BentoInfoText,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.weight(1.0f)
+                                    )
+                                    Spacer(modifier = Modifier.width(64.dp))
+                                }
+
+                                // Row 2: Inputs and save button in a sleek lower-height layout
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    // Bags Produced Input (Smaller in height)
+                                    OutlinedTextField(
+                                        value = producedInput,
+                                        onValueChange = { producedInput = it },
+                                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                        placeholder = { 
+                                            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                                Text("0", style = TextStyle(fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.Gray)) 
+                                            }
+                                        },
+                                        textStyle = TextStyle(fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White, textAlign = TextAlign.Center),
+                                        singleLine = true,
+                                        modifier = Modifier
+                                            .height(54.dp)
+                                            .weight(1.0f)
+                                            .testTag("sheet_fab_input_${product.id}"),
+                                        shape = RoundedCornerShape(10.dp),
+                                        colors = OutlinedTextFieldDefaults.colors(
+                                            focusedTextColor = Color.White,
+                                            unfocusedTextColor = Color.White,
+                                            focusedContainerColor = Color(0xFF1E293B),
+                                            unfocusedContainerColor = Color(0xFF1E293B),
+                                            focusedBorderColor = BentoForestGreen,
+                                            unfocusedBorderColor = BentoBorder,
+                                            focusedPlaceholderColor = Color.Gray,
+                                            unfocusedPlaceholderColor = Color.Gray
+                                        )
+                                    )
+
+                                    // Bags Sold Input (Smaller in height)
+                                    OutlinedTextField(
+                                        value = soldInput,
+                                        onValueChange = { soldInput = it },
+                                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                        placeholder = { 
+                                            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                                Text("0", style = TextStyle(fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.Gray)) 
+                                            }
+                                        },
+                                        textStyle = TextStyle(fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White, textAlign = TextAlign.Center),
+                                        singleLine = true,
+                                        modifier = Modifier
+                                            .height(54.dp)
+                                            .weight(1.0f)
+                                            .testTag("sheet_sold_input_${product.id}"),
+                                        shape = RoundedCornerShape(10.dp),
+                                        colors = OutlinedTextFieldDefaults.colors(
+                                            focusedTextColor = Color.White,
+                                            unfocusedTextColor = Color.White,
+                                            focusedContainerColor = Color(0xFF1E293B),
+                                            unfocusedContainerColor = Color(0xFF1E293B),
+                                            focusedBorderColor = BentoForestGreen,
+                                            unfocusedBorderColor = BentoBorder,
+                                            focusedPlaceholderColor = Color.Gray,
+                                            unfocusedPlaceholderColor = Color.Gray
+                                        )
+                                    )
+
+                                    // Interactive Quick Save Action Button
+                                    IconButton(
+                                        onClick = {
+                                            val fVal = producedInput.toIntOrNull() ?: 0
+                                            val sVal = soldInput.toIntOrNull() ?: 0
+                                            viewModel.recordProductDailyActivity(product.id, fVal, sVal, 0, "Daily entry update")
+                                        },
+                                        modifier = Modifier
+                                            .size(width = 56.dp, height = 54.dp)
+                                            .clip(RoundedCornerShape(10.dp))
+                                            .background(if (isSaved) Color(0xFF065F46) else BentoForestGreen)
+                                            .testTag("sheet_save_btn_${product.id}")
+                                    ) {
+                                        Icon(
+                                            imageVector = if (isSaved) Icons.Default.Check else Icons.Default.Done,
+                                            contentDescription = "Save values",
+                                            tint = Color.White,
+                                            modifier = Modifier.size(24.dp)
+                                        )
+                                    }
                                 }
                             }
                         }
