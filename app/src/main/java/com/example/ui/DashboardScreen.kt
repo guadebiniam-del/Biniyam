@@ -1198,7 +1198,7 @@ fun BentoGridOverviewPanel(
                                 )
                             }
 
-                            // Dedicated Details & Stats Sheet (Size, Pcs/Bag, Counter, KG, Stock)
+                            // Dedicated Details & Stats Sheet (Size, Counter, Pieces Per Bag, Bag Weight, Stock)
                             Column(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -1207,7 +1207,7 @@ fun BentoGridOverviewPanel(
                                     .padding(14.dp),
                                 verticalArrangement = Arrangement.spacedBy(10.dp) // Generous padding/spacing between each detail line
                             ) {
-                                // 1. Size Detail
+                                // 1. Size
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -1227,54 +1227,14 @@ fun BentoGridOverviewPanel(
                                     )
                                 }
 
-                                // 2. Unit Weight
+                                // 2. Counter
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Text(
-                                        text = "Unit Bag Weight",
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = BentoSubText,
-                                        fontWeight = FontWeight.Medium
-                                    )
-                                    Text(
-                                        text = "${product.bagWeightKg} kg",
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = Color.White,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
-
-                                // 3. Pieces per bag
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(
-                                        text = "Pieces Per Bag",
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = BentoSubText,
-                                        fontWeight = FontWeight.Medium
-                                    )
-                                    Text(
-                                        text = "${product.piecesPerBag} Pcs/Bag",
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = Color.White,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
-
-                                // 4. Machine Counter Number
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(
-                                        text = "Machine Counter",
+                                        text = "Counter",
                                         style = MaterialTheme.typography.bodyMedium,
                                         color = BentoSubText,
                                         fontWeight = FontWeight.Medium
@@ -1287,7 +1247,47 @@ fun BentoGridOverviewPanel(
                                     )
                                 }
 
-                                // 5. Warehouse Stock Stats
+                                // 3. Pieces Per Bag
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = "Pieces Per Bag",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = BentoSubText,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                    Text(
+                                        text = "${product.piecesPerBag}",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = Color.White,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+
+                                // 4. Bag Weight (kg)
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = "Bag Weight (kg)",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = BentoSubText,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                    Text(
+                                        text = "${product.bagWeightKg} kg",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = Color.White,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+
+                                // 5. Current Stock Level (bags + kg in green)
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -1309,7 +1309,8 @@ fun BentoGridOverviewPanel(
                                         Text(
                                             text = "(${String.format("%.1f", product.currentStock * product.bagWeightKg)} kg)",
                                             style = MaterialTheme.typography.labelSmall,
-                                            color = BentoSubText
+                                            fontWeight = FontWeight.Bold,
+                                            color = BentoSoftGreen
                                         )
                                     }
                                 }
