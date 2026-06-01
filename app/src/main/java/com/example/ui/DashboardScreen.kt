@@ -1330,7 +1330,7 @@ fun BentoGridOverviewPanel(
                                     val enteredFab = producedInput.toIntOrNull() ?: 0
                                     val fabSuffix = if (enteredFab > 0) " (${String.format("%.1f", enteredFab * product.bagWeightKg)} kg)" else ""
                                     Text(
-                                        text = "PRODUCED$fabSuffix",
+                                        text = "የተመረተ$fabSuffix",
                                         style = MaterialTheme.typography.labelSmall,
                                         color = BentoForestGreen,
                                         fontWeight = FontWeight.Bold,
@@ -1340,7 +1340,7 @@ fun BentoGridOverviewPanel(
                                     val enteredSold = soldInput.toIntOrNull() ?: 0
                                     val soldSuffix = if (enteredSold > 0) " (${String.format("%.1f", enteredSold * product.bagWeightKg)} kg)" else ""
                                     Text(
-                                        text = "SOLD$soldSuffix",
+                                        text = "የተጫነ$soldSuffix",
                                         style = MaterialTheme.typography.labelSmall,
                                         color = BentoInfoText,
                                         fontWeight = FontWeight.Bold,
