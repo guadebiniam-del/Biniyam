@@ -1334,6 +1334,7 @@ fun BentoGridOverviewPanel(
                                         style = MaterialTheme.typography.labelSmall,
                                         color = BentoForestGreen,
                                         fontWeight = FontWeight.Bold,
+                                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                                         modifier = Modifier.weight(1.0f)
                                     )
 
@@ -1344,6 +1345,7 @@ fun BentoGridOverviewPanel(
                                         style = MaterialTheme.typography.labelSmall,
                                         color = BentoInfoText,
                                         fontWeight = FontWeight.Bold,
+                                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                                         modifier = Modifier.weight(1.0f)
                                     )
                                     Spacer(modifier = Modifier.width(64.dp))
