@@ -25,6 +25,9 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -780,9 +783,9 @@ fun DashboardScreen(
                                         val activeWorkers = workers.filter { it.isActive }
 
                                         activeWorkers.forEachIndexed { idx, worker ->
-                                            val currentYearMonth = if (selectedDate.length >= 7) selectedDate.substring(0, 7) else "2026-06"
+                                            val currentYearMonthPrefix = String.format(Locale.US, "%04d-%02d-", ethYear, ethMonth)
                                             val workerMonthAtt = allWorkerAttendance.filter {
-                                                it.workerId == worker.id && it.date.startsWith(currentYearMonth)
+                                                it.workerId == worker.id && it.date.startsWith(currentYearMonthPrefix)
                                             }
                                             val absentDays = workerMonthAtt.count { it.status == "Absent" }
                                             val monthlySalary = worker.monthlySalary
@@ -829,16 +832,34 @@ fun DashboardScreen(
                                                             verticalAlignment = Alignment.CenterVertically
                                                         ) {
                                                             Text(
-                                                                text = toAmharicName(worker.name),
+                                                                text = buildAnnotatedString {
+                                                                    append(toAmharicName(worker.name))
+                                                                    append("\n")
+                                                                    val fontSizeVal = androidx.compose.material3.MaterialTheme.typography.bodySmall.fontSize
+                                                                    val fontW = if (absentDays > 0) FontWeight.Bold else FontWeight.Normal
+                                                                    val fontC = if (absentDays > 0) BentoAlertText else BentoSubText
+                                                                    withStyle(style = SpanStyle(color = fontC, fontSize = fontSizeVal, fontWeight = fontW)) {
+                                                                        append("ያልተገኘበት፡ $absentDays ቀን")
+                                                                    }
+                                                                },
                                                                 style = MaterialTheme.typography.titleMedium,
                                                                 fontWeight = FontWeight.Bold,
                                                                 color = Color.White
                                                             )
                                                             Text(
-                                                                text = "${String.format("%.2f", earnedSalary)} ብር",
+                                                                text = buildAnnotatedString {
+                                                                    append("${String.format("%.2f", earnedSalary)} ብር")
+                                                                    if (absentDays > 0) {
+                                                                        append("\n")
+                                                                        val fontS = androidx.compose.material3.MaterialTheme.typography.labelSmall.fontSize
+                                                                        withStyle(style = SpanStyle(color = BentoAlertText, fontSize = fontS, fontWeight = FontWeight.Bold)) {
+                                                                            append("ቅጣት፡ -${String.format("%.2f", deduction)} ብር")
+                                                                        }
+                                                                    }
+                                                                },
                                                                 style = MaterialTheme.typography.titleMedium,
                                                                 fontWeight = FontWeight.ExtraBold,
-                                                                color = BentoSoftGreen
+                                                                color = if (absentDays > 0) BentoAlertText else BentoSoftGreen
                                                             )
                                                         }
 
@@ -876,14 +897,14 @@ fun DashboardScreen(
 
                                                             if (absentDays > 0) {
                                                                 Text(
-                                                                    text = "ቀሪ፡ $absentDays ቀን",
+                                                                    text = "የተሰሩ ቀናት፡ ${maxOf(0, ethDay - absentDays)} ቀን (ከ $ethDay) — ቀሪ፡ $absentDays ቀን",
                                                                     style = MaterialTheme.typography.bodySmall,
                                                                     fontWeight = FontWeight.Bold,
                                                                     color = BentoAlertText
                                                                 )
                                                             } else {
                                                                 Text(
-                                                                    text = "ሙሉ ደሞዝ",
+                                                                    text = "የተሰሩ ቀናት፡ ${maxOf(0, ethDay - absentDays)} ቀን (ከ $ethDay) — ሙሉ ደሞዝ",
                                                                     style = MaterialTheme.typography.bodySmall,
                                                                     fontWeight = FontWeight.Medium,
                                                                     color = BentoSoftGreen
