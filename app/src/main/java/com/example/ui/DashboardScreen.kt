@@ -154,6 +154,7 @@ fun DashboardScreen(
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
+                            .navigationBarsPadding()
                             .padding(12.dp)
                             .background(
                                 Color(0xFF0C101B).copy(alpha = 0.85f),
