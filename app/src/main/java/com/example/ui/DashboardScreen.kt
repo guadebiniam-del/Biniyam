@@ -791,7 +791,9 @@ fun DashboardScreen(
                                             val monthlySalary = worker.monthlySalary
                                             val dailySalary = monthlySalary / 30.0
                                             val deduction = absentDays * 2.0 * dailySalary
-                                            val earnedSalary = if (absentDays == 0) monthlySalary else maxOf(0.0, monthlySalary - deduction)
+                                            val daysPassedThisMonth = minOf(30, ethDay)
+                                            val daysWorkedSoFar = maxOf(0, daysPassedThisMonth - absentDays)
+                                            val earnedSalary = maxOf(0.0, dailySalary * (daysPassedThisMonth - (absentDays * 2.0)))
                                             totalPayroll += earnedSalary
 
                                             // Premium customized worker card
@@ -843,6 +845,13 @@ fun DashboardScreen(
                                                             style = MaterialTheme.typography.bodySmall,
                                                             fontWeight = if (absentDays > 0) FontWeight.Bold else FontWeight.Normal,
                                                             color = if (absentDays > 0) BentoAlertText else BentoSubText
+                                                        )
+
+                                                        Text(
+                                                            text = "የተሰራ ቀን፡ $daysWorkedSoFar ቀን",
+                                                            style = MaterialTheme.typography.bodySmall,
+                                                            fontWeight = FontWeight.Medium,
+                                                            color = BentoSoftGreen
                                                         )
 
                                                         Row(
