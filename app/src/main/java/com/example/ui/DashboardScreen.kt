@@ -67,9 +67,11 @@ fun DashboardScreen(
     val stats by viewModel.statsState.collectAsStateWithLifecycle()
     val workerStats by viewModel.workerAttendanceStats.collectAsStateWithLifecycle()
     val activityLogs by viewModel.allActivityLogs.collectAsStateWithLifecycle()
+    val allWorkerAttendance by viewModel.allWorkerAttendance.collectAsStateWithLifecycle()
 
     // Active tab selection matching the Bento Grid HTML design: Daily Overview, Inventory, Workers, Activity Log
     var activeTab by remember { mutableStateOf("Daily Overview") }
+    var workerScreenTab by remember { mutableStateOf("Attendance") } // "Attendance" or "Salary"
 
     // Luxury animations and haptics states
     var showSplash by remember { mutableStateOf(true) }
@@ -563,49 +565,255 @@ fun DashboardScreen(
                                     addBtnTag = "add_worker_section_btn"
                                 )
 
+                                Spacer(modifier = Modifier.height(12.dp))
+
+                                // segment sub-tabs for Attendance and Salary
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .background(Color(0xFF0F172A).copy(alpha = 0.6f), RoundedCornerShape(12.dp))
+                                        .border(1.dp, BentoBorder.copy(alpha = 0.4f), RoundedCornerShape(12.dp))
+                                        .padding(4.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    val options = listOf(
+                                        "Attendance" to "ተረኛ መቆጣጠሪያ (Attendance)",
+                                        "Salary" to "ደሞዝ (Salary)"
+                                    )
+                                    options.forEach { (key, label) ->
+                                        val isSel = workerScreenTab == key
+                                        Box(
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .clip(RoundedCornerShape(8.dp))
+                                                .background(if (isSel) BentoForestGreen else Color.Transparent)
+                                                .clickable { workerScreenTab = key }
+                                                .padding(vertical = 10.dp),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Text(
+                                                text = label,
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                fontWeight = FontWeight.Bold,
+                                                color = if (isSel) Color.White else BentoSubText
+                                            )
+                                        }
+                                    }
+                                }
+
                                 Spacer(modifier = Modifier.height(8.dp))
 
-                                Card(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    shape = RoundedCornerShape(12.dp),
-                                    colors = CardDefaults.cardColors(
-                                        containerColor = BentoNeutralGray
-                                    ),
-                                    border = BorderStroke(1.dp, BentoBorder)
-                                ) {
-                                    Column(modifier = Modifier.padding(12.dp)) {
-                                        Text(
-                                            text = "Daily Roster: ${formatDateFriendly(selectedDate)}",
-                                            style = MaterialTheme.typography.titleSmall,
-                                            fontWeight = FontWeight.SemiBold,
-                                            color = BentoForestGreen
-                                        )
-                                        Text(
-                                            text = "Work shift active 24/7. Tap icons to mark attendance state for today.",
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = BentoSubText,
-                                            modifier = Modifier.padding(bottom = 8.dp)
-                                        )
+                                if (workerScreenTab == "Attendance") {
+                                    Card(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        shape = RoundedCornerShape(12.dp),
+                                        colors = CardDefaults.cardColors(
+                                            containerColor = BentoNeutralGray
+                                        ),
+                                        border = BorderStroke(1.dp, BentoBorder)
+                                    ) {
+                                        Column(modifier = Modifier.padding(12.dp)) {
+                                            Text(
+                                                text = "Daily Roster: ${formatDateFriendly(selectedDate)}",
+                                                style = MaterialTheme.typography.titleSmall,
+                                                fontWeight = FontWeight.SemiBold,
+                                                color = BentoForestGreen
+                                            )
+                                            Text(
+                                                text = "Work shift active 24/7. Tap icons to mark attendance state for today.",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = BentoSubText,
+                                                modifier = Modifier.padding(bottom = 8.dp)
+                                            )
 
-                                        if (workers.isEmpty()) {
-                                            EmptyStatePlaceholder("No workers registered yet.")
-                                        } else {
-                                            workers.forEach { worker ->
-                                                val stat = workerStats.find { it.workerId == worker.id }
-                                                val currentAttendanceOnDate = attendanceList.find { it.workerId == worker.id }
+                                            if (workers.isEmpty()) {
+                                                EmptyStatePlaceholder("No workers registered yet.")
+                                            } else {
+                                                workers.forEach { worker ->
+                                                    val stat = workerStats.find { it.workerId == worker.id }
+                                                    val currentAttendanceOnDate = attendanceList.find { it.workerId == worker.id }
 
-                                                WorkerRowItem(
-                                                    worker = worker,
-                                                    stats = stat,
-                                                    activeAttendance = currentAttendanceOnDate,
-                                                    onStatusSelect = { status ->
-                                                        viewModel.markWorkerAttendance(worker.id, status)
+                                                    WorkerRowItem(
+                                                        worker = worker,
+                                                        stats = stat,
+                                                        activeAttendance = currentAttendanceOnDate,
+                                                        onStatusSelect = { status ->
+                                                            viewModel.markWorkerAttendance(worker.id, status)
+                                                        }
+                                                    )
+                                                    HorizontalDivider(
+                                                        color = BentoBorder.copy(alpha = 0.5f),
+                                                        modifier = Modifier.padding(vertical = 4.dp)
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+                                } else {
+                                    Card(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        shape = RoundedCornerShape(12.dp),
+                                        colors = CardDefaults.cardColors(
+                                            containerColor = BentoNeutralGray
+                                        ),
+                                        border = BorderStroke(1.dp, BentoBorder)
+                                    ) {
+                                        Column(modifier = Modifier.padding(16.dp)) {
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Text(
+                                                    text = "የሰራተኞች ደሞዝ መዝገብ (Salary Ledger)",
+                                                    style = MaterialTheme.typography.titleSmall,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = BentoForestGreen
+                                                )
+                                                val monthLabel = try {
+                                                    val parts = selectedDate.split("-")
+                                                    if (parts.size >= 2) {
+                                                        val m = parts[1].toIntOrNull() ?: 6
+                                                        val months = listOf("", "ጥር (Jan)", "የካቲት (Feb)", "መጋቢት (Mar)", "ሚያዝያ (Apr)", "ግንቦት (May)", "ሰኔ (Jun)", "ሐምሌ (Jul)", "ነሐሴ (Aug)", "መስከረም (Sep)", "ጥቅምት (Oct)", "ሕዳር (Nov)", "ታኅሣሥ (Dec)")
+                                                        if (m in 1..12) months[m] else "ሰኔ (Jun)"
+                                                    } else "ሰኔ (Jun)"
+                                                } catch (e: Exception) {
+                                                    "ሰኔ (Jun)"
+                                                }
+                                                Text(
+                                                    text = monthLabel,
+                                                    style = MaterialTheme.typography.labelMedium,
+                                                    fontWeight = FontWeight.ExtraBold,
+                                                    color = BentoSoftGreen,
+                                                    modifier = Modifier
+                                                        .background(BentoForestGreen.copy(alpha = 0.15f), RoundedCornerShape(6.dp))
+                                                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                                                )
+                                            }
+
+                                            Text(
+                                                text = "Formula: Monthly Salary - (Absences × 2 × Daily Salary). Zero absences = Full Pay.",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = BentoSubText,
+                                                modifier = Modifier.padding(bottom = 16.dp)
+                                            )
+
+                                            if (workers.isEmpty()) {
+                                                EmptyStatePlaceholder("No workers registered yet.")
+                                            } else {
+                                                var totalPayroll = 0.0
+                                                val activeWorkers = workers.filter { it.isActive }
+
+                                                activeWorkers.forEachIndexed { idx, worker ->
+                                                    val currentYearMonth = if (selectedDate.length >= 7) selectedDate.substring(0, 7) else "2026-06"
+                                                    val workerMonthAtt = allWorkerAttendance.filter {
+                                                        it.workerId == worker.id && it.date.startsWith(currentYearMonth)
                                                     }
-                                                )
+                                                    val absentDays = workerMonthAtt.count { it.status == "Absent" }
+                                                    val monthlySalary = worker.monthlySalary
+                                                    val dailySalary = monthlySalary / 30.0
+                                                    val deduction = absentDays * 2.0 * dailySalary
+                                                    val earnedSalary = if (absentDays == 0) monthlySalary else maxOf(0.0, monthlySalary - deduction)
+                                                    totalPayroll += earnedSalary
+
+                                                    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+                                                        Row(
+                                                            modifier = Modifier.fillMaxWidth(),
+                                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                                            verticalAlignment = Alignment.CenterVertically
+                                                        ) {
+                                                            Text(
+                                                                text = toAmharicName(worker.name),
+                                                                style = MaterialTheme.typography.bodyLarge,
+                                                                fontWeight = FontWeight.Bold,
+                                                                color = Color.White
+                                                            )
+                                                            Text(
+                                                                text = "ደሞዝ: ${String.format("%.2f", earnedSalary)} ብር",
+                                                                style = MaterialTheme.typography.bodyMedium,
+                                                                fontWeight = FontWeight.Bold,
+                                                                color = BentoSoftGreen
+                                                            )
+                                                        }
+
+                                                        Spacer(modifier = Modifier.height(4.dp))
+
+                                                        Row(
+                                                            modifier = Modifier.fillMaxWidth(),
+                                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                                            verticalAlignment = Alignment.CenterVertically
+                                                        ) {
+                                                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                                                Text(
+                                                                    text = "የወር ደሞዝ: ${String.format("%.0f", monthlySalary)} ብር",
+                                                                    style = MaterialTheme.typography.bodySmall,
+                                                                    color = BentoSubText
+                                                                )
+                                                                Text(
+                                                                    text = "|",
+                                                                    style = MaterialTheme.typography.bodySmall,
+                                                                    color = BentoBorder
+                                                                )
+                                                                Text(
+                                                                    text = "ቀሪ ቀናት: ${absentDays} ቀናት",
+                                                                    style = MaterialTheme.typography.bodySmall,
+                                                                    color = if (absentDays > 0) BentoAlertText else BentoSubText
+                                                                )
+                                                            }
+
+                                                            if (deduction > 0.0) {
+                                                                Text(
+                                                                    text = "ቅጣት: -${String.format("%.2f", deduction)} ብር",
+                                                                    style = MaterialTheme.typography.bodySmall,
+                                                                    fontWeight = FontWeight.Bold,
+                                                                    color = BentoAlertText
+                                                                )
+                                                            } else {
+                                                                Text(
+                                                                    text = "ሙሉ ደሞዝ (Full)",
+                                                                    style = MaterialTheme.typography.bodySmall,
+                                                                    fontWeight = FontWeight.Medium,
+                                                                    color = BentoSoftGreen
+                                                                )
+                                                            }
+                                                        }
+                                                    }
+
+                                                    if (idx < activeWorkers.size - 1) {
+                                                        HorizontalDivider(
+                                                            color = BentoBorder.copy(alpha = 0.4f),
+                                                            modifier = Modifier.padding(vertical = 8.dp)
+                                                        )
+                                                    }
+                                                }
+
                                                 HorizontalDivider(
-                                                    color = BentoBorder.copy(alpha = 0.5f),
-                                                    modifier = Modifier.padding(vertical = 4.dp)
+                                                    color = BentoForestGreen.copy(alpha = 0.4f),
+                                                    thickness = 1.dp,
+                                                    modifier = Modifier.padding(vertical = 12.dp)
                                                 )
+
+                                                Row(
+                                                    modifier = Modifier
+                                                        .fillMaxWidth()
+                                                        .background(BentoForestGreen.copy(alpha = 0.12f), RoundedCornerShape(8.dp))
+                                                        .padding(12.dp),
+                                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                                    verticalAlignment = Alignment.CenterVertically
+                                                ) {
+                                                    Text(
+                                                        text = "ጠቅላላ ክፍያ (Total Payroll)",
+                                                        style = MaterialTheme.typography.bodyMedium,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = Color.White
+                                                    )
+                                                    Text(
+                                                        text = "${String.format("%.2f", totalPayroll)} ብር",
+                                                        style = MaterialTheme.typography.titleMedium,
+                                                        fontWeight = FontWeight.Black,
+                                                        color = BentoSoftGreen
+                                                    )
+                                                }
                                             }
                                         }
                                     }
@@ -798,8 +1006,8 @@ fun DashboardScreen(
     if (showAddWorkerDialog) {
         AddWorkerDialog(
             onDismiss = { showAddWorkerDialog = false },
-            onSave = { name ->
-                viewModel.addNewWorker(name)
+            onSave = { name, salary ->
+                viewModel.addNewWorker(name, salary)
                 showAddWorkerDialog = false
             }
         )
@@ -2504,28 +2712,41 @@ fun AddMasterbatchDialog(
 @Composable
 fun AddWorkerDialog(
     onDismiss: () -> Unit,
-    onSave: (name: String) -> Unit
+    onSave: (name: String, monthlySalary: Double) -> Unit
 ) {
     var name by remember { mutableStateOf("") }
+    var salaryStr by remember { mutableStateOf("10000") }
 
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Register Employee Worker") },
         text = {
-            OutlinedTextField(
-                value = name,
-                onValueChange = { name = it },
-                label = { Text("Worker Full Name") },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag("diag_worker_name")
-            )
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text("Worker Full Name") },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("diag_worker_name")
+                )
+                OutlinedTextField(
+                    value = salaryStr,
+                    onValueChange = { salaryStr = it },
+                    label = { Text("Monthly Salary (Birr)") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("diag_worker_salary")
+                )
+            }
         },
         confirmButton = {
             Button(
                 onClick = {
                     if (name.trim().isNotEmpty()) {
-                        onSave(name.trim())
+                        val salary = salaryStr.toDoubleOrNull() ?: 10000.0
+                        onSave(name.trim(), salary)
                     }
                 },
                 modifier = Modifier.testTag("diag_worker_submit")
@@ -4409,4 +4630,28 @@ object GeminiBotService {
             "ለመገናኘት አልተቻለም (Connection Failed): ${e.localizedMessage ?: "አልታወቀም "}"
         }
     }
+}
+
+fun toAmharicName(name: String): String {
+    val clean = name.trim()
+    if (clean.any { it.code in 0x1200..0x137F }) {
+        return clean
+    }
+    val lower = clean.lowercase()
+    if (lower.contains("abebe") && lower.contains("kebede")) return "አበበ ከበደ"
+    if (lower.contains("anwar") && lower.contains("adem")) return "አንዋር አደም"
+    if (lower.contains("chala") && lower.contains("gerba")) return "ቻላ ገርባ"
+    if (lower.contains("soliana") && lower.contains("yared")) return "ሶሊያና ያሬድ"
+
+    val dict = mapOf(
+        "abebe" to "አበበ", "kebede" to "ከበደ", "anwar" to "አንዋር", "adem" to "አደም",
+        "chala" to "ቻላ", "gerba" to "ገርባ", "soliana" to "ሶሊያና", "yared" to "ያሬድ",
+        "almaz" to "አልማዝ", "aster" to "አስቴር", "bekele" to "በቀለ", "tesfaye" to "ተስፋዬ",
+        "mesfin" to "መስፍን", "lema" to "ለማ", "hailu" to "ኃይሉ", "girma" to "ግርማ"
+    )
+    val parts = lower.split("\\s+".toRegex())
+    val translatedParts = parts.map { part ->
+         dict[part] ?: part.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
+    }
+    return translatedParts.joinToString(" ")
 }

@@ -67,7 +67,8 @@ data class Worker(
     val name: String = "",
     val joinDate: String = "", // "yyyy-MM-dd"
     val leaveDate: String? = null, // "yyyy-MM-dd" if resigned, null if active
-    val isActive: Boolean = true
+    val isActive: Boolean = true,
+    val monthlySalary: Double = 10000.0
 )
 
 @Entity(tableName = "worker_attendance")

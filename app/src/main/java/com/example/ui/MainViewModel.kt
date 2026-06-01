@@ -82,6 +82,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         calculateWorkerStats(date, period, workers, attendances)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    val allWorkerAttendance: StateFlow<List<WorkerAttendance>> = repository.allAttendanceFlow
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
     private fun allAttendanceFlow(): Flow<List<WorkerAttendance>> = repository.allAttendanceFlow
 
 
@@ -251,11 +254,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     // --- WORKERS BUSINESS ACTIONS ---
 
-    fun addNewWorker(name: String) {
+    fun addNewWorker(name: String, monthlySalary: Double = 10000.0) {
         viewModelScope.launch {
             val worker = Worker(
                 name = name,
-                joinDate = selectedDate.value
+                joinDate = selectedDate.value,
+                monthlySalary = monthlySalary
             )
             val generatedId = repository.insertWorker(worker)
             logAction(
