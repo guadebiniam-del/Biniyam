@@ -270,6 +270,21 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun updateWorkerSalary(workerId: Int, newSalary: Double) {
+        viewModelScope.launch {
+            val worker = allWorkers.value.find { it.id == workerId }
+            if (worker != null) {
+                val updated = worker.copy(monthlySalary = newSalary)
+                repository.updateWorker(updated)
+                logAction(
+                    category = "Worker",
+                    actionType = "Edit",
+                    description = "Updated salary for '${worker.name}' to $newSalary Birr"
+                )
+            }
+        }
+    }
+
     fun markWorkerAttendance(workerId: Int, status: String) {
         viewModelScope.launch {
             val attendance = WorkerAttendance(

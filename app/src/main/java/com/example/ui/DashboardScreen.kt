@@ -88,6 +88,8 @@ fun DashboardScreen(
 
     // Date picker state toggle
     var showDatePickerDialog by remember { mutableStateOf(false) }
+    var editingWorkerSalary by remember { mutableStateOf<Worker?>(null) }
+    var salaryEditValue by remember { mutableStateOf("") }
 
     if (showSplash) {
         AnwarSplashScreen(onFinished = { showSplash = false })
@@ -674,11 +676,11 @@ fun DashboardScreen(
                                                     val parts = selectedDate.split("-")
                                                     if (parts.size >= 2) {
                                                         val m = parts[1].toIntOrNull() ?: 6
-                                                        val months = listOf("", "ጥር (Jan)", "የካቲት (Feb)", "መጋቢት (Mar)", "ሚያዝያ (Apr)", "ግንቦት (May)", "ሰኔ (Jun)", "ሐምሌ (Jul)", "ነሐሴ (Aug)", "መስከረም (Sep)", "ጥቅምት (Oct)", "ሕዳር (Nov)", "ታኅሣሥ (Dec)")
-                                                        if (m in 1..12) months[m] else "ሰኔ (Jun)"
-                                                    } else "ሰኔ (Jun)"
+                                                        val months = listOf("", "ጥር", "የካቲት", "መጋቢት", "ሚያዝያ", "ግንቦት", "ሰኔ", "ሐምሌ", "ነሐሴ", "መስከረም", "ጥቅምት", "ሕዳር", "ታኅሣሥ")
+                                                        if (m in 1..12) months[m] else "ሰኔ"
+                                                    } else "ሰኔ"
                                                 } catch (e: Exception) {
-                                                    "ሰኔ (Jun)"
+                                                    "ሰኔ"
                                                 }
                                                 Text(
                                                     text = monthLabel,
@@ -690,13 +692,6 @@ fun DashboardScreen(
                                                         .padding(horizontal = 8.dp, vertical = 4.dp)
                                                 )
                                             }
-
-                                            Text(
-                                                text = "Formula: Monthly Salary - (Absences × 2 × Daily Salary). Zero absences = Full Pay.",
-                                                style = MaterialTheme.typography.bodySmall,
-                                                color = BentoSubText,
-                                                modifier = Modifier.padding(bottom = 16.dp)
-                                            )
 
                                             if (workers.isEmpty()) {
                                                 EmptyStatePlaceholder("No workers registered yet.")
@@ -743,12 +738,29 @@ fun DashboardScreen(
                                                             horizontalArrangement = Arrangement.SpaceBetween,
                                                             verticalAlignment = Alignment.CenterVertically
                                                         ) {
-                                                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                                            Row(
+                                                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                                                verticalAlignment = Alignment.CenterVertically
+                                                            ) {
                                                                 Text(
                                                                     text = "የወር ደሞዝ: ${String.format("%.0f", monthlySalary)} ብር",
                                                                     style = MaterialTheme.typography.bodySmall,
                                                                     color = BentoSubText
                                                                 )
+                                                                IconButton(
+                                                                    onClick = {
+                                                                        editingWorkerSalary = worker
+                                                                        salaryEditValue = String.format("%.0f", monthlySalary)
+                                                                    },
+                                                                    modifier = Modifier.size(24.dp)
+                                                                ) {
+                                                                    Icon(
+                                                                        imageVector = Icons.Default.Edit,
+                                                                        contentDescription = "Edit Salary",
+                                                                        tint = BentoSoftGreen,
+                                                                        modifier = Modifier.size(13.dp)
+                                                                    )
+                                                                }
                                                                 Text(
                                                                     text = "|",
                                                                     style = MaterialTheme.typography.bodySmall,
@@ -781,7 +793,7 @@ fun DashboardScreen(
 
                                                     if (idx < activeWorkers.size - 1) {
                                                         HorizontalDivider(
-                                                            color = BentoBorder.copy(alpha = 0.4f),
+                                                            color = BentoForestGreen.copy(alpha = 0.4f),
                                                             modifier = Modifier.padding(vertical = 8.dp)
                                                         )
                                                     }
@@ -797,18 +809,12 @@ fun DashboardScreen(
                                                     modifier = Modifier
                                                         .fillMaxWidth()
                                                         .background(BentoForestGreen.copy(alpha = 0.12f), RoundedCornerShape(8.dp))
-                                                        .padding(12.dp),
-                                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                                        .padding(16.dp),
+                                                    horizontalArrangement = Arrangement.Center,
                                                     verticalAlignment = Alignment.CenterVertically
                                                 ) {
                                                     Text(
-                                                        text = "ጠቅላላ ክፍያ (Total Payroll)",
-                                                        style = MaterialTheme.typography.bodyMedium,
-                                                        fontWeight = FontWeight.Bold,
-                                                        color = Color.White
-                                                    )
-                                                    Text(
-                                                        text = "${String.format("%.2f", totalPayroll)} ብር",
+                                                        text = "ጠቅላላ ደሞዝ: ${String.format("%.2f", totalPayroll)} ብር",
                                                         style = MaterialTheme.typography.titleMedium,
                                                         fontWeight = FontWeight.Black,
                                                         color = BentoSoftGreen
@@ -1010,6 +1016,67 @@ fun DashboardScreen(
                 viewModel.addNewWorker(name, salary)
                 showAddWorkerDialog = false
             }
+        )
+    }
+
+    if (editingWorkerSalary != null) {
+        AlertDialog(
+            onDismissRequest = { editingWorkerSalary = null },
+            title = {
+                Text(
+                    text = "${toAmharicName(editingWorkerSalary?.name ?: "")} - ደሞዝ ማስተካከያ",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = BentoSoftGreen
+                )
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text = "አዲስ የወር ደሞዝ ያስገቡ (በብር):",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Color.White
+                    )
+                    OutlinedTextField(
+                        value = salaryEditValue,
+                        onValueChange = { salaryEditValue = it },
+                        label = { Text("ደሞዝ (Salary)") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("edit_worker_salary_value"),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White,
+                            focusedBorderColor = BentoForestGreen,
+                            unfocusedBorderColor = BentoBorder,
+                            focusedLabelColor = BentoForestGreen,
+                            cursorColor = BentoForestGreen
+                        )
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val amt = salaryEditValue.toDoubleOrNull()
+                        if (amt != null && editingWorkerSalary != null) {
+                            viewModel.updateWorkerSalary(editingWorkerSalary!!.id, amt)
+                            editingWorkerSalary = null
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = BentoForestGreen),
+                    modifier = Modifier.testTag("submit_salary_edit")
+                ) {
+                    Text("አስቀምጥ (Save)", color = Color.White)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { editingWorkerSalary = null }) {
+                    Text("ተው (Cancel)", color = BentoSubText)
+                }
+            },
+            containerColor = Color(0xFF1E293B)
         )
     }
 
