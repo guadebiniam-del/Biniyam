@@ -815,116 +815,81 @@ fun DashboardScreen(
                                                             )
                                                         )
                                                         .drawBehind {
-                                                            // Thin green left border accent
+                                                            // Thin left border accent (red if absent, green if ok)
                                                             drawRect(
-                                                                color = BentoForestGreen,
+                                                                color = if (absentDays > 0) BentoAlertText else BentoForestGreen,
                                                                 topLeft = androidx.compose.ui.geometry.Offset(0f, 0f),
                                                                 size = androidx.compose.ui.geometry.Size(4.dp.toPx(), this.size.height)
                                                             )
                                                         }
                                                         .padding(start = 16.dp, top = 16.dp, bottom = 16.dp, end = 16.dp),
-                                                    verticalAlignment = Alignment.CenterVertically
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    horizontalArrangement = Arrangement.SpaceBetween
                                                 ) {
-                                                    Column(modifier = Modifier.weight(1f)) {
+                                                    // Left column: name, absent days, and monthly salary
+                                                    Column(
+                                                        modifier = Modifier.weight(1f),
+                                                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                                                    ) {
+                                                        Text(
+                                                            text = toAmharicName(worker.name),
+                                                            style = MaterialTheme.typography.titleMedium,
+                                                            fontWeight = FontWeight.Bold,
+                                                            color = Color.White
+                                                        )
+
+                                                        Text(
+                                                            text = "ያልተገኘበት፡ $absentDays ቀን",
+                                                            style = MaterialTheme.typography.bodySmall,
+                                                            fontWeight = if (absentDays > 0) FontWeight.Bold else FontWeight.Normal,
+                                                            color = if (absentDays > 0) BentoAlertText else BentoSubText
+                                                        )
+
                                                         Row(
-                                                            modifier = Modifier.fillMaxWidth(),
-                                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                                            horizontalArrangement = Arrangement.spacedBy(4.dp),
                                                             verticalAlignment = Alignment.CenterVertically
                                                         ) {
                                                             Text(
-                                                                text = buildAnnotatedString {
-                                                                    append(toAmharicName(worker.name))
-                                                                    append("\n")
-                                                                    val fontSizeVal = androidx.compose.material3.MaterialTheme.typography.bodySmall.fontSize
-                                                                    val fontW = if (absentDays > 0) FontWeight.Bold else FontWeight.Normal
-                                                                    val fontC = if (absentDays > 0) BentoAlertText else BentoSubText
-                                                                    withStyle(style = SpanStyle(color = fontC, fontSize = fontSizeVal, fontWeight = fontW)) {
-                                                                        append("ያልተገኘበት፡ $absentDays ቀን")
-                                                                    }
+                                                                text = "የወር ደሞዝ: ${String.format("%.0f", monthlySalary)} ብር",
+                                                                style = MaterialTheme.typography.bodySmall,
+                                                                color = BentoSubText
+                                                            )
+                                                            IconButton(
+                                                                onClick = {
+                                                                    editingWorkerSalary = worker
+                                                                    salaryEditValue = String.format("%.0f", monthlySalary)
                                                                 },
-                                                                style = MaterialTheme.typography.titleMedium,
+                                                                modifier = Modifier.size(24.dp)
+                                                            ) {
+                                                                Icon(
+                                                                    imageVector = Icons.Default.Edit,
+                                                                    contentDescription = "Edit Salary",
+                                                                    tint = BentoSoftGreen,
+                                                                    modifier = Modifier.size(13.dp)
+                                                                )
+                                                            }
+                                                        }
+                                                    }
+
+                                                    // Right column: Final earned salary and deduction
+                                                    Column(
+                                                        horizontalAlignment = Alignment.End,
+                                                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                                                    ) {
+                                                        Text(
+                                                            text = "${String.format("%.2f", earnedSalary)} ብር",
+                                                            style = MaterialTheme.typography.titleLarge,
+                                                            fontWeight = FontWeight.ExtraBold,
+                                                            color = if (absentDays > 0) BentoAlertText else BentoSoftGreen
+                                                        )
+
+                                                        if (absentDays > 0) {
+                                                            Text(
+                                                                text = "ቅጣት፡ -${String.format("%.2f", deduction)} ብር",
+                                                                style = MaterialTheme.typography.bodySmall,
                                                                 fontWeight = FontWeight.Bold,
-                                                                color = Color.White
+                                                                color = BentoAlertText
                                                             )
-                                                            Text(
-                                                                text = buildAnnotatedString {
-                                                                    append("${String.format("%.2f", earnedSalary)} ብር")
-                                                                    if (absentDays > 0) {
-                                                                        append("\n")
-                                                                        val fontS = androidx.compose.material3.MaterialTheme.typography.labelSmall.fontSize
-                                                                        withStyle(style = SpanStyle(color = BentoAlertText, fontSize = fontS, fontWeight = FontWeight.Bold)) {
-                                                                            append("ቅጣት፡ -${String.format("%.2f", deduction)} ብር")
-                                                                        }
-                                                                    }
-                                                                },
-                                                                style = MaterialTheme.typography.titleMedium,
-                                                                fontWeight = FontWeight.ExtraBold,
-                                                                color = if (absentDays > 0) BentoAlertText else BentoSoftGreen
-                                                            )
-                                                        }
-
-                                                        Spacer(modifier = Modifier.height(10.dp))
-
-                                                        Row(
-                                                            modifier = Modifier.fillMaxWidth(),
-                                                            horizontalArrangement = Arrangement.SpaceBetween,
-                                                            verticalAlignment = Alignment.CenterVertically
-                                                        ) {
-                                                            Row(
-                                                                horizontalArrangement = Arrangement.spacedBy(4.dp),
-                                                                verticalAlignment = Alignment.CenterVertically
-                                                            ) {
-                                                                Text(
-                                                                    text = "የወር ደሞዝ: ${String.format("%.0f", monthlySalary)} ብር",
-                                                                    style = MaterialTheme.typography.bodySmall,
-                                                                    color = BentoSubText
-                                                                )
-                                                                IconButton(
-                                                                    onClick = {
-                                                                        editingWorkerSalary = worker
-                                                                        salaryEditValue = String.format("%.0f", monthlySalary)
-                                                                    },
-                                                                    modifier = Modifier.size(24.dp)
-                                                                ) {
-                                                                    Icon(
-                                                                        imageVector = Icons.Default.Edit,
-                                                                        contentDescription = "Edit Salary",
-                                                                        tint = BentoSoftGreen,
-                                                                        modifier = Modifier.size(13.dp)
-                                                                    )
-                                                                }
-                                                            }
-
-                                                            if (absentDays > 0) {
-                                                                Text(
-                                                                    text = "የተሰሩ ቀናት፡ ${maxOf(0, ethDay - absentDays)} ቀን (ከ $ethDay) — ቀሪ፡ $absentDays ቀን",
-                                                                    style = MaterialTheme.typography.bodySmall,
-                                                                    fontWeight = FontWeight.Bold,
-                                                                    color = BentoAlertText
-                                                                )
-                                                            } else {
-                                                                Text(
-                                                                    text = "የተሰሩ ቀናት፡ ${maxOf(0, ethDay - absentDays)} ቀን (ከ $ethDay) — ሙሉ ደሞዝ",
-                                                                    style = MaterialTheme.typography.bodySmall,
-                                                                    fontWeight = FontWeight.Medium,
-                                                                    color = BentoSoftGreen
-                                                                )
-                                                            }
-                                                        }
-
-                                                        if (deduction > 0.0) {
-                                                            Spacer(modifier = Modifier.height(4.dp))
-                                                            Row(
-                                                                modifier = Modifier.fillMaxWidth(),
-                                                                horizontalArrangement = Arrangement.End
-                                                            ) {
-                                                                Text(
-                                                                    text = "ቅጣት: -${String.format("%.2f", deduction)} ብር",
-                                                                    style = MaterialTheme.typography.bodySmall,
-                                                                    fontWeight = FontWeight.ExtraBold,
-                                                                    color = BentoAlertText
-                                                                )
-                                                            }
                                                         }
                                                     }
                                                 }
