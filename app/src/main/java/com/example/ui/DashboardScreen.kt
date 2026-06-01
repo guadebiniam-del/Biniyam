@@ -867,6 +867,7 @@ fun BentoGridOverviewPanel(
 ) {
     val selectedDateStr = viewModel.selectedDate.collectAsStateWithLifecycle().value
     val allTransactions = viewModel.allProductTransactions.collectAsStateWithLifecycle().value
+    val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
 
     // Let's compute weekly and monthly targets based on selectedDateStr and allTransactions
     val isSunday = remember(selectedDateStr) {
@@ -1414,6 +1415,7 @@ fun BentoGridOverviewPanel(
                                     // Interactive Quick Save Action Button
                                     IconButton(
                                         onClick = {
+                                            focusManager.clearFocus()
                                             val fVal = producedInput.toIntOrNull() ?: 0
                                             val sVal = soldInput.toIntOrNull() ?: 0
                                             viewModel.recordProductDailyActivity(product.id, fVal, sVal, 0, "Daily entry update")
