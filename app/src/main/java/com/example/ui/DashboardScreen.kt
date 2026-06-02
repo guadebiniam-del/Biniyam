@@ -73,6 +73,7 @@ fun DashboardScreen(
     val workerStats by viewModel.workerAttendanceStats.collectAsStateWithLifecycle()
     val activityLogs by viewModel.allActivityLogs.collectAsStateWithLifecycle()
     val allWorkerAttendance by viewModel.allWorkerAttendance.collectAsStateWithLifecycle()
+    val announcements by viewModel.allAnnouncements.collectAsStateWithLifecycle()
 
     // Active tab selection matching the Bento Grid HTML design: Daily Overview, Inventory, Workers, Activity Log
     var activeTab by remember { mutableStateOf("Daily Overview") }
@@ -96,6 +97,24 @@ fun DashboardScreen(
     var showDatePickerDialog by remember { mutableStateOf(false) }
     var editingWorkerSalary by remember { mutableStateOf<Worker?>(null) }
     var salaryEditValue by remember { mutableStateOf("") }
+    var showAddAnnouncementDialog by remember { mutableStateOf(false) }
+
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val prefs = remember { context.getSharedPreferences("anwar_app_prefs", android.content.Context.MODE_PRIVATE) }
+    var activeAnnouncementToShow by remember { mutableStateOf<Announcement?>(null) }
+
+    LaunchedEffect(announcements, showSplash) {
+        if (!showSplash) {
+            val latestActive = announcements.firstOrNull { it.active }
+            if (latestActive != null) {
+                val key = "dismissed_announcement_${latestActive.id}"
+                val wasDismissed = prefs.getBoolean(key, false)
+                if (!wasDismissed) {
+                    activeAnnouncementToShow = latestActive
+                }
+            }
+        }
+    }
 
     if (showSplash) {
         AnwarSplashScreen(onFinished = { showSplash = false })
@@ -964,7 +983,9 @@ fun DashboardScreen(
                         ) {
                             item {
                                 ActivityLogSection(
-                                    activityLogs = activityLogs
+                                    activityLogs = activityLogs,
+                                    announcements = announcements,
+                                    onDeleteAnnouncement = { viewModel.deleteAnnouncement(it) }
                                 )
                             }
                         }
@@ -1077,6 +1098,30 @@ fun DashboardScreen(
                         }
                     }
                     Spacer(modifier = Modifier.height(8.dp))
+                }
+
+                // Administrative Announcement option
+                HorizontalDivider(color = BentoBorder, modifier = Modifier.padding(vertical = 4.dp))
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(BentoForestGreen.copy(alpha = 0.12f))
+                        .border(1.dp, BentoForestGreen.copy(alpha = 0.35f), RoundedCornerShape(12.dp))
+                        .clickable {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            showSidebar = false
+                            showAddAnnouncementDialog = true
+                        }
+                        .padding(vertical = 12.dp, horizontal = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
+                    Icon(Icons.Default.Notifications, contentDescription = null, tint = BentoForestGreen, modifier = Modifier.size(24.dp))
+                    Column {
+                        Text("📢 መልዕክት ልጥፍ", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold, color = Color.White)
+                        Text("አዲስ የኩባንያ መልዕክት መለጠፊያ ቦርድ", style = MaterialTheme.typography.labelSmall, color = BentoSubText)
+                    }
                 }
 
                 Spacer(modifier = Modifier.weight(1f))
@@ -1264,6 +1309,28 @@ fun DashboardScreen(
                     returned = mbStats.returned
                 )
                 selectedMasterbatchForBagPurchase = null
+            }
+        )
+    }
+
+    // 9. Startup Update Notification dialog
+    activeAnnouncementToShow?.let { ann ->
+        UpdateNotificationDialog(
+            announcement = ann,
+            onDismiss = {
+                prefs.edit().putBoolean("dismissed_announcement_${ann.id}", true).apply()
+                activeAnnouncementToShow = null
+            }
+        )
+    }
+
+    // 10. Post Announcement Dialog (Secure Admin tool)
+    if (showAddAnnouncementDialog) {
+        PostAnnouncementDialog(
+            onDismiss = { showAddAnnouncementDialog = false },
+            onPost = { title, message ->
+                viewModel.postAnnouncement(title, message)
+                showAddAnnouncementDialog = false
             }
         )
     }
@@ -3796,7 +3863,9 @@ fun imageIconsList(label: String): androidx.compose.ui.graphics.vector.ImageVect
 // --- LIVE ACTIVITY LOGS COMPOSABLE ---
 @Composable
 fun ActivityLogSection(
-    activityLogs: List<ActivityLog>
+    activityLogs: List<ActivityLog>,
+    announcements: List<Announcement> = emptyList(),
+    onDeleteAnnouncement: ((String) -> Unit)? = null
 ) {
     var searchQuery by remember { mutableStateOf("") }
     var selectedCategoryFilter by remember { mutableStateOf("All") }
@@ -3860,6 +3929,82 @@ fun ActivityLogSection(
                             style = MaterialTheme.typography.bodySmall,
                             color = BentoSubText
                         )
+                    }
+                }
+            }
+        }
+
+        // Render current posted announcements if available
+        if (announcements.isNotEmpty()) {
+            Spacer(modifier = Modifier.height(16.dp))
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF0F121E)), // Deep luxury border highlighted container
+                border = BorderStroke(1.dp, BentoForestGreen.copy(alpha = 0.2f))
+            ) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(
+                        text = "📢 ማስታወቂያ ሰሌዳ (Active Announcements)",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = BentoGold
+                    )
+                    
+                    announcements.forEach { ann ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(Color(0xFF161A29), RoundedCornerShape(12.dp))
+                                .border(1.dp, BentoBorder, RoundedCornerShape(12.dp))
+                                .padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(8.dp)
+                                            .background(BentoSoftGreen, CircleShape)
+                                    )
+                                    Text(
+                                        text = ann.title,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.ExtraBold,
+                                        color = Color.White
+                                    )
+                                }
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = ann.message,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = Color.White.copy(alpha = 0.85f),
+                                    lineHeight = 18.sp
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = "ቀን፡ ${ann.date}",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = BentoSubText
+                                )
+                            }
+                            if (onDeleteAnnouncement != null) {
+                                IconButton(
+                                    onClick = { onDeleteAnnouncement(ann.id) }
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Delete,
+                                        contentDescription = "Delete Announcement",
+                                        tint = BentoAlertText,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -5103,4 +5248,232 @@ fun toAmharicName(name: String): String {
          dict[part] ?: part.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
     }
     return translatedParts.joinToString(" ")
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun UpdateNotificationDialog(
+    announcement: Announcement,
+    onDismiss: () -> Unit
+) {
+    androidx.compose.ui.window.Dialog(
+        onDismissRequest = onDismiss,
+        properties = androidx.compose.ui.window.DialogProperties(
+            dismissOnBackPress = false,
+            dismissOnClickOutside = false
+        )
+    ) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+                .testTag("update_notification_dialog"),
+            shape = RoundedCornerShape(28.dp),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF161618)), // Pure carbon black dark theme
+            border = BorderStroke(1.dp, BentoBorder)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                // ANWAR logo at top
+                Box(
+                    modifier = Modifier
+                        .size(100.dp)
+                        .background(Color.Black, shape = CircleShape)
+                        .border(2.dp, BentoGold, shape = CircleShape)
+                        .padding(3.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    androidx.compose.foundation.Image(
+                        painter = androidx.compose.ui.res.painterResource(id = R.drawable.img_anwar_logo),
+                        contentDescription = "Anwar Company Logo",
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .clip(CircleShape),
+                        contentScale = androidx.compose.ui.layout.ContentScale.Crop
+                    )
+                }
+
+                // Title "📢 notification" in bold green
+                Text(
+                    text = "📢 notification",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = BentoSoftGreen,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Divider(color = BentoBorder)
+
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        text = announcement.title,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White,
+                        textAlign = TextAlign.Center
+                    )
+
+                    // The announcement message in white text
+                    Text(
+                        text = announcement.message,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Color.White,
+                        textAlign = TextAlign.Center,
+                        lineHeight = 22.sp
+                    )
+
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    Text(
+                        text = "ቀን: ${announcement.date}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = BentoSubText,
+                        textAlign = TextAlign.Center
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Green "update" button
+                Button(
+                    onClick = onDismiss,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = BentoSoftGreen,
+                        contentColor = Color.Black
+                    ),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp)
+                        .testTag("diag_announcement_dismiss")
+                ) {
+                    Text(
+                        text = "update",
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Black,
+                        letterSpacing = 1.sp
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun PostAnnouncementDialog(
+    onDismiss: () -> Unit,
+    onPost: (title: String, message: String) -> Unit
+) {
+    var pinText by remember { mutableStateOf("") }
+    var titleText by remember { mutableStateOf("") }
+    var messageText by remember { mutableStateOf("") }
+    var showError by remember { mutableStateOf(false) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                "📢 መልዕክት መለጠፊያ (Post Announcement)",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = Color.White
+            )
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(
+                    "መልዕክቱን ለመለጠፍ እባክዎ የአድሚን የይለፍ ቃል (1234) ያስገቡ:",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = BentoSubText
+                )
+
+                OutlinedTextField(
+                    value = pinText,
+                    onValueChange = {
+                        pinText = it
+                        showError = false
+                    },
+                    label = { Text("Admin PIN (e.g. 1234)", color = Color.White.copy(alpha = 0.6f)) },
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = Color.White,
+                        unfocusedTextColor = Color.White,
+                        focusedBorderColor = BentoSoftGreen,
+                        unfocusedBorderColor = BentoBorder
+                    ),
+                    visualTransformation = PasswordVisualTransformation(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    isError = showError,
+                    modifier = Modifier.fillMaxWidth().testTag("admin_post_pin")
+                )
+
+                if (showError) {
+                    Text(
+                        "የገቡት የይለፍ ቃል የተሳሳተ ነው!",
+                        color = BentoAlertText,
+                        style = MaterialTheme.typography.labelSmall
+                    )
+                }
+
+                OutlinedTextField(
+                    value = titleText,
+                    onValueChange = { titleText = it },
+                    label = { Text("አርዕስት (Announcement Title)", color = Color.White.copy(alpha = 0.6f)) },
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = Color.White,
+                        unfocusedTextColor = Color.White,
+                        focusedBorderColor = BentoSoftGreen,
+                        unfocusedBorderColor = BentoBorder
+                    ),
+                    placeholder = { Text("e.g. 📢 Operations Update") },
+                    modifier = Modifier.fillMaxWidth().testTag("admin_post_title")
+                )
+
+                OutlinedTextField(
+                    value = messageText,
+                    onValueChange = { messageText = it },
+                    label = { Text("መልዕክት (Message)", color = Color.White.copy(alpha = 0.6f)) },
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = Color.White,
+                        unfocusedTextColor = Color.White,
+                        focusedBorderColor = BentoSoftGreen,
+                        unfocusedBorderColor = BentoBorder
+                    ),
+                    placeholder = { Text("e.g. Shift 2 timings will be changed...") },
+                    minLines = 3,
+                    modifier = Modifier.fillMaxWidth().testTag("admin_post_message")
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    if (pinText == "1234") {
+                        if (titleText.isNotBlank() && messageText.isNotBlank()) {
+                            onPost(titleText, messageText)
+                        }
+                    } else {
+                        showError = true
+                    }
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = BentoSoftGreen, contentColor = Color.Black)
+            ) {
+                Text("ለጥፍ (Post)")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("አጥፋ (Cancel)", color = Color.White)
+            }
+        }
+    )
 }

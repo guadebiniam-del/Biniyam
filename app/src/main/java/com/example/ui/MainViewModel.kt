@@ -51,6 +51,40 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val allActivityLogs: StateFlow<List<ActivityLog>> = repository.allActivityLogsFlow
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    val allAnnouncements: StateFlow<List<Announcement>> = repository.allAnnouncementsFlow
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    fun postAnnouncement(title: String, message: String) {
+        viewModelScope.launch {
+            try {
+                val ethiopianDate = EthiopianCalendarHelper.getTodayEthiopianString()
+                val ann = Announcement(
+                    id = java.util.UUID.randomUUID().toString(),
+                    title = title,
+                    message = message,
+                    date = ethiopianDate,
+                    timestamp = System.currentTimeMillis(),
+                    active = true
+                )
+                repository.insertAnnouncement(ann)
+                logAction("System", "Add", "አዲስ መልዕክት ተለጠፈ: $title")
+            } catch (e: Exception) {
+                android.util.Log.e("MainViewModel", "Error posting announcement: ${e.message}", e)
+            }
+        }
+    }
+
+    fun deleteAnnouncement(id: String) {
+        viewModelScope.launch {
+            try {
+                repository.deleteAnnouncement(id)
+                logAction("System", "Delete", "መልዕክት ጠፋ")
+            } catch (e: Exception) {
+                android.util.Log.e("MainViewModel", "Error deleting announcement: ${e.message}", e)
+            }
+        }
+    }
+
     // --- SYSTEM TIME & CALENDAR PERIOD STATES ---
     sealed class ReportPeriod {
         object Daily : ReportPeriod()

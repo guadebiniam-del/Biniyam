@@ -112,6 +112,23 @@ class InventoryRepository {
         }
     }
 
+    // --- ANNOUNCEMENTS ---
+    val allAnnouncementsFlow: Flow<List<Announcement>> = getCollectionFlow("announcements", Announcement::class.java)
+        .map { list -> list.sortedByDescending { it.timestamp } }
+
+    suspend fun insertAnnouncement(announcement: Announcement) {
+        val idToUse = announcement.id.ifEmpty { java.util.UUID.randomUUID().toString() }
+        val updated = announcement.copy(
+            id = idToUse,
+            timestamp = if (announcement.timestamp == 0L) System.currentTimeMillis() else announcement.timestamp
+        )
+        db.collection("announcements").document(idToUse).set(updated).awaitTask()
+    }
+
+    suspend fun deleteAnnouncement(id: String) {
+        db.collection("announcements").document(id).delete().awaitTask()
+    }
+
     // --- PRODUCTS ---
     val allActivityLogsFlow: Flow<List<ActivityLog>> = getCollectionFlow("activity_logs", ActivityLog::class.java)
         .map { list -> list.sortedByDescending { it.timestamp } }

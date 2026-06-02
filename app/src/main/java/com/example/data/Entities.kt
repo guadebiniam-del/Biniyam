@@ -81,7 +81,16 @@ data class WorkerAttendance(
     val status: String = "" // "On Duty", "Absent", "Left" (resigned), "Sunday Off"
 )
 
-// --- ACTIVITY LOGS (Firestore Managed) ---
+// --- ANNOUNCEMENTS ---
+@Entity(tableName = "announcements")
+data class Announcement(
+    @PrimaryKey val id: String = "",
+    val title: String = "",
+    val message: String = "",
+    val date: String = "",
+    val timestamp: Long = 0L,
+    val active: Boolean = true
+)
 data class ActivityLog(
     val id: String = "",
     val timestamp: Long = 0,
