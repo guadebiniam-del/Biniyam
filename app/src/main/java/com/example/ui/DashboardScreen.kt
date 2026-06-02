@@ -2553,75 +2553,103 @@ fun MasterbatchCard(
         modifier = Modifier
             .fillMaxWidth()
             .testTag("masterbatch_card_${masterbatch.id}"),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(containerColor = BentoNeutralGray),
         border = BorderStroke(1.dp, BentoBorder)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            // Pigment Color indicator
-            Box(
-                modifier = Modifier
-                    .size(40.dp)
-                    .background(
-                        color = getMasterbatchColor(masterbatch.color),
-                        shape = CircleShape
-                    )
-                    .border(1.5.dp, BentoBorder, CircleShape)
-            )
-
-            Spacer(modifier = Modifier.width(12.dp))
-
+            // Left hand section: Color indicator, Title, Stock Status and Flow of Store Units
             Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "${masterbatch.color} Pigment Masterbatch",
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = BentoTextDark
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(12.dp)
+                            .background(
+                                color = getMasterbatchColor(masterbatch.color),
+                                shape = CircleShape
+                            )
+                            .border(1.dp, Color.White.copy(alpha = 0.4f), CircleShape)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "${masterbatch.color} Pigment Masterbatch",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(6.dp))
+
+                val bagsLeft = masterbatch.currentStock / 25.0
+                val bagsBought = stats.bought / 25.0
+
+                // Current inventory store levels
+                Column {
+                    Text(
+                        text = "መጋዘን ውስጥ የሚገኝ ክምችት (In Store Stock)",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = BentoSubText
+                    )
+                    Text(
+                        text = "${String.format(Locale.US, "%.1f", bagsLeft)} ከረጢት / Bags (${masterbatch.currentStock.toInt()} kg)",
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.Bold,
+                        color = BentoSoftGreen
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                // Buy Bags & Out for machine details
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy(16.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
                     Text(
-                        text = "Used: -${stats.used.toInt()} kg",
+                        text = "Bought: ${String.format(Locale.US, "%.1f", bagsBought)} Bags",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = BentoSubText
+                    )
+                    Text(
+                        text = "Machine Out: -${stats.used.toInt()} kg",
                         style = MaterialTheme.typography.labelSmall,
                         color = BentoAlertText
-                    )
-                    Text(
-                        text = "Bought: +${stats.bought.toInt()} kg",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = BentoForestGreen
-                    )
-                    Text(
-                        text = "Stock: ${masterbatch.currentStock.toInt()} kg left",
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = BentoTextDark
                     )
                 }
             }
 
             // Quick actions
-            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                IconButton(onClick = onRecordClick) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                IconButton(
+                    onClick = onRecordClick,
+                    modifier = Modifier.size(36.dp)
+                ) {
                     Icon(
-                        Icons.Default.Add,
+                        Icons.Default.AddCircle,
                         contentDescription = "Add activity log",
-                        tint = BentoForestGreen,
-                        modifier = Modifier.size(20.dp)
+                        tint = BentoSoftGreen,
+                        modifier = Modifier.size(22.dp)
                     )
                 }
-                IconButton(onClick = onDeleteClick) {
+                IconButton(
+                    onClick = onDeleteClick,
+                    modifier = Modifier.size(32.dp)
+                ) {
                     Icon(
                         Icons.Default.Delete,
                         contentDescription = "Delete",
-                        tint = BentoAlertText.copy(alpha = 0.6f),
-                        modifier = Modifier.size(18.dp)
+                        tint = BentoAlertText.copy(alpha = 0.5f),
+                        modifier = Modifier.size(16.dp)
                     )
                 }
             }
@@ -2857,11 +2885,16 @@ fun AddMasterbatchDialog(
     onSave: (color: String, initialStock: Double) -> Unit
 ) {
     var colorName by remember { mutableStateOf("") }
-    var initialStockStr by remember { mutableStateOf("50.0") }
+    var initialStockBagsStr by remember { mutableStateOf("2.0") }
+
+    val computedInitialKg = remember(initialStockBagsStr) {
+        val bags = initialStockBagsStr.toDoubleOrNull() ?: 0.0
+        bags * 25.0
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Add Masterbatch Color Agent") },
+        title = { Text("Add Masterbatch Color Agent", fontWeight = FontWeight.Bold) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 OutlinedTextField(
@@ -2873,9 +2906,12 @@ fun AddMasterbatchDialog(
                         .testTag("diag_mb_color")
                 )
                 OutlinedTextField(
-                    value = initialStockStr,
-                    onValueChange = { initialStockStr = it },
-                    label = { Text("Initial Stock in kg") },
+                    value = initialStockBagsStr,
+                    onValueChange = { initialStockBagsStr = it },
+                    label = { Text("መጋዘን ውስጥ የሚገባ ከረጢት (Initial Stock in Bags)") },
+                    supportingText = {
+                        Text("→ Equals ${computedInitialKg.toInt()} kg (1 bag = 25 kg)", color = BentoSoftGreen, fontWeight = FontWeight.Bold)
+                    },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -2884,9 +2920,8 @@ fun AddMasterbatchDialog(
         confirmButton = {
             Button(
                 onClick = {
-                    val stock = initialStockStr.toDoubleOrNull() ?: 0.0
                     if (colorName.isNotEmpty()) {
-                        onSave(colorName, stock)
+                        onSave(colorName, computedInitialKg)
                     }
                 },
                 modifier = Modifier.testTag("diag_mb_submit")
@@ -3172,32 +3207,52 @@ fun RecordMasterbatchActivityDialog(
     onSave: (used: Double, bought: Double) -> Unit
 ) {
     var usedStr by remember { mutableStateOf("") }
-    var boughtStr by remember { mutableStateOf("") }
+    var boughtBagsStr by remember { mutableStateOf("") }
+
+    val computedBoughtKg = remember(boughtBagsStr) {
+        val bags = boughtBagsStr.toDoubleOrNull() ?: 0.0
+        bags * 25.0
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Activity Log: ${masterbatch.color} Masterbatch") },
+        title = { Text("Activity Log: ${masterbatch.color} Masterbatch", fontWeight = FontWeight.Bold) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedTextField(
-                    value = usedStr,
-                    onValueChange = { usedStr = it },
-                    label = { Text("Used Today in Extrusion (kg)") },
-                    placeholder = { Text("0.0") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .testTag("diag_mb_used")
+                Text(
+                    text = "ክምችት ለመጨመር ወይም ለመቀነስ (Track Stock Flow)",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = BentoSubText
                 )
+
                 OutlinedTextField(
-                    value = boughtStr,
-                    onValueChange = { boughtStr = it },
-                    label = { Text("Bought/Restocked Today (kg)") },
-                    placeholder = { Text("0.0") },
+                    value = boughtBagsStr,
+                    onValueChange = { boughtBagsStr = it },
+                    label = { Text("የተገዛ ከረጢት - መጋዘን ውስጥ (Bought Bags - Put in Store)") },
+                    placeholder = { Text("e.g. 5 bags") },
+                    supportingText = {
+                        if (computedBoughtKg > 0.0) {
+                            Text("→ Adds ${computedBoughtKg.toInt()} kg of pigment to store stock", color = BentoSoftGreen, fontWeight = FontWeight.Bold)
+                        } else {
+                            Text("1 Bag (1 ከረጢት) = 25 kg", color = BentoSubText)
+                        }
+                    },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     modifier = Modifier
                         .fillMaxWidth()
                         .testTag("diag_mb_bought")
+                )
+
+                OutlinedTextField(
+                    value = usedStr,
+                    onValueChange = { usedStr = it },
+                    label = { Text("ከመጋዘን ለማሽን የወጣ - ኪ.ግ (Out from Store for Machine - kg)") },
+                    placeholder = { Text("e.g. 10 kg") },
+                    supportingText = { Text("Enter the usage amount in kilograms", color = BentoSubText) },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("diag_mb_used")
                 )
             }
         },
@@ -3205,8 +3260,7 @@ fun RecordMasterbatchActivityDialog(
             Button(
                 onClick = {
                     val u = usedStr.toDoubleOrNull() ?: 0.0
-                    val b = boughtStr.toDoubleOrNull() ?: 0.0
-                    onSave(u, b)
+                    onSave(u, computedBoughtKg)
                 },
                 modifier = Modifier.testTag("diag_mb_activity_submit")
             ) {
