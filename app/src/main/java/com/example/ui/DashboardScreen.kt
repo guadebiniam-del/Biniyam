@@ -90,6 +90,7 @@ fun DashboardScreen(
     var selectedProductForActivity by remember { mutableStateOf<Product?>(null) }
     var selectedRawMaterialForActivity by remember { mutableStateOf<RawMaterial?>(null) }
     var selectedMasterbatchForActivity by remember { mutableStateOf<Masterbatch?>(null) }
+    var selectedMasterbatchForBagPurchase by remember { mutableStateOf<Masterbatch?>(null) }
 
     // Date picker state toggle
     var showDatePickerDialog by remember { mutableStateOf(false) }
@@ -525,18 +526,18 @@ fun DashboardScreen(
                             // --- SECTION 3: MASTERBATCH COLOR TRACKING ---
                             item {
                                 InventoryHeaderSection(
-                                    title = "MASTERBATCH COLOR AGENTS",
-                                    subtitle = "Industrial pigments used in extrusion process",
+                                    title = "የማስተርባች መዝገብ",
+                                    subtitle = "የቀለም ማስተርባች ክምችትና የቀን ፍጆታ መቆጣጠሪያ",
                                     icon = Icons.Default.Star,
                                     onAddClick = { showAddMasterbatchDialog = true },
-                                    addButtonText = "+ Pigment Color",
+                                    addButtonText = "+ አዲስ ማስተርባች",
                                     addBtnTag = "add_masterbatch_section_btn"
                                 )
 
                                 Spacer(modifier = Modifier.height(8.dp))
 
                                 if (masterbatches.isEmpty()) {
-                                    EmptyStatePlaceholder("No Masterbatch colors added. Click + Pigment Color.")
+                                    EmptyStatePlaceholder("ምንም የተመዘገበ ማስተርባች የለም:: አዲስ ለመመዝገብ '+ አዲስ ማስተርባች' የሚለውን ይጫኑ::")
                                 } else {
                                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                         masterbatches.forEach { mb ->
@@ -545,7 +546,8 @@ fun DashboardScreen(
                                                 masterbatch = mb,
                                                 stats = mbStats,
                                                 onRecordClick = { selectedMasterbatchForActivity = mb },
-                                                onDeleteClick = { viewModel.deleteMasterbatch(mb) }
+                                                onDeleteClick = { viewModel.deleteMasterbatch(mb) },
+                                                onAddBoughtBagsClick = { selectedMasterbatchForBagPurchase = mb }
                                             )
                                         }
                                     }
@@ -1234,12 +1236,34 @@ fun DashboardScreen(
 
     // 7. Record Masterbatch Activity Dialog
     selectedMasterbatchForActivity?.let { mb ->
+        val mbStats = stats.masterbatchSummary[mb.id] ?: MasterbatchAggStats(mb.id, 0.0, 0.0)
         RecordMasterbatchActivityDialog(
             masterbatch = mb,
+            stats = mbStats,
             onDismiss = { selectedMasterbatchForActivity = null },
-            onSave = { used, bought ->
-                viewModel.recordMasterbatchActivity(mb.id, used, bought)
+            onSave = { used, bought, takenOut, returned ->
+                viewModel.recordMasterbatchActivity(mb.id, used, bought, takenOut, returned)
                 selectedMasterbatchForActivity = null
+            }
+        )
+    }
+
+    // 8. Add Bought Bags Dialog
+    selectedMasterbatchForBagPurchase?.let { mb ->
+        val mbStats = stats.masterbatchSummary[mb.id] ?: MasterbatchAggStats(mb.id, 0.0, 0.0)
+        AddBoughtBagsDialog(
+            masterbatch = mb,
+            onDismiss = { selectedMasterbatchForBagPurchase = null },
+            onSave = { bags ->
+                val bagsInKg = bags * 25.0
+                viewModel.recordMasterbatchActivity(
+                    masterbatchId = mb.id,
+                    used = mbStats.used,
+                    bought = mbStats.bought + bagsInKg,
+                    takenOut = mbStats.takenOut,
+                    returned = mbStats.returned
+                )
+                selectedMasterbatchForBagPurchase = null
             }
         )
     }
@@ -2547,7 +2571,8 @@ fun MasterbatchCard(
     masterbatch: Masterbatch,
     stats: MasterbatchAggStats,
     onRecordClick: () -> Unit,
-    onDeleteClick: () -> Unit
+    onDeleteClick: () -> Unit,
+    onAddBoughtBagsClick: () -> Unit
 ) {
     Card(
         modifier = Modifier
@@ -2560,97 +2585,185 @@ fun MasterbatchCard(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
+                .height(IntrinsicSize.Min), // makes the left accent bar fill to card height nicely!
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            // Left hand section: Color indicator, Title, Stock Status and Flow of Store Units
-            Column(modifier = Modifier.weight(1f)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        modifier = Modifier
-                            .size(12.dp)
-                            .background(
-                                color = getMasterbatchColor(masterbatch.color),
-                                shape = CircleShape
-                            )
-                            .border(1.dp, Color.White.copy(alpha = 0.4f), CircleShape)
+            // Left visual accent bar representing masterbatch color
+            Box(
+                modifier = Modifier
+                    .width(6.dp)
+                    .fillMaxHeight()
+                    .background(
+                        color = getMasterbatchColor(masterbatch.color),
+                        shape = RoundedCornerShape(topStart = 12.dp, bottomStart = 12.dp)
                     )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "${masterbatch.color} Pigment Masterbatch",
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White
-                    )
+            )
+
+            // Inner content
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                // Header Row (Color Name and Delete)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            modifier = Modifier
+                                .size(10.dp)
+                                .background(
+                                    color = getMasterbatchColor(masterbatch.color),
+                                    shape = CircleShape
+                                )
+                                .border(1.dp, Color.White.copy(alpha = 0.4f), CircleShape)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "${masterbatch.color} Pigment Masterbatch",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+                    }
+
+                    IconButton(
+                        onClick = onDeleteClick,
+                        modifier = Modifier.size(24.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Delete,
+                            contentDescription = "መዝገብ አጥፋ",
+                            tint = BentoAlertText.copy(alpha = 0.6f),
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
                 }
 
-                Spacer(modifier = Modifier.height(6.dp))
-
-                val bagsLeft = masterbatch.currentStock / 25.0
-                val bagsBought = stats.bought / 25.0
-
-                // Current inventory store levels
-                Column {
+                // Promo: Store Stock (በመጋዘን ያለ) shown large and bold in green
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(Color.Black.copy(alpha = 0.2f), RoundedCornerShape(8.dp))
+                        .padding(12.dp)
+                ) {
                     Text(
-                        text = "መጋዘን ውስጥ የሚገኝ ክምችት (In Store Stock)",
+                        text = "በመጋዘን ያለ (Remaining in Store)",
                         style = MaterialTheme.typography.labelSmall,
-                        color = BentoSubText
+                        color = BentoSubText,
+                        fontWeight = FontWeight.Bold
                     )
+                    Spacer(modifier = Modifier.height(2.dp))
                     Text(
-                        text = "${String.format(Locale.US, "%.1f", bagsLeft)} ከረጢት / Bags (${masterbatch.currentStock.toInt()} kg)",
-                        style = MaterialTheme.typography.bodySmall,
-                        fontWeight = FontWeight.Bold,
+                        text = "${String.format(Locale.US, "%.1f", masterbatch.currentStock / 25.0)} ከረጢት / Bags (${masterbatch.currentStock.toInt()} ኪ.ግ)",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.ExtraBold,
                         color = BentoSoftGreen
                     )
                 }
 
-                Spacer(modifier = Modifier.height(4.dp))
-
-                // Buy Bags & Out for machine details
+                // Daily in/out shown clearly
                 Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(14.dp)
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Text(
-                        text = "Bought: ${String.format(Locale.US, "%.1f", bagsBought)} Bags",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = BentoSubText
-                    )
-                    Text(
-                        text = "Machine Out: -${stats.used.toInt()} kg",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = BentoAlertText
-                    )
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "ከመጋዘን የወጣ",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = BentoSubText
+                        )
+                        Text(
+                            text = "${stats.takenOut.toInt()} ኪ.ግ",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+                    }
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "ወደ መጋዘን የተመለሰ",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = BentoSubText
+                        )
+                        Text(
+                            text = "${stats.returned.toInt()} ኪ.ግ",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+                    }
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "የዕለት ፍጆታ",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = BentoAlertText
+                        )
+                        Text(
+                            text = "${stats.used.toInt()} ኪ.ግ",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = BentoAlertText
+                        )
+                    }
                 }
-            }
 
-            // Quick actions
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                IconButton(
-                    onClick = onRecordClick,
-                    modifier = Modifier.size(36.dp)
+                // Action buttons
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Icon(
-                        Icons.Default.AddCircle,
-                        contentDescription = "Add activity log",
-                        tint = BentoSoftGreen,
-                        modifier = Modifier.size(22.dp)
-                    )
-                }
-                IconButton(
-                    onClick = onDeleteClick,
-                    modifier = Modifier.size(32.dp)
-                ) {
-                    Icon(
-                        Icons.Default.Delete,
-                        contentDescription = "Delete",
-                        tint = BentoAlertText.copy(alpha = 0.5f),
-                        modifier = Modifier.size(16.dp)
-                    )
+                    // + bag ግዢ Button
+                    Button(
+                        onClick = onAddBoughtBagsClick,
+                        colors = ButtonDefaults.buttonColors(containerColor = BentoSoftGreen.copy(alpha = 0.15f), contentColor = BentoSoftGreen),
+                        shape = RoundedCornerShape(8.dp),
+                        border = BorderStroke(1.dp, BentoSoftGreen.copy(alpha = 0.5f)),
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(36.dp),
+                        contentPadding = PaddingValues(0.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Add,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = "+ bag ግዢ",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+
+                    // Daily Ledger Log Button
+                    Button(
+                        onClick = onRecordClick,
+                        colors = ButtonDefaults.buttonColors(containerColor = Color.White.copy(alpha = 0.08f), contentColor = Color.White),
+                        shape = RoundedCornerShape(8.dp),
+                        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.2f)),
+                        modifier = Modifier
+                            .weight(1.2f)
+                            .height(36.dp),
+                        contentPadding = PaddingValues(0.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Edit,
+                            contentDescription = null,
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = "የዕለት ፍጆታ መዝግብ",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
                 }
             }
         }
@@ -2894,13 +3007,14 @@ fun AddMasterbatchDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Add Masterbatch Color Agent", fontWeight = FontWeight.Bold) },
+        title = { Text("አዲስ ማስተርባች (ቀለም) መመዝገቢያ", fontWeight = FontWeight.Bold, color = Color.White) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 OutlinedTextField(
                     value = colorName,
                     onValueChange = { colorName = it },
-                    label = { Text("Color Name (e.g., Green, Black, White)") },
+                    label = { Text("የማስተርባች ቀለም (Color Name: Green, Black...)") },
+                    placeholder = { Text("ቀለም ያስገቡ") },
                     modifier = Modifier
                         .fillMaxWidth()
                         .testTag("diag_mb_color")
@@ -2908,9 +3022,9 @@ fun AddMasterbatchDialog(
                 OutlinedTextField(
                     value = initialStockBagsStr,
                     onValueChange = { initialStockBagsStr = it },
-                    label = { Text("መጋዘን ውስጥ የሚገባ ከረጢት (Initial Stock in Bags)") },
+                    label = { Text("የመጀመሪያ ክምችት በከረጢት (Initial Bags)") },
                     supportingText = {
-                        Text("→ Equals ${computedInitialKg.toInt()} kg (1 bag = 25 kg)", color = BentoSoftGreen, fontWeight = FontWeight.Bold)
+                        Text("→ ${computedInitialKg.toInt()} ኪ.ግ / kg (1 ከረጢት = 25 ኪ.ግ)", color = BentoSoftGreen, fontWeight = FontWeight.Bold)
                     },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     modifier = Modifier.fillMaxWidth()
@@ -2926,11 +3040,11 @@ fun AddMasterbatchDialog(
                 },
                 modifier = Modifier.testTag("diag_mb_submit")
             ) {
-                Text("Save")
+                Text("መዝግብ (Save)")
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
+            TextButton(onClick = onDismiss) { Text("አጥፋ (Cancel)") }
         }
     )
 }
@@ -3203,72 +3317,147 @@ fun RecordRawMaterialActivityDialog(
 @Composable
 fun RecordMasterbatchActivityDialog(
     masterbatch: Masterbatch,
+    stats: MasterbatchAggStats,
     onDismiss: () -> Unit,
-    onSave: (used: Double, bought: Double) -> Unit
+    onSave: (used: Double, bought: Double, takenOut: Double, returned: Double) -> Unit
 ) {
-    var usedStr by remember { mutableStateOf("") }
-    var boughtBagsStr by remember { mutableStateOf("") }
+    var takenOutStr by remember { mutableStateOf(if (stats.takenOut > 0.0) stats.takenOut.toInt().toString() else "") }
+    var returnedStr by remember { mutableStateOf(if (stats.returned > 0.0) stats.returned.toInt().toString() else "") }
 
-    val computedBoughtKg = remember(boughtBagsStr) {
-        val bags = boughtBagsStr.toDoubleOrNull() ?: 0.0
-        bags * 25.0
-    }
+    val takenOut = takenOutStr.toDoubleOrNull() ?: 0.0
+    val returned = returnedStr.toDoubleOrNull() ?: 0.0
+    val netDailyUsage = maxOf(0.0, takenOut - returned)
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Activity Log: ${masterbatch.color} Masterbatch", fontWeight = FontWeight.Bold) },
+        title = { Text("የዕለት ፍጆታ መመዝገቢያ: ${masterbatch.color}", fontWeight = FontWeight.Bold, color = Color.White) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
                 Text(
-                    text = "ክምችት ለመጨመር ወይም ለመቀነስ (Track Stock Flow)",
+                    text = "የዕለት የማሽን አጠቃቀም እና የቀለም ፍጆታ መቆጣጠሪያ",
                     style = MaterialTheme.typography.labelSmall,
                     color = BentoSubText
                 )
 
                 OutlinedTextField(
-                    value = boughtBagsStr,
-                    onValueChange = { boughtBagsStr = it },
-                    label = { Text("የተገዛ ከረጢት - መጋዘን ውስጥ (Bought Bags - Put in Store)") },
-                    placeholder = { Text("e.g. 5 bags") },
-                    supportingText = {
-                        if (computedBoughtKg > 0.0) {
-                            Text("→ Adds ${computedBoughtKg.toInt()} kg of pigment to store stock", color = BentoSoftGreen, fontWeight = FontWeight.Bold)
-                        } else {
-                            Text("1 Bag (1 ከረጢት) = 25 kg", color = BentoSubText)
-                        }
-                    },
+                    value = takenOutStr,
+                    onValueChange = { takenOutStr = it },
+                    label = { Text("ከመጋዘን የወጣ - ኪ.ግ (Taken Out to Machine)") },
+                    placeholder = { Text("የኪ.ግ ብዛት") },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .testTag("diag_mb_bought")
+                    modifier = Modifier.fillMaxWidth()
                 )
 
                 OutlinedTextField(
-                    value = usedStr,
-                    onValueChange = { usedStr = it },
-                    label = { Text("ከመጋዘን ለማሽን የወጣ - ኪ.ግ (Out from Store for Machine - kg)") },
-                    placeholder = { Text("e.g. 10 kg") },
-                    supportingText = { Text("Enter the usage amount in kilograms", color = BentoSubText) },
+                    value = returnedStr,
+                    onValueChange = { returnedStr = it },
+                    label = { Text("ወደ መጋዘን የተመለሰ - ኪ.ግ (Returned to Store)") },
+                    placeholder = { Text("የኪ.ግ ብዛት") },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                // Computed: Net Daily Usage
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .testTag("diag_mb_used")
+                        .background(BentoAlertText.copy(alpha = 0.1f), RoundedCornerShape(6.dp))
+                        .padding(10.dp)
+                ) {
+                    Text(
+                        text = "የዕለት ፍጆታ (Net Daily Usage)",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = BentoAlertText,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "${netDailyUsage.toInt()} ኪ.ግ (kg)",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = BentoAlertText
+                    )
+                }
+
+                // Computed: Remaining in store on confirmation
+                val currentRemKg = maxOf(0.0, masterbatch.currentStock - netDailyUsage + stats.used)
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(BentoSoftGreen.copy(alpha = 0.1f), RoundedCornerShape(6.dp))
+                        .padding(10.dp)
+                ) {
+                    Text(
+                        text = "በመጋዘን ያለ (Remaining in Store)",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = BentoSoftGreen,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "${String.format(Locale.US, "%.1f", currentRemKg / 25.0)} ከረጢት (${currentRemKg.toInt()} kg)",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = BentoSoftGreen
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    onSave(netDailyUsage, stats.bought, takenOut, returned)
+                },
+                modifier = Modifier.testTag("diag_mb_activity_submit")
+            ) {
+                Text("መዝግብ (Record)")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("አጥፋ (Cancel)") }
+        }
+    )
+}
+
+@Composable
+fun AddBoughtBagsDialog(
+    masterbatch: Masterbatch,
+    onDismiss: () -> Unit,
+    onSave: (bags: Double) -> Unit
+) {
+    var bagsStr by remember { mutableStateOf("") }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("አዲስ የከረጢት ግዢ መመዝገቢያ", fontWeight = FontWeight.Bold, color = Color.White) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(
+                    text = "${masterbatch.color} ማስተርባች መጋዘን ውስጥ ለመጨመር የከረጢት ብዛት ያስገቡ (1 ከረጢት = 25 ኪ.ግ)",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = BentoSubText
+                )
+                OutlinedTextField(
+                    value = bagsStr,
+                    onValueChange = { bagsStr = it },
+                    label = { Text("የተገዛ የከረጢት ብዛት (Bags)") },
+                    placeholder = { Text("ከረጢት ብዛት") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier.fillMaxWidth()
                 )
             }
         },
         confirmButton = {
             Button(
                 onClick = {
-                    val u = usedStr.toDoubleOrNull() ?: 0.0
-                    onSave(u, computedBoughtKg)
-                },
-                modifier = Modifier.testTag("diag_mb_activity_submit")
+                    val bags = bagsStr.toDoubleOrNull() ?: 0.0
+                    if (bags > 0) {
+                        onSave(bags)
+                    }
+                }
             ) {
-                Text("Apply")
+                Text("መዝግብ (Add)")
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
+            TextButton(onClick = onDismiss) { Text("አጥፋ (Cancel)") }
         }
     )
 }

@@ -57,7 +57,9 @@ data class MasterbatchTransaction(
     val masterbatchId: Int = 0,
     val date: String = "", // "yyyy-MM-dd"
     val used: Double = 0.0, // kg used daily
-    val bought: Double = 0.0 // kg bought daily
+    val bought: Double = 0.0, // kg bought daily
+    val takenOut: Double = 0.0, // kg taken out to machine daily
+    val returned: Double = 0.0 // kg returned from machine daily
 )
 
 // --- WORKERS ---

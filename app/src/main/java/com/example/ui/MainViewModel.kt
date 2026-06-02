@@ -209,13 +209,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     // Masterbatch
-    fun recordMasterbatchActivity(masterbatchId: Int, used: Double, bought: Double) {
+    fun recordMasterbatchActivity(masterbatchId: Int, used: Double, bought: Double, takenOut: Double = 0.0, returned: Double = 0.0) {
         viewModelScope.launch {
             val transaction = MasterbatchTransaction(
                 masterbatchId = masterbatchId,
                 date = selectedDate.value,
                 used = used,
-                bought = bought
+                bought = bought,
+                takenOut = takenOut,
+                returned = returned
             )
             repository.addMasterbatchTransactionAndUpdateStock(transaction)
             
@@ -223,7 +225,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             logAction(
                 category = "Masterbatch",
                 actionType = "Edit",
-                description = "Updated Masterbatch '${mb?.color ?: "ID #$masterbatchId"}' Pigment: Used: -${used}kg, Bought: +${bought}kg (Date: ${selectedDate.value})"
+                description = "Updated Masterbatch '${mb?.color ?: "ID #$masterbatchId"}' Pigment: Taken Out: ${takenOut}kg, Returned: ${returned}kg, Net Used: ${used}kg, Bought: +${bought}kg (Date: ${selectedDate.value})"
             )
         }
     }
@@ -366,7 +368,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             MasterbatchAggStats(
                 masterbatchId = entry.key,
                 used = mbt.sumOf { it.used },
-                bought = mbt.sumOf { it.bought }
+                bought = mbt.sumOf { it.bought },
+                takenOut = mbt.sumOf { it.takenOut },
+                returned = mbt.sumOf { it.returned }
             )
         }
 
@@ -459,7 +463,9 @@ data class ProductAggStats(
 data class MasterbatchAggStats(
     val masterbatchId: Int,
     val used: Double,
-    val bought: Double
+    val bought: Double,
+    val takenOut: Double = 0.0,
+    val returned: Double = 0.0
 )
 
 data class WorkerAggStats(
