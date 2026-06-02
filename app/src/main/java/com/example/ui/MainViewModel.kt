@@ -54,6 +54,28 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val allAnnouncements: StateFlow<List<Announcement>> = repository.allAnnouncementsFlow
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    val appVersionState: StateFlow<AppVersion?> = repository.appVersionFlow
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+
+    fun updateAppVersion(newVersion: String, apkUrl: String, changelog: String, isMandatory: Boolean) {
+        viewModelScope.launch {
+            try {
+                val appVer = AppVersion(
+                    id = "latest",
+                    versionName = newVersion,
+                    apkUrl = apkUrl,
+                    changelog = changelog,
+                    isMandatory = isMandatory,
+                    timestamp = System.currentTimeMillis()
+                )
+                repository.updateAppVersion(appVer)
+                logAction("System", "Edit", "አፕሊኬሽን እትም ተቀየረ፡ v$newVersion")
+            } catch (e: Exception) {
+                android.util.Log.e("MainViewModel", "Error updating app version: ${e.message}", e)
+            }
+        }
+    }
+
     fun postAnnouncement(title: String, message: String) {
         viewModelScope.launch {
             try {

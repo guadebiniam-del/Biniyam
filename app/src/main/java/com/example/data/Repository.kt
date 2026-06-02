@@ -129,6 +129,19 @@ class InventoryRepository {
         db.collection("announcements").document(id).delete().awaitTask()
     }
 
+    // --- APP VERSION MANAGEMENT ---
+    val appVersionFlow: Flow<AppVersion?> = getCollectionFlow("appVersion", AppVersion::class.java)
+        .map { list -> list.firstOrNull { it.id == "latest" } ?: list.firstOrNull() }
+
+    suspend fun updateAppVersion(appVersion: AppVersion) {
+        val docId = "latest"
+        val updated = appVersion.copy(
+            id = docId,
+            timestamp = System.currentTimeMillis()
+        )
+        db.collection("appVersion").document(docId).set(updated).awaitTask()
+    }
+
     // --- PRODUCTS ---
     val allActivityLogsFlow: Flow<List<ActivityLog>> = getCollectionFlow("activity_logs", ActivityLog::class.java)
         .map { list -> list.sortedByDescending { it.timestamp } }

@@ -91,6 +91,17 @@ data class Announcement(
     val timestamp: Long = 0L,
     val active: Boolean = true
 )
+
+// --- APP VERSION MANAGEMENT ---
+data class AppVersion(
+    val id: String = "latest",
+    val versionName: String = "1.0.0",
+    val apkUrl: String = "https://github.com/guadebiniam-del/Biniyam/raw/main/.build-outputs/app-debug.apk",
+    val changelog: String = "",
+    val isMandatory: Boolean = false,
+    val timestamp: Long = 0L
+)
+
 data class ActivityLog(
     val id: String = "",
     val timestamp: Long = 0,

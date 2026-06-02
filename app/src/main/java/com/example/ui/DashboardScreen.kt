@@ -55,6 +55,8 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import java.text.SimpleDateFormat
 import java.util.*
 
+const val CURRENT_APP_VERSION = "1.0.0"
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DashboardScreen(
@@ -74,6 +76,7 @@ fun DashboardScreen(
     val activityLogs by viewModel.allActivityLogs.collectAsStateWithLifecycle()
     val allWorkerAttendance by viewModel.allWorkerAttendance.collectAsStateWithLifecycle()
     val announcements by viewModel.allAnnouncements.collectAsStateWithLifecycle()
+    val appVersionInfo by viewModel.appVersionState.collectAsStateWithLifecycle()
 
     // Active tab selection matching the Bento Grid HTML design: Daily Overview, Inventory, Workers, Activity Log
     var activeTab by remember { mutableStateOf("Daily Overview") }
@@ -98,12 +101,14 @@ fun DashboardScreen(
     var editingWorkerSalary by remember { mutableStateOf<Worker?>(null) }
     var salaryEditValue by remember { mutableStateOf("") }
     var showAddAnnouncementDialog by remember { mutableStateOf(false) }
+    var showAppVersionDialog by remember { mutableStateOf(false) }
 
     val context = androidx.compose.ui.platform.LocalContext.current
     val prefs = remember { context.getSharedPreferences("anwar_app_prefs", android.content.Context.MODE_PRIVATE) }
     var activeAnnouncementToShow by remember { mutableStateOf<Announcement?>(null) }
+    var activeAppVersionToShow by remember { mutableStateOf<AppVersion?>(null) }
 
-    LaunchedEffect(announcements, showSplash) {
+    LaunchedEffect(announcements, appVersionInfo, showSplash) {
         if (!showSplash) {
             val latestActive = announcements.firstOrNull { it.active }
             if (latestActive != null) {
@@ -111,6 +116,17 @@ fun DashboardScreen(
                 val wasDismissed = prefs.getBoolean(key, false)
                 if (!wasDismissed) {
                     activeAnnouncementToShow = latestActive
+                }
+            }
+            if (appVersionInfo != null) {
+                val remoteVer = appVersionInfo!!.versionName
+                if (isNewerVersion(CURRENT_APP_VERSION, remoteVer)) {
+                    val key = "dismissed_version_${remoteVer}"
+                    val wasDismissed = prefs.getBoolean(key, false)
+                    val isMandatory = appVersionInfo!!.isMandatory
+                    if (!wasDismissed || isMandatory) {
+                        activeAppVersionToShow = appVersionInfo
+                    }
                 }
             }
         }
@@ -1124,6 +1140,30 @@ fun DashboardScreen(
                     }
                 }
 
+                // App Version Manager option (under hamburger menu)
+                HorizontalDivider(color = BentoBorder, modifier = Modifier.padding(vertical = 4.dp))
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(BentoForestGreen.copy(alpha = 0.12f))
+                        .border(1.dp, BentoForestGreen.copy(alpha = 0.35f), RoundedCornerShape(12.dp))
+                        .clickable {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            showSidebar = false
+                            showAppVersionDialog = true
+                        }
+                        .padding(vertical = 12.dp, horizontal = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
+                    Icon(Icons.Default.Build, contentDescription = null, tint = BentoForestGreen, modifier = Modifier.size(24.dp))
+                    Column {
+                        Text("🛠️ App Version Manager", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold, color = Color.White)
+                        Text("አፕሊኬሽን ስሪት መቀየሪያ (App Updates)", style = MaterialTheme.typography.labelSmall, color = BentoSubText)
+                    }
+                }
+
                 Spacer(modifier = Modifier.weight(1f))
 
                 Text(
@@ -1137,6 +1177,12 @@ fun DashboardScreen(
                     style = MaterialTheme.typography.labelSmall,
                     color = BentoForestGreen,
                     fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = "APP VERSION: v$CURRENT_APP_VERSION",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = BentoSoftGreen,
+                    fontWeight = FontWeight.ExtraBold
                 )
             }
         }
@@ -1331,6 +1377,32 @@ fun DashboardScreen(
             onPost = { title, message ->
                 viewModel.postAnnouncement(title, message)
                 showAddAnnouncementDialog = false
+            }
+        )
+    }
+
+    // 11. Startup Version Update notification dialog
+    activeAppVersionToShow?.let { appVer ->
+        VersionUpdatePopupDialog(
+            appVersion = appVer,
+            onDismiss = {
+                prefs.edit().putBoolean("dismissed_version_${appVer.versionName}", true).apply()
+                activeAppVersionToShow = null
+            }
+        )
+    }
+
+    // 12. App Version Manager Dialog (Secure Admin tool)
+    if (showAppVersionDialog) {
+        AdminAppVersionDialog(
+            currentLatestVersionName = appVersionInfo?.versionName ?: "1.0.0",
+            currentLatestApkUrl = appVersionInfo?.apkUrl ?: "github.com/guadebiniam-del/Biniyam/raw/main/.build-outputs/app-debug.apk",
+            currentLatestChangelog = appVersionInfo?.changelog ?: "First version update released.",
+            currentLatestIsMandatory = appVersionInfo?.isMandatory ?: false,
+            onDismiss = { showAppVersionDialog = false },
+            onUpdate = { newVersion, apkUrl, changelog, isMandatory ->
+                viewModel.updateAppVersion(newVersion, apkUrl, changelog, isMandatory)
+                showAppVersionDialog = false
             }
         )
     }
@@ -5473,6 +5545,359 @@ fun PostAnnouncementDialog(
         dismissButton = {
             TextButton(onClick = onDismiss) {
                 Text("አጥፋ (Cancel)", color = Color.White)
+            }
+        }
+    )
+}
+
+fun isNewerVersion(local: String, remote: String): Boolean {
+    val localParts = local.split(".").map { it.trim().toIntOrNull() ?: 0 }
+    val remoteParts = remote.split(".").map { it.trim().toIntOrNull() ?: 0 }
+    val length = maxOf(localParts.size, remoteParts.size)
+    for (i in 0 until length) {
+        val l = localParts.getOrNull(i) ?: 0
+        val r = remoteParts.getOrNull(i) ?: 0
+        if (r > l) return true
+        if (l > r) return false
+    }
+    return false
+}
+
+@Composable
+fun VersionUpdatePopupDialog(
+    appVersion: AppVersion,
+    onDismiss: () -> Unit
+) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    Dialog(
+        onDismissRequest = {
+            if (!appVersion.isMandatory) {
+                onDismiss()
+            }
+        },
+        properties = androidx.compose.ui.window.DialogProperties(
+            dismissOnBackPress = !appVersion.isMandatory,
+            dismissOnClickOutside = !appVersion.isMandatory
+        )
+    ) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+                .testTag("version_update_dialog"),
+            shape = RoundedCornerShape(28.dp),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF161618)),
+            border = BorderStroke(1.dp, BentoBorder)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                // ANWAR logo at top
+                Box(
+                    modifier = Modifier
+                        .size(100.dp)
+                        .background(Color.Black, shape = CircleShape)
+                        .border(2.dp, BentoGold, shape = CircleShape)
+                        .padding(3.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    androidx.compose.foundation.Image(
+                        painter = androidx.compose.ui.res.painterResource(id = R.drawable.img_anwar_logo),
+                        contentDescription = "Anwar Company Logo",
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .clip(CircleShape),
+                        contentScale = androidx.compose.ui.layout.ContentScale.Crop
+                    )
+                }
+
+                // Title "New Version Available!"
+                Text(
+                    text = "New Version Available!",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = BentoSoftGreen,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Divider(color = BentoBorder)
+
+                // Current version and New version numbers
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceEvenly
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("Current Version", style = MaterialTheme.typography.bodySmall, color = BentoSubText)
+                        Text("v$CURRENT_APP_VERSION", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold, color = Color.White)
+                    }
+                    Icon(
+                        imageVector = Icons.Default.KeyboardArrowRight,
+                        contentDescription = null,
+                        tint = BentoSoftGreen,
+                        modifier = Modifier.align(Alignment.CenterVertically)
+                    )
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("Latest Version", style = MaterialTheme.typography.bodySmall, color = BentoSubText)
+                        Text("v${appVersion.versionName}", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold, color = BentoGold)
+                    }
+                }
+
+                if (appVersion.isMandatory) {
+                    Box(
+                        modifier = Modifier
+                            .background(BentoAlertText.copy(alpha = 0.15f), RoundedCornerShape(8.dp))
+                            .border(1.dp, BentoAlertText.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
+                            .padding(horizontal = 12.dp, vertical = 6.dp)
+                    ) {
+                        Text(
+                            text = "⚠️ This is a mandatory update to continue using the app.",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = BentoAlertText,
+                            fontWeight = FontWeight.Bold,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
+
+                // Release notes / changelog text
+                if (appVersion.changelog.isNotBlank()) {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = Color.Black.copy(alpha = 0.4f)),
+                        border = BorderStroke(1.dp, BentoBorder)
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Text(
+                                "What's New:",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = BentoGold
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = appVersion.changelog,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color.White.copy(alpha = 0.9f),
+                                lineHeight = 18.sp
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                // Green "Update Now" button
+                Button(
+                    onClick = {
+                        val finalUrl = appVersion.apkUrl.ifBlank { "https://github.com/guadebiniam-del/Biniyam/raw/main/.build-outputs/app-debug.apk" }
+                        val urlToOpen = if (finalUrl.startsWith("http://") || finalUrl.startsWith("https://")) {
+                            finalUrl
+                        } else {
+                            "https://$finalUrl"
+                        }
+                        try {
+                            val intent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse(urlToOpen))
+                            context.startActivity(intent)
+                        } catch (e: Exception) {
+                            Toast.makeText(context, "Cannot open browser link: ${e.message}", Toast.LENGTH_LONG).show()
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = BentoSoftGreen,
+                        contentColor = Color.Black
+                    ),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp)
+                        .testTag("diag_version_update_now_btn")
+                ) {
+                    Text(
+                        text = "Update Now",
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Black,
+                        letterSpacing = 1.sp
+                    )
+                }
+
+                // "Later" button only if update is not mandatory
+                if (!appVersion.isMandatory) {
+                    TextButton(
+                        onClick = onDismiss,
+                        modifier = Modifier.fillMaxWidth().testTag("diag_version_update_later_btn")
+                    ) {
+                        Text(
+                            "Later",
+                            color = Color.White.copy(alpha = 0.6f),
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun AdminAppVersionDialog(
+    currentLatestVersionName: String,
+    currentLatestApkUrl: String,
+    currentLatestChangelog: String,
+    currentLatestIsMandatory: Boolean,
+    onDismiss: () -> Unit,
+    onUpdate: (version: String, apkUrl: String, changelog: String, isMandatory: Boolean) -> Unit
+) {
+    var pinText by remember { mutableStateOf("") }
+    var versionText by remember { mutableStateOf(currentLatestVersionName) }
+    var apkUrlText by remember { mutableStateOf(currentLatestApkUrl) }
+    var changelogText by remember { mutableStateOf(currentLatestChangelog) }
+    var isMandatory by remember { mutableStateOf(currentLatestIsMandatory) }
+    var showError by remember { mutableStateOf(false) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                "🛠️ App Version Manager",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = Color.White
+            )
+        },
+        text = {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.verticalScroll(rememberScrollState())
+            ) {
+                Text(
+                    "ይህ ክፍል የአፕሊኬሽን እትም ለመለወጥና ለማሻሻል ያገለግላል። (የአድሚን ክፍያ ቃል (1234) ያስገቡ):",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = BentoSubText
+                )
+
+                OutlinedTextField(
+                    value = pinText,
+                    onValueChange = {
+                        pinText = it
+                        showError = false
+                    },
+                    label = { Text("Admin PIN (e.g. 1234)", color = Color.White.copy(alpha = 0.6f)) },
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = Color.White,
+                        unfocusedTextColor = Color.White,
+                        focusedBorderColor = BentoSoftGreen,
+                        unfocusedBorderColor = BentoBorder
+                    ),
+                    visualTransformation = PasswordVisualTransformation(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    isError = showError,
+                    modifier = Modifier.fillMaxWidth().testTag("admin_version_pin")
+                )
+
+                if (showError) {
+                    Text(
+                        "የገቡት የይለፍ ቃል የተሳሳተ ነው!",
+                        color = BentoAlertText,
+                        style = MaterialTheme.typography.labelSmall
+                    )
+                }
+
+                OutlinedTextField(
+                    value = versionText,
+                    onValueChange = { versionText = it },
+                    label = { Text("Latest Version Number (e.g. 1.0.1)", color = Color.White.copy(alpha = 0.6f)) },
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = Color.White,
+                        unfocusedTextColor = Color.White,
+                        focusedBorderColor = BentoSoftGreen,
+                        unfocusedBorderColor = BentoBorder
+                    ),
+                    modifier = Modifier.fillMaxWidth().testTag("admin_version_number")
+                )
+
+                OutlinedTextField(
+                    value = apkUrlText,
+                    onValueChange = { apkUrlText = it },
+                    label = { Text("APK Link", color = Color.White.copy(alpha = 0.6f)) },
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = Color.White,
+                        unfocusedTextColor = Color.White,
+                        focusedBorderColor = BentoSoftGreen,
+                        unfocusedBorderColor = BentoBorder
+                    ),
+                    modifier = Modifier.fillMaxWidth().testTag("admin_version_apk_url")
+                )
+
+                OutlinedTextField(
+                    value = changelogText,
+                    onValueChange = { changelogText = it },
+                    label = { Text("የለውጥ ዝርዝር (Changelog / Release Notes)", color = Color.White.copy(alpha = 0.6f)) },
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = Color.White,
+                        unfocusedTextColor = Color.White,
+                        focusedBorderColor = BentoSoftGreen,
+                        unfocusedBorderColor = BentoBorder
+                    ),
+                    minLines = 3,
+                    modifier = Modifier.fillMaxWidth().testTag("admin_version_changelog")
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            "Mandatory Update",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+                        Text(
+                            "ፎርስድ አፕዴት (ለመጠቀም መዘመን አለበት)",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = BentoSubText
+                        )
+                    }
+                    Switch(
+                        checked = isMandatory,
+                        onCheckedChange = { isMandatory = it },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = BentoSoftGreen,
+                            checkedTrackColor = BentoForestGreen
+                        ),
+                        modifier = Modifier.testTag("admin_version_mandatory_switch")
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    if (pinText == "1234") {
+                        if (versionText.isNotBlank() && apkUrlText.isNotBlank()) {
+                            onUpdate(versionText, apkUrlText, changelogText, isMandatory)
+                        }
+                    } else {
+                        showError = true
+                    }
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = BentoSoftGreen, contentColor = Color.Black)
+            ) {
+                Text("አዘምን (Confirm)")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("ማጣሪያ (Cancel)", color = Color.White)
             }
         }
     )
