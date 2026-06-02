@@ -2624,7 +2624,7 @@ fun MasterbatchCard(
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = "${masterbatch.color} Pigment Masterbatch",
+                            text = "${masterbatch.color} ማስተርባች",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             color = Color.White
@@ -2652,26 +2652,35 @@ fun MasterbatchCard(
                         .padding(12.dp)
                 ) {
                     Text(
-                        text = "በመጋዘን ያለ (Remaining in Store)",
+                        text = "በመጋዘን ያለ",
                         style = MaterialTheme.typography.labelSmall,
                         color = BentoSubText,
                         fontWeight = FontWeight.Bold
                     )
                     Spacer(modifier = Modifier.height(2.dp))
+                    
+                    val totalKg = masterbatch.currentStock
+                    val fullBags = (totalKg / 25).toInt()
+                    val remainingKg = (totalKg % 25).toInt()
+                    val stockText = "$fullBags ከረጢት + $remainingKg ኪ.ግ"
+
                     Text(
-                        text = "${String.format(Locale.US, "%.1f", masterbatch.currentStock / 25.0)} ከረጢት / Bags (${masterbatch.currentStock.toInt()} ኪ.ግ)",
+                        text = stockText,
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.ExtraBold,
                         color = BentoSoftGreen
                     )
                 }
 
-                // Daily in/out shown clearly
+                // Daily in/out shown clearly and evenly spaced
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Column(modifier = Modifier.weight(1f)) {
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        horizontalAlignment = Alignment.Start
+                    ) {
                         Text(
                             text = "ከመጋዘን የወጣ",
                             style = MaterialTheme.typography.labelSmall,
@@ -2684,7 +2693,10 @@ fun MasterbatchCard(
                             color = Color.White
                         )
                     }
-                    Column(modifier = Modifier.weight(1f)) {
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
                         Text(
                             text = "ወደ መጋዘን የተመለሰ",
                             style = MaterialTheme.typography.labelSmall,
@@ -2697,7 +2709,10 @@ fun MasterbatchCard(
                             color = Color.White
                         )
                     }
-                    Column(modifier = Modifier.weight(1f)) {
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        horizontalAlignment = Alignment.End
+                    ) {
                         Text(
                             text = "የዕለት ፍጆታ",
                             style = MaterialTheme.typography.labelSmall,
@@ -2735,7 +2750,7 @@ fun MasterbatchCard(
                         )
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(
-                            text = "+ bag ግዢ",
+                            text = "+ የተገዛ ቀለም ",
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.Bold
                         )
