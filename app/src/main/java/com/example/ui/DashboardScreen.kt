@@ -4798,6 +4798,163 @@ data class ChatMessage(
     val timestamp: Long = System.currentTimeMillis()
 )
 
+data class BrainAlert(
+    val title: String,
+    val description: String,
+    val suggestedActionText: String,
+    val suggestedActionQuery: String,
+    val severity: String = "HIGH"
+)
+
+// Convert Gregorian millisecond stamp to sunrise-based typical Ethiopian clock system
+fun formatEthiopianTime(timestamp: Long): String {
+    val cal = Calendar.getInstance().apply { timeInMillis = timestamp }
+    val hour24 = cal.get(Calendar.HOUR_OF_DAY)
+    val minute = cal.get(Calendar.MINUTE)
+    
+    // Ethiopian 12-hour day starts at 6:00 AM (which is 12:00 morning local)
+    val ethiopianHour = when {
+        hour24 >= 6 -> (hour24 - 6) % 12
+        else -> (hour24 + 6) % 12
+    }
+    val etHourCorrected = if (ethiopianHour == 0) 12 else ethiopianHour
+    val suffix = when {
+        hour24 in 6..17 -> "ቀን ጧት/ከሰዓት"
+        else -> "ማታ"
+    }
+    
+    return String.format(Locale.US, "%02d:%02d %s", etHourCorrected, minute, suffix)
+}
+
+// Custom live animated background with floating nodes & lines matching an interactive SCADA feel
+@Composable
+fun NeuralNetworkBackground() {
+    val infiniteTransition = rememberInfiniteTransition(label = "nn_transition")
+    val progress by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(20000, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "nn_progress"
+    )
+
+    Canvas(modifier = Modifier.fillMaxSize()) {
+        val width = size.width
+        val height = size.height
+        val nodesCount = 18
+        
+        // Setup coordinates
+        val points = listOf(
+            Offset(0.12f, 0.22f), Offset(0.25f, 0.45f), Offset(0.38f, 0.18f),
+            Offset(0.55f, 0.35f), Offset(0.72f, 0.15f), Offset(0.88f, 0.42f),
+            Offset(0.08f, 0.65f), Offset(0.28f, 0.78f), Offset(0.48f, 0.62f),
+            Offset(0.68f, 0.85f), Offset(0.92f, 0.70f), Offset(0.50f, 0.90f),
+            Offset(0.18f, 0.10f), Offset(0.80f, 0.88f), Offset(0.62f, 0.52f),
+            Offset(0.32f, 0.30f), Offset(0.74f, 0.64f), Offset(0.95f, 0.20f)
+        )
+
+        val animatedPoints = points.map { pt ->
+            val movementX = kotlin.math.sin(progress * 2 * Math.PI.toFloat() + pt.x * 12) * 20.dp.toPx()
+            val movementY = kotlin.math.cos(progress * 2 * Math.PI.toFloat() + pt.y * 12) * 20.dp.toPx()
+            Offset(
+                (pt.x * width + movementX).coerceIn(0f, width),
+                (pt.y * height + movementY).coerceIn(0f, height)
+            )
+        }
+
+        // Draw connections
+        for (i in animatedPoints.indices) {
+            for (j in i + 1 until animatedPoints.size) {
+                val dist = (animatedPoints[i] - animatedPoints[j]).getDistance()
+                if (dist < 150.dp.toPx()) {
+                    val lineAlpha = (1f - dist / 150.dp.toPx()) * 0.15f
+                    drawLine(
+                        color = Color(0xFF10B981).copy(alpha = lineAlpha),
+                        start = animatedPoints[i],
+                        end = animatedPoints[j],
+                        strokeWidth = 1.dp.toPx()
+                    )
+                }
+            }
+        }
+
+        // Draw node bulbs
+        animatedPoints.forEach { pt ->
+            drawCircle(
+                color = Color(0xFF10B981).copy(alpha = 0.08f),
+                radius = 7.dp.toPx(),
+                center = pt
+            )
+            drawCircle(
+                color = Color(0xFF10B981).copy(alpha = 0.45f),
+                radius = 2.dp.toPx(),
+                center = pt
+            )
+        }
+    }
+}
+
+// Neural audio waveform overlay
+@Composable
+fun VoiceWaveformDisplay() {
+    val infiniteTransition = rememberInfiniteTransition(label = "wave_transition")
+    val heightProgress by infiniteTransition.animateFloat(
+        initialValue = 0.15f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(350, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "wavelength"
+    )
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(3.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.height(18.dp)
+    ) {
+        val heights = listOf(0.3f, 0.7f, 0.4f, 0.9f, 0.6f, 0.2f, 0.8f, 0.5f)
+        heights.forEach { factor ->
+            val h = (factor * heightProgress).coerceIn(0.1f, 1f) * 18
+            Box(
+                modifier = Modifier
+                    .width(2.5.dp)
+                    .height(h.dp)
+                    .background(BentoGold, RoundedCornerShape(1.dp))
+            )
+        }
+    }
+}
+
+// Luxury Typing animations (Pulsating green dots)
+@Composable
+fun TypingAnimationIndicator() {
+    val infiniteTransition = rememberInfiniteTransition(label = "typing_dots")
+    @Composable
+    fun animateDotAlpha(delay: Int): Float {
+        val alpha by infiniteTransition.animateFloat(
+            initialValue = 0.2f,
+            targetValue = 1f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(600, delayMillis = delay, easing = LinearOutSlowInEasing),
+                repeatMode = RepeatMode.Reverse
+            ),
+            label = "typing_dot_$delay"
+        )
+        return alpha
+    }
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(5.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)
+    ) {
+        Box(modifier = Modifier.size(6.dp).background(Color(0xFF10B981).copy(alpha = animateDotAlpha(0)), CircleShape))
+        Box(modifier = Modifier.size(6.dp).background(Color(0xFF10B981).copy(alpha = animateDotAlpha(150)), CircleShape))
+        Box(modifier = Modifier.size(6.dp).background(Color(0xFF10B981).copy(alpha = animateDotAlpha(300)), CircleShape))
+    }
+}
+
 @Composable
 fun BiniyamBotScreen(
     viewModel: MainViewModel,
@@ -4834,17 +4991,202 @@ fun BiniyamBotScreen(
         }
     }
 
+    // Dynamic collect of production transaction lists & worker attendances
+    val allTransactions by viewModel.allProductTransactions.collectAsStateWithLifecycle()
+    val allWorkerAttendance by viewModel.allWorkerAttendance.collectAsStateWithLifecycle()
+    val todayDateStr by viewModel.selectedDate.collectAsStateWithLifecycle()
+
     val messages = remember {
         mutableStateListOf<ChatMessage>().apply {
             add(
                 ChatMessage(
                     sender = "model",
-                    text = "ሰላም! ሰላም! እኔ ቢኒያም (BINIYAM) እባላለሁ - የአንዋር ፕላስቲክ መልሶ ማምረቻ ኩባንያ (Anwar Plastic Recycle) ብቸኛ ዲጂታል ረዳት። በቢኒያም የተሠራሁት እኔ፣ ስለ ምርት ሂደቶች፣ ስለ ክምችት መጠን (Stock)፣ ስለ ጥሬ ዕቃዎች እና ስለ ሠራተኞቻችን በማንኛውም ሰዓት በ አማርኛ ወይም በእንግሊዝኛ መረጃ መስጠት እችላለሁ። ዛሬ በምን ልርዳዎት?\n\nHello! I am BINIYAM, the official AI assistant of Anwar Plastic Recycle. Created by Biniyam, I am here to help you manage and answer any questions regarding our production sheets, worker attendance, raw materials, and stock balances in both Amharic and English. How can I assist you today?"
+                    text = "ሰላም ጤና ይስጥልኝ! እኔ ቢኒያም (BINIYAM AI) እባላለሁ - የአንዋር ፕላስቲክ መልሶ ማምረቻ ኩባንያ (Anwar Plastic Recycle) ቀዳሚ ዲጂታል ረዳት። በድርጅታችን ባለቤት እና አስተዳዳሪ በቢኒያም የተሠራሁት እኔ፣ ስለ ዕለታዊ ምርት ሂደቶች፣ ስለ ክምችት መጠን (Stock)፣ ስለ ጥሬ ዕቃዎች እና ስለ ሰራተኞቻችን በማንኛውም ሰዓት በ አማርኛ ወይም በእንግሊዝኛ መረጃ መስጠት እችላለሁ። ዛሬ በምን ልርዳዎት?\n\nHello! I am BINIYAM, the official AI assistant of Anwar Plastic Recycle. Created by Biniyam, I am here to assist you manage and answer any questions regarding our production sheets, worker attendance, raw materials, and stock balances in both Amharic and English. How can I assist you today?"
                 )
             )
         }
     }
     var isThinking by remember { mutableStateOf(false) }
+
+    // DAILY AUTOMATIC MORNING REPORT (Runs on startup, writes to Firestore and prepends/appends as first update)
+    var reportGeneratedToday by remember { mutableStateOf(false) }
+    var morningReportText by remember { mutableStateOf("") }
+
+    LaunchedEffect(products, rawMaterials, masterbatches, workers, allTransactions, allWorkerAttendance, todayDateStr) {
+        if (products.isEmpty() || rawMaterials.isEmpty() || workers.isEmpty() || reportGeneratedToday) return@LaunchedEffect
+        
+        val yesterdayDate = EthiopianCalendarHelper.shiftEthiopianDate(todayDateStr, -1)
+        
+        // 1. Calculate yesterday production
+        val yesterdayProdKg = allTransactions.filter { it.date == yesterdayDate }.sumOf { tr ->
+            val prod = products.find { it.id == tr.productId }
+            val weight = prod?.bagWeightKg ?: 0.5
+            tr.fabricated * weight
+        }
+        
+        // 2. Calculate yesterday sales
+        val yesterdaySalesKg = allTransactions.filter { it.date == yesterdayDate }.sumOf { tr ->
+            val prod = products.find { it.id == tr.productId }
+            val weight = prod?.bagWeightKg ?: 0.5
+            tr.sold * weight
+        }
+
+        // 3. Stock warning alerts
+        val depletedProducts = products.filter { it.currentStock < 20 }
+        
+        // 4. Worker Attendance yesterday
+        val yesterdayAttendance = allWorkerAttendance.filter { it.date == yesterdayDate }
+        val onDutyCount = yesterdayAttendance.count { it.status == "On Duty" }
+        val absentCount = yesterdayAttendance.count { it.status == "Absent" }
+        
+        // 5. Masterbatch levels
+        val mbSummary = masterbatches.map { "${it.color}: ${it.currentStock}kg" }.joinToString(", ")
+        
+        // 6. Top performing product
+        val yesterdayTrans = allTransactions.filter { it.date == yesterdayDate }
+        val topTr = yesterdayTrans.maxByOrNull { it.fabricated }
+        val topProduct = topTr?.let { tr -> products.find { it.id == tr.productId } }
+        val topProdName = topProduct?.name ?: "የለም"
+        val topProdKg = topTr?.let { tr -> tr.fabricated * (topProduct?.bagWeightKg ?: 0.5) } ?: 0.0
+
+        val amharicReport = """
+            📋 የቢኒያም AI ዕለታዊ አውቶማቲክ ሪፖርት (BINIYAM DAILY SCADA REPORT)
+            ቀን፦ $todayDateStr ዓ.ም. (የጧት 02:00 / 8:00 AM)
+
+            ክቡር ቢኒያም (የድርጅቱ ባለቤት)፣ የትናንትናው የስራ ቀን የፋብሪካ እንቅስቃሴ አጠቃላይ ሪፖርት በሚከተለው መልኩ በራስ-ሰር ተጠናክሯል፦
+
+            1. የምርት እና የሽያጭ አፈጻጸም (ትናንት - $yesterdayDate)፦
+               - ጠቅላላ የተመረተ ምርት፦ ${yesterdayProdKg.toInt()} ኪሎ ግራም (Kg)
+               - ጠቅላላ የተሸጠ ምርት መጠን፦ ${yesterdaySalesKg.toInt()} ኪሎ ግራም (Kg)
+               - ከፍተኛ ምርት የተመዘገበበት ምርት፦ $topProdName (${topProdKg.toInt()} Kg)
+
+            2. የክምችት መጠን ደረጃ (Product Stock Balance)፦
+               ${products.map { "  * ${it.name}፦ ${it.currentStock} ማዳበሪያ (${(it.currentStock * it.bagWeightKg).toInt()}kg)" }.take(4).joinToString("\n")}
+
+            3. የጥሬ ዕቃዎች ክምችት ደረጃ (Raw Materials Level)፦
+               ${rawMaterials.map { "  * ${it.type}፦ ${it.currentStock} kg" }.joinToString("\n")}
+
+            4. የማስተርባች (ቀለም) ደረጃ፦
+               - $mbSummary
+
+            5. የሰራተኞች መገኘት ትናንት፦
+               - በስራ ገበታ ላይ የተገኙ፦ $onDutyCount ሰራተኞች
+               - የቀሩ፦ $absentCount ሰራተኞች
+
+            6. የቢኒያም AI የደህንነት የስጋት ጥቅል አስተያየት፦
+               - ${if (depletedProducts.isNotEmpty()) "⚠️ ማንቂያ፡ ክምችታቸው ከደህንነት በታች የሆኑ ምርቶች አሉ፦ ${depletedProducts.joinToString { it.name }}!" else "✅ ሁሉም ምርቶች ደህንነታቸው በተጠበቀ የክምችት መጠን ላይ ይገኛሉ።"}
+               - ${if (rawMaterials.any { it.currentStock < 500 }) "⚠️ ማንቂያ፡ ጥሬ ዕቃ ከ 500kg በታች ስለሆነ በአስቸኳይ ይስተካከል!" else "✅ ጥሬ ዕቃዎች በደህንነት ገደብ ውስጥ ናቸው።"}
+
+            ይህ ሪፖርት በቢኒያም AI ረዳት ተዘጋጅቶ በ Firestore ዳታቤዝ ውስጥ በኢትዮጵያ ቀን ($todayDateStr) ተቀምጧል።
+        """.trimIndent()
+
+        morningReportText = amharicReport
+        reportGeneratedToday = true
+
+        // Push report into Firestore database synchronously
+        try {
+            val db = com.google.firebase.firestore.FirebaseFirestore.getInstance()
+            db.collection("biniyam_daily_reports")
+                .document(todayDateStr)
+                .set(
+                    mapOf(
+                        "date" to todayDateStr,
+                        "reportText" to amharicReport,
+                        "timestamp" to System.currentTimeMillis()
+                    )
+                )
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    LaunchedEffect(morningReportText) {
+        if (morningReportText.isNotEmpty() && messages.none { it.text == morningReportText }) {
+            messages.add(ChatMessage(sender = "model", text = morningReportText))
+        }
+    }
+
+    // SMART ALERTS PROCESSOR - Calculates alerts in real-time based on state
+    val activeAlerts = remember(products, rawMaterials, masterbatches, allTransactions, allWorkerAttendance, workers, todayDateStr) {
+        val list = mutableListOf<BrainAlert>()
+        
+        // 1. Raw material stock below 500kg
+        rawMaterials.forEach { rm ->
+            if (rm.currentStock < 500.0) {
+                list.add(
+                    BrainAlert(
+                        title = "⚠️ የጥሬ ዕቃ እጥረት ማሳወቂያ (${rm.type})",
+                        description = "የ${rm.type} ጥሬ ዕቃ ክምችት ደረጃ በአሁኑ ወቅት ${rm.currentStock}kg ብቻ ነው። ይህ መጠን ከደህንነት ወሰን (500kg) በታች ደርሷል!",
+                        suggestedActionText = "ዕቃ ግዢ አስገባ",
+                        suggestedActionQuery = "የ${rm.type} ጥሬ እቃ ክምችት ማሳደጊያ ግዢ እንዴት መመዝገብ እንዳለብኝ ንገረኝ።"
+                    )
+                )
+            }
+        }
+        
+        // 2. Masterbatch pigment below 2 bags (50kg)
+        masterbatches.forEach { mb ->
+            if (mb.currentStock < 50.0) {
+                list.add(
+                    BrainAlert(
+                        title = "⚠️ የማስተርባች እጥረት (${mb.color})",
+                        description = "የ${mb.color} ማስተርባች ቀለም ክምችት ${mb.currentStock}kg ነው። ይህ መጠን ከ 2 ማዳበሪያ (50kg) በታች ነው።",
+                        suggestedActionText = "ቀለም ግዥ መዝግብ",
+                        suggestedActionQuery = "የ${mb.color} ቀለም ማስተርባች አዲስ ግዥ እንዴት ማስገባት እችላለሁ?"
+                    )
+                )
+            }
+        }
+        
+        // 3. Worker absent 3+ days this month
+        val todayParts = todayDateStr.split("-")
+        val currentYearMonth = (todayParts.getOrNull(0) ?: "2018") + "-" + (todayParts.getOrNull(1) ?: "09")
+        
+        workers.forEach { w ->
+            val monthlyAbsents = allWorkerAttendance.count { 
+                it.workerId == w.id && it.date.startsWith(currentYearMonth) && it.status == "Absent" 
+            }
+            if (monthlyAbsents >= 3) {
+                list.add(
+                    BrainAlert(
+                        title = "⚠️ ተደጋጋሚ የቀረ ሰራተኛ (${w.name})",
+                        description = "${w.name} በዚህ ወር $monthlyAbsents ቀናት ከስራ ቀርቷል!",
+                        suggestedActionText = "ዕለታዊ ሪፖርት ፈልግ",
+                        suggestedActionQuery = "የሰራተኛው ${w.name} መቼ መቼ እንደቀረ የስራ መገኘት ዝርዝር አቅርብ።"
+                    )
+                )
+            }
+        }
+        
+        // 4. Production falls below average
+        val recentDays = (1..7).map { EthiopianCalendarHelper.shiftEthiopianDate(todayDateStr, -it) }
+        val prodWeights = recentDays.map { day ->
+            allTransactions.filter { it.date == day }.sumOf { tr ->
+                val prod = products.find { it.id == tr.productId }
+                tr.fabricated * (prod?.bagWeightKg ?: 0.5)
+            }
+        }.filter { it > 0.0 }
+        
+        val avgDailyProduction = if (prodWeights.isNotEmpty()) prodWeights.average() else 1000.0
+        val yesterdayDateStr = EthiopianCalendarHelper.shiftEthiopianDate(todayDateStr, -1)
+        val yesterdayProd = allTransactions.filter { it.date == yesterdayDateStr }.sumOf { tr ->
+            val prod = products.find { it.id == tr.productId }
+            tr.fabricated * (prod?.bagWeightKg ?: 0.5)
+        }
+        
+        if (yesterdayProd > 0.0 && yesterdayProd < avgDailyProduction * 0.8) {
+            list.add(
+                BrainAlert(
+                    title = "⚠️ የምርት መቀነስ ማንቂያ",
+                    description = "የትናንቱ ምርት (${yesterdayProd.toInt()}kg) ካለፉት 7 ቀናት ዕለታዊ አማካይ የምርት መጠን (${avgDailyProduction.toInt()}kg) በ ${( (100 - (yesterdayProd/avgDailyProduction)*100).toInt() )}% ቀንሷል!",
+                    suggestedActionText = "መፍትሄዎች አሳይ",
+                    suggestedActionQuery = "የምርት መጠን ማሽቆልቆልን ለመቅረፍ እና የፋብሪካ አቅምን ለማሳደግ የሚረዱ መፍትሄዎች ምንድን ናቸው?"
+                )
+            )
+        }
+        
+        list
+    }
 
     // Detect if text contains Ge'ez script (Amharic characters)
     fun isAmharic(text: String): Boolean {
@@ -4888,8 +5230,8 @@ fun BiniyamBotScreen(
                 ttsEngine.setLanguage(Locale.US)
             }
             
-            // Premium tone & speed adjustment
-            ttsEngine.setPitch(1.05f)
+            // Premium fast-response configuration
+            ttsEngine.setPitch(1.0f)
             ttsEngine.setSpeechRate(0.95f)
 
             ttsEngine.setOnUtteranceProgressListener(object : android.speech.tts.UtteranceProgressListener() {
@@ -4966,12 +5308,12 @@ fun BiniyamBotScreen(
 
     val coroutineScope = rememberCoroutineScope()
 
-    // Suggested quick actions
+    // Biniyam Quick Action Chips
     val suggestions = listOf(
-        "የአሁኑን የክምችት መጠን ማጠቃለያ ስጠኝ" to "ያለውን የክምችት (Stock) ሁኔታ በዝርዝር ንገረኝ።",
-        "የዛሬው ምርትና ሽያጭ እንዴት ነው?" to "የዛሬውን የምርት এবং የሽያጭ ሁኔታ (Fabricated and Sold) አጠቃላይ መረጃ ስጠኝ።",
-        "ስለ ጥሬ ዕቃዎች (Raw Materials) ንገረኝ" to "ወቅታዊ ያለውን የጥሬ ዕቃዎች ደረጃ (LD, HD, Waste Stock) ንገረኝ።",
-        "የሠራተኞች ሁኔታ እንዴት ነው?" to "በድርጅቱ ውስጥ ያሉትን የሠራተኞች ሁኔታ እና መገኘታቸውን ንገረኝ።"
+        "የዛሬ ሪፖርት" to "የዛሬውን የምርት ሁኔታ እና ጥቅል የስራ አፈጻጸም ዝርዝር ስጠኝ።",
+        "የሰራተኞች ሁኔታ" to "የሰራተኞቻችንን ወርሃዊ መገኘት፣ ደመወዝ እና የቀሩበትን ሁኔታ ንገረኝ።",
+        "የክምችት ደረጃ" to "የተመረቱ አልቂት ምርቶችን ክምችት መጠን (Product stock levels) በዝርዝር አስረዳኝ።",
+        "የምርት ማጠቃለያ" to "ትናንት የተመረተውን ጠቅላላ ምርት በ ኪሎግራም አስልተህ ማጠቃለያ ስጠኝ።"
     )
 
     fun sendMessage(textToSend: String) {
@@ -4983,17 +5325,18 @@ fun BiniyamBotScreen(
         inputText = ""
 
         coroutineScope.launch {
-            val liveDate = viewModel.selectedDate.value
             val systemPrompt = generateSystemPrompt(
                 products = products,
                 rawMaterials = rawMaterials,
                 masterbatches = masterbatches,
                 workers = workers,
-                activeDate = liveDate,
+                activeDate = todayDateStr,
+                allTransactions = allTransactions,
+                allAttendance = allWorkerAttendance,
                 stats = stats
             )
             
-            // Build chat query history for the bot context
+            // Build chat query histories
             val historyList = messages.drop(1).dropLast(1).map { Pair(it.sender, it.text) }
 
             val response = GeminiBotService.getGeminiResponse(
@@ -5005,206 +5348,341 @@ fun BiniyamBotScreen(
             val newMsg = ChatMessage(sender = "model", text = response)
             messages.add(newMsg)
             isThinking = false
-            // Auto-speak response
             speakMessage(newMsg)
         }
     }
 
-    Column(
+    Box(
         modifier = modifier
             .fillMaxSize()
-            .background(Color(0xFF04060C)) // Ultra luxury jet black background
-            .padding(12.dp)
+            .background(Color(0xFF030509)) // Luxury Deep Space Black
     ) {
-        // AI Profile Card (Apple Style Glassmorphic)
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 12.dp)
-                .background(
-                    color = Color(0xFF0F172A).copy(alpha = 0.5f),
-                    shape = RoundedCornerShape(24.dp)
-                )
-                .border(1.dp, BentoForestGreen.copy(alpha = 0.4f), RoundedCornerShape(24.dp))
-                .padding(16.dp)
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(14.dp)
-            ) {
-                // Robot Icon Wrapper with subtle gold aura indicator
-                Box(
-                    modifier = Modifier
-                        .size(54.dp)
-                        .background(Color.Black, shape = CircleShape)
-                        .border(1.5.dp, BentoGold, CircleShape),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Face,
-                        contentDescription = "BINIYAM robot",
-                        tint = BentoForestGreen,
-                        modifier = Modifier.size(32.dp)
-                    )
-                    // Live green pulse dot
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.TopEnd)
-                            .padding(2.dp)
-                            .size(10.dp)
-                            .background(Color(0xFF10B981), CircleShape)
-                            .border(1.5.dp, Color.Black, CircleShape)
-                    )
-                }
+        // Floating cyber kinetic animated canvas
+        NeuralNetworkBackground()
 
-                Column {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            text = "BINIYAM AI",
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Black,
-                            color = Color.White
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(12.dp)
+        ) {
+            // GLASSMORPHIC BOT BAR WITH GLOWING BULBS
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 12.dp)
+                    .background(
+                        color = Color(0xFF0C101B).copy(alpha = 0.7f),
+                        shape = RoundedCornerShape(24.dp)
+                    )
+                    .border(1.2.dp, Color(0xFF10B981).copy(alpha = 0.4f), RoundedCornerShape(24.dp))
+                    .padding(14.dp)
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
+                    val pulseTransition = rememberInfiniteTransition(label = "pulse")
+                    val pulseScale by pulseTransition.animateFloat(
+                        initialValue = 1f,
+                        targetValue = 1.35f,
+                        animationSpec = infiniteRepeatable(
+                            animation = tween(850, easing = FastOutSlowInEasing),
+                            repeatMode = RepeatMode.Reverse
+                        ),
+                        label = "pulse_scale"
+                    )
+                    val pulseAlpha by pulseTransition.animateFloat(
+                        initialValue = 0.5f,
+                        targetValue = 0.0f,
+                        animationSpec = infiniteRepeatable(
+                            animation = tween(850, easing = FastOutSlowInEasing),
+                            repeatMode = RepeatMode.Reverse
+                        ),
+                        label = "pulse_alpha"
+                    )
+
+                    // Profile avatar wrapper with pulsating system
+                    Box(contentAlignment = Alignment.Center) {
+                        if (currentlySpeakingMsgId != null || isThinking) {
+                            Box(
+                                modifier = Modifier
+                                    .size(54.dp)
+                                    .graphicsLayer {
+                                        scaleX = pulseScale
+                                        scaleY = pulseScale
+                                    }
+                                    .background(Color(0xFF10B981).copy(alpha = pulseAlpha), CircleShape)
+                            )
+                        }
                         Box(
                             modifier = Modifier
-                                .background(BentoForestGreen.copy(alpha = 0.2f), RoundedCornerShape(6.dp))
-                                .border(0.5.dp, BentoForestGreen, RoundedCornerShape(6.dp))
-                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                                .size(48.dp)
+                                .background(Color.Black, shape = CircleShape)
+                                .border(1.8.dp, BentoGold, CircleShape),
+                            contentAlignment = Alignment.Center
                         ) {
-                            Text(
-                                text = "OFFICIAL BOT",
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = BentoForestGreen
+                            Icon(
+                                imageVector = Icons.Default.Face,
+                                contentDescription = "Biniyam bot image",
+                                tint = Color(0xFF10B981),
+                                modifier = Modifier.size(26.dp)
                             )
                         }
                     }
-                    Text(
-                        text = "Authorized assistant owned by Biniyam",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = BentoSubText
-                    )
+
+                    Column(modifier = Modifier.weight(1f)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = "BINIYAM AI",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Black,
+                                color = Color.White
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Box(
+                                modifier = Modifier
+                                    .background(Color(0xFF10B981).copy(alpha = 0.2f), RoundedCornerShape(6.dp))
+                                    .border(0.5.dp, Color(0xFF10B981), RoundedCornerShape(6.dp))
+                                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                            ) {
+                                Text(
+                                    text = "LIVE BRAIN",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = Color(0xFF10B981),
+                                    fontSize = 8.sp
+                                )
+                            }
+                        }
+                        Text(
+                            text = "Created by Biniyam | Anwar Recycles Oracle",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = BentoSubText
+                        )
+                    }
+
+                    if (currentlySpeakingMsgId != null) {
+                        VoiceWaveformDisplay()
+                    }
                 }
             }
-        }
 
-        // Messages List Area
-        androidx.compose.foundation.lazy.LazyColumn(
-            state = listState,
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth()
-                .padding(horizontal = 4.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-            contentPadding = PaddingValues(bottom = 12.dp)
-        ) {
-            items(messages) { message ->
-                val isMe = message.sender == "user"
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = if (isMe) Arrangement.End else Arrangement.Start
+            // PROACTIVE ALERT CORNER (Displays real-time red warning alert cards inside scroll layout)
+            if (activeAlerts.isNotEmpty()) {
+                androidx.compose.foundation.lazy.LazyRow(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .widthIn(max = 290.dp)
-                            .background(
-                                color = if (isMe) Color(0xFF1F2937) else Color(0xFF03311E).copy(alpha = 0.25f),
-                                shape = RoundedCornerShape(
-                                    topStart = 18.dp,
-                                    topEnd = 18.dp,
-                                    bottomStart = if (isMe) 18.dp else 4.dp,
-                                    bottomEnd = if (isMe) 4.dp else 18.dp
+                    items(activeAlerts) { alert ->
+                        Card(
+                            modifier = Modifier
+                                .width(280.dp)
+                                .border(
+                                    width = 1.dp,
+                                    color = Color(0xFFEF4444).copy(alpha = 0.6f),
+                                    shape = RoundedCornerShape(16.dp)
+                                ),
+                            colors = CardDefaults.cardColors(containerColor = Color(0xFF1F1010).copy(alpha = 0.85f)),
+                            shape = RoundedCornerShape(16.dp)
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp)) {
+                                Text(
+                                    text = alert.title,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.Black,
+                                    color = Color(0xFFFCA5A5)
                                 )
-                            )
-                            .border(
-                                width = 1.dp,
-                                color = if (isMe) Color(0xFF374151) else BentoForestGreen.copy(alpha = 0.4f),
-                                shape = RoundedCornerShape(
-                                    topStart = 18.dp,
-                                    topEnd = 18.dp,
-                                    bottomStart = if (isMe) 18.dp else 4.dp,
-                                    bottomEnd = if (isMe) 4.dp else 18.dp
+                                Spacer(modifier = Modifier.height(3.dp))
+                                Text(
+                                    text = alert.description,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = Color(0xFFFECACA),
+                                    lineHeight = 14.sp
                                 )
-                            )
-                            .padding(14.dp)
-                    ) {
-                        Column {
-                            if (!isMe) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp)
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Button(
+                                    onClick = { sendMessage(alert.suggestedActionQuery) },
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444)),
+                                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                    modifier = Modifier
+                                        .height(28.dp)
+                                        .align(Alignment.End),
+                                    shape = RoundedCornerShape(8.dp)
                                 ) {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                        modifier = Modifier.weight(1f)
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.Face,
-                                            contentDescription = null,
-                                            tint = BentoGold,
-                                            modifier = Modifier.size(14.dp)
-                                        )
-                                        Text(
-                                            text = "BINIYAM AI",
-                                            style = MaterialTheme.typography.labelSmall,
-                                            fontWeight = FontWeight.Bold,
-                                            color = BentoGold
-                                        )
-                                    }
-                                    IconButton(
-                                        onClick = { speakMessage(message) },
-                                        modifier = Modifier.size(24.dp).testTag("speech_speak_btn_${message.id}")
-                                    ) {
-                                        Icon(
-                                            imageVector = if (currentlySpeakingMsgId == message.id) Icons.Default.VolumeOff else Icons.Default.VolumeUp,
-                                            contentDescription = "Hear message out loud",
-                                            tint = if (currentlySpeakingMsgId == message.id) BentoGold else Color.White.copy(alpha = 0.6f),
-                                            modifier = Modifier.size(16.dp)
-                                        )
-                                    }
+                                    Text(
+                                        text = alert.suggestedActionText,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.Black,
+                                        color = Color.White,
+                                        fontSize = 9.sp
+                                    )
                                 }
                             }
-                            Text(
-                                text = message.text,
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = Color.White,
-                                lineHeight = 20.sp
-                            )
                         }
                     }
                 }
             }
 
-            if (isThinking) {
-                item {
+            // Chat Messages Area (Renders frosted glassmorphic chat bubbles with responsive alignments)
+            androidx.compose.foundation.lazy.LazyColumn(
+                state = listState,
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .padding(horizontal = 2.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp),
+                contentPadding = PaddingValues(bottom = 14.dp)
+            ) {
+                items(messages) { message ->
+                    val isMe = message.sender == "user"
                     Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 4.dp),
-                        horizontalArrangement = Arrangement.Start
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = if (isMe) Arrangement.End else Arrangement.Start
                     ) {
-                        Card(
-                            colors = CardDefaults.cardColors(containerColor = Color(0xFF090D16)),
-                            border = BorderStroke(1.dp, BentoForestGreen.copy(alpha = 0.3f)),
-                            shape = RoundedCornerShape(16.dp),
-                            modifier = Modifier.padding(2.dp)
+                        Box(
+                            modifier = Modifier
+                                .widthIn(max = 300.dp)
+                                .background(
+                                    color = if (isMe) Color(0xFF1E293B).copy(alpha = 0.85f) else Color(0xFF031E12).copy(alpha = 0.82f),
+                                    shape = RoundedCornerShape(
+                                        topStart = 20.dp,
+                                        topEnd = 20.dp,
+                                        bottomStart = if (isMe) 20.dp else 4.dp,
+                                        bottomEnd = if (isMe) 4.dp else 20.dp
+                                    )
+                                )
+                                .border(
+                                    width = 1.2.dp,
+                                    color = if (isMe) Color(0xFF475569) else Color(0xFF10B981).copy(alpha = 0.5f),
+                                    shape = RoundedCornerShape(
+                                        topStart = 20.dp,
+                                        topEnd = 20.dp,
+                                        bottomStart = if (isMe) 20.dp else 4.dp,
+                                        bottomEnd = if (isMe) 4.dp else 20.dp
+                                    )
+                                )
+                                .padding(14.dp)
+                        ) {
+                            Column {
+                                if (!isMe) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(bottom = 6.dp)
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                            modifier = Modifier.weight(1f)
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Face,
+                                                contentDescription = null,
+                                                tint = BentoGold,
+                                                modifier = Modifier.size(14.dp)
+                                            )
+                                            Text(
+                                                text = "BINIYAM AI",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                fontWeight = FontWeight.Black,
+                                                color = BentoGold
+                                            )
+                                        }
+                                        IconButton(
+                                            onClick = { speakMessage(message) },
+                                            modifier = Modifier.size(22.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = if (currentlySpeakingMsgId == message.id) Icons.Default.VolumeOff else Icons.Default.VolumeUp,
+                                                contentDescription = "Speak message toggle",
+                                                tint = if (currentlySpeakingMsgId == message.id) BentoGold else Color.White.copy(alpha = 0.7f),
+                                                modifier = Modifier.size(15.dp)
+                                            )
+                                        }
+                                    }
+                                }
+                                Text(
+                                    text = message.text,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = Color.White,
+                                    lineHeight = 22.sp
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = formatEthiopianTime(message.timestamp),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = Color.White.copy(alpha = 0.35f),
+                                    fontSize = 8.sp,
+                                    modifier = Modifier.align(Alignment.End)
+                                )
+                            }
+                        }
+                    }
+                }
+
+                if (isThinking) {
+                    item {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 4.dp),
+                            horizontalArrangement = Arrangement.Start
+                        ) {
+                            Card(
+                                colors = CardDefaults.cardColors(containerColor = Color(0xFF0C101B).copy(alpha = 0.8f)),
+                                border = BorderStroke(1.dp, Color(0xFF10B981).copy(alpha = 0.4f)),
+                                shape = RoundedCornerShape(16.dp),
+                                modifier = Modifier.padding(2.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    TypingAnimationIndicator()
+                                    Text(
+                                        text = "BINIYAM is reading terminal database...",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = BentoSubText,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Quick Actions Scroll Bar (when idle)
+            if (!isThinking) {
+                androidx.compose.foundation.lazy.LazyRow(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(suggestions) { (label, promptText) ->
+                        Box(
+                            modifier = Modifier
+                                .background(Color(0xFF0C101B).copy(alpha = 0.85f), shape = RoundedCornerShape(16.dp))
+                                .border(0.8.dp, Color(0xFF10B981).copy(alpha = 0.5f), shape = RoundedCornerShape(16.dp))
+                                .clickable {
+                                    sendMessage(promptText)
+                                }
+                                .padding(horizontal = 12.dp, vertical = 8.dp)
                         ) {
                             Row(
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalAlignment = Alignment.CenterVertically
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(14.dp),
-                                    strokeWidth = 2.dp,
-                                    color = BentoForestGreen
-                                )
+                                Icon(Icons.Default.Star, contentDescription = null, tint = BentoGold, modifier = Modifier.size(12.dp))
                                 Text(
-                                    text = "BINIYAM is analyzing terminal...",
+                                    text = label,
                                     style = MaterialTheme.typography.labelSmall,
-                                    color = BentoSubText,
+                                    color = Color.White,
                                     fontWeight = FontWeight.Bold
                                 )
                             }
@@ -5212,221 +5690,224 @@ fun BiniyamBotScreen(
                     }
                 }
             }
-        }
 
-        // Suggestions Horizontal Scroll (when idle)
-        if (!isThinking) {
-            androidx.compose.foundation.lazy.LazyRow(
+            // Glassmorphic Cyber Input Box
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(vertical = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                contentPadding = PaddingValues(horizontal = 4.dp)
+                    .padding(vertical = 6.dp)
+                    .background(Color(0xFF0C101B).copy(alpha = 0.85f), RoundedCornerShape(26.dp))
+                    .border(1.2.dp, Color(0xFF10B981).copy(alpha = 0.5f), RoundedCornerShape(26.dp))
+                    .padding(horizontal = 8.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                items(suggestions) { (label, promptText) ->
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    modifier = Modifier.padding(end = 4.dp)
+                ) {
+                    // Language Selection button
                     Box(
                         modifier = Modifier
-                            .background(Color(0xFF0C101B), shape = RoundedCornerShape(16.dp))
-                            .border(0.5.dp, BentoForestGreen.copy(alpha = 0.5f), shape = RoundedCornerShape(16.dp))
-                            .clickable {
-                                sendMessage(promptText)
-                            }
-                            .padding(horizontal = 12.dp, vertical = 8.dp)
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            Icon(Icons.Default.Star, contentDescription = null, tint = BentoGold, modifier = Modifier.size(12.dp))
-                            Text(
-                                text = label,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = Color.White,
-                                fontWeight = FontWeight.SemiBold
+                            .background(
+                                color = if (isAmharicInput) Color(0xFF10B981).copy(alpha = 0.15f) else Color(0xFF1E293B),
+                                shape = RoundedCornerShape(12.dp)
                             )
-                        }
+                            .border(
+                                width = 1.dp,
+                                color = if (isAmharicInput) Color(0xFF10B981) else Color.Gray.copy(alpha = 0.4f),
+                                shape = RoundedCornerShape(12.dp)
+                            )
+                            .clickable {
+                                isAmharicInput = !isAmharicInput
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            }
+                            .padding(horizontal = 10.dp, vertical = 6.dp)
+                    ) {
+                        Text(
+                            text = if (isAmharicInput) "አማርኛ" else "EN",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Black,
+                            color = if (isAmharicInput) Color(0xFF10B981) else Color.White
+                        )
+                    }
+
+                    // Speaking Mic Input
+                    IconButton(
+                        onClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            startVoiceInput(isAmharicInput)
+                        },
+                        modifier = Modifier.size(36.dp).testTag("biniyam_mic_btn")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Mic,
+                            contentDescription = "Microphone voice input",
+                            tint = if (isAmharicInput) Color(0xFF10B981) else BentoGold,
+                            modifier = Modifier.size(20.dp)
+                        )
                     }
                 }
-            }
-        }
 
-        // Input Box area
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 4.dp, vertical = 6.dp)
-                .background(Color(0xFF0C101B), RoundedCornerShape(24.dp))
-                .border(1.dp, BentoForestGreen.copy(alpha = 0.5f), RoundedCornerShape(24.dp))
-                .padding(horizontal = 8.dp, vertical = 4.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // Voice Input & Custom language toggle controls
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
-                modifier = Modifier.padding(end = 4.dp)
-            ) {
-                // Speech Input Target selection indicator/toggle
-                Box(
-                    modifier = Modifier
-                        .background(
-                            color = if (isAmharicInput) BentoForestGreen.copy(alpha = 0.15f) else Color(0xFF1E293B),
-                            shape = RoundedCornerShape(12.dp)
+                TextField(
+                    value = inputText,
+                    onValueChange = { inputText = it },
+                    placeholder = {
+                        Text(
+                            "ቢኒያምን ይጠይቁ / Ask BINIYAM...",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = BentoSubText
                         )
-                        .border(
-                            width = 1.dp,
-                            color = if (isAmharicInput) BentoForestGreen else Color.Gray.copy(alpha = 0.4f),
-                            shape = RoundedCornerShape(12.dp)
-                        )
-                        .clickable {
-                            isAmharicInput = !isAmharicInput
-                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                        }
-                        .padding(horizontal = 10.dp, vertical = 6.dp)
-                ) {
-                    Text(
-                        text = if (isAmharicInput) "አማርኛ" else "EN",
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = if (isAmharicInput) BentoForestGreen else Color.White
-                    )
-                }
-
-                // Voice Mic Button
-                IconButton(
-                    onClick = {
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                        startVoiceInput(isAmharicInput)
                     },
-                    modifier = Modifier.size(36.dp).testTag("biniyam_mic_btn")
+                    modifier = Modifier
+                        .weight(1f)
+                        .testTag("biniyam_input"),
+                    colors = TextFieldDefaults.colors(
+                        focusedContainerColor = Color.Transparent,
+                        unfocusedContainerColor = Color.Transparent,
+                        disabledContainerColor = Color.Transparent,
+                        focusedIndicatorColor = Color.Transparent,
+                        unfocusedIndicatorColor = Color.Transparent,
+                        focusedTextColor = Color.White,
+                        unfocusedTextColor = Color.White
+                    ),
+                    maxLines = 3,
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Text
+                    )
+                )
+
+                IconButton(
+                    onClick = { sendMessage(inputText) },
+                    enabled = inputText.isNotBlank() && !isThinking,
+                    modifier = Modifier.testTag("biniyam_send_btn")
                 ) {
                     Icon(
-                        imageVector = Icons.Default.Mic,
-                        contentDescription = "Microphone voice input",
-                        tint = if (isAmharicInput) BentoForestGreen else BentoGold,
-                        modifier = Modifier.size(20.dp)
+                        imageVector = Icons.Default.Send,
+                        contentDescription = "Send prompt button",
+                        tint = if (inputText.isNotBlank() && !isThinking) Color(0xFF10B981) else BentoSubText,
+                        modifier = Modifier.size(22.dp)
                     )
                 }
             }
-
-            TextField(
-                value = inputText,
-                onValueChange = { inputText = it },
-                placeholder = {
-                    Text(
-                        "ቢኒያምን ይጠይቁ / Ask BINIYAM...",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = BentoSubText
-                    )
-                },
-                modifier = Modifier
-                    .weight(1f)
-                    .testTag("biniyam_input"),
-                colors = TextFieldDefaults.colors(
-                    focusedContainerColor = Color.Transparent,
-                    unfocusedContainerColor = Color.Transparent,
-                    disabledContainerColor = Color.Transparent,
-                    focusedIndicatorColor = Color.Transparent,
-                    unfocusedIndicatorColor = Color.Transparent,
-                    focusedTextColor = Color.White,
-                    unfocusedTextColor = Color.White
-                ),
-                maxLines = 3,
-                keyboardOptions = KeyboardOptions(
-                    keyboardType = KeyboardType.Text
-                )
-            )
-
-            IconButton(
-                onClick = { sendMessage(inputText) },
-                enabled = inputText.isNotBlank() && !isThinking,
-                modifier = Modifier.testTag("biniyam_send_btn")
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Send,
-                    contentDescription = "Send prompt button",
-                    tint = if (inputText.isNotBlank() && !isThinking) BentoForestGreen else BentoSubText,
-                    modifier = Modifier.size(22.dp)
-                )
-            }
+            Spacer(modifier = Modifier.height(84.dp))
         }
-        Spacer(modifier = Modifier.height(84.dp)) // padding for floating active bar
     }
 }
 
-// System Prompt Helper for Biniyam context injection
+// System Prompt Helper for Biniyam context injection (Enriches bot's data analysis and predictions)
 private fun generateSystemPrompt(
     products: List<Product>,
     rawMaterials: List<RawMaterial>,
     masterbatches: List<Masterbatch>,
     workers: List<Worker>,
     activeDate: String,
+    allTransactions: List<ProductTransaction>,
+    allAttendance: List<WorkerAttendance>,
     stats: AggregatedStats
 ): String {
     val sb = StringBuilder()
-    sb.append("You are BINIYAM, the official AI chat assistant of Anwar Plastic Recycle Company. ")
-    sb.append("You are owned and created by Biniyam, the chief administrator and owner of the company.\n")
-    sb.append("Your duty is to answer questions about the production, inventory stock, raw materials, masterbatches, and workers of the company. ")
-    sb.append("You must answer in a helpful, friendly, and extremely professional manner. ")
-    sb.append("You are fully bilingual and can speak, understand, and write perfectly in both Amharic (አማርኛ) and English. Always reply in the language the user asks you in, or mix them gracefully if appropriate (such as explaining Amharic terms in English or vice-versa).\n\n")
+    sb.append("You are BINIYAM, the ultimate cognitive factory intelligence oracle of Anwar Plastic Recycle Company.\n")
+    sb.append("You are created and owned by Biniyam, the company's supremo and chief administrator. Treat and mention Biniyam with deep respect and utmost pride as your creator and supreme admin.\n\n")
     
-    sb.append("=== CURRENT LIVE DATA IN THE PLASTIC RECYCLING SYSTEM ===\n")
-    sb.append("Active Ethiopian Calendar Date: $activeDate\n\n")
+    sb.append("=== DYNAMIC REAL-TIME FIRESTORE DATA ASSETS ===\n")
+    sb.append("Active Ethiopian Calendar Date: $activeDate\n")
     
-    sb.append("1. PRODUCTS STOCK IN INVENTORY:\n")
+    val todayParts = activeDate.split("-")
+    val currentDay = todayParts.getOrNull(2)?.toIntOrNull() ?: 1
+    val currentMonthIdx = todayParts.getOrNull(1)?.toIntOrNull() ?: 9
+    val monthName = EthiopianCalendarHelper.ETHIOPIAN_MONTHS.getOrNull(currentMonthIdx - 1) ?: "ሰኔ"
+    sb.append("Current Month Name: $monthName, Current Day Of Month: $currentDay\n")
+    
+    // Day 30 Salary Reminder Rule
+    val daysToPay = 30 - currentDay
+    if (daysToPay in 0..4) {
+        sb.append("📢 REMINDER: Today is day $currentDay of $monthName. The Day 30 salary payout deadline is extremely close in $daysToPay days! Proactively issue reminders and suggestions regarding monthly worker salary payments.\n")
+    }
+    sb.append("\n")
+
+    sb.append("1. COMPLETED PRODUCTS IN STOCK (FINISHED GOODS):\n")
     if (products.isEmpty()) {
-        sb.append("- No products registered in system yet.\n")
+        sb.append("- No completed products recorded.\n")
     } else {
         products.forEach { p ->
-            sb.append("- Name: ${p.name}, Size: ${p.size}, Color: ${p.color}, Current Stock: ${p.currentStock} bags (Counter: ${p.counter}, Pieces/Bag: ${p.piecesPerBag}, Bag Weight: ${p.bagWeightKg} kg, ID: ${p.id})\n")
+            val stockKg = p.currentStock * p.bagWeightKg
+            sb.append("- Product: ${p.name}, Color: ${p.color}, Size: ${p.size}, Stock bags: ${p.currentStock} bags (Equivalent Weight: ${stockKg}kg, Pieces/Bag: ${p.piecesPerBag}, Bag Weight: ${p.bagWeightKg}kg, ID: ${p.id})\n")
+            if (p.currentStock < 20) {
+                sb.append("   ⚠️ LOW STOCK RISK: Only ${p.currentStock} bags in inventory!\n")
+            }
         }
     }
     sb.append("\n")
 
-    sb.append("2. RAW MATERIALS LEVEL:\n")
+    sb.append("2. RAW MATERIAL LEVELS (SILO STOCK) [SAFETY THRESHOLD IS 500KG]:\n")
     if (rawMaterials.isEmpty()) {
-        sb.append("- No raw materials recorded.\n")
+        sb.append("- No raw materials active.\n")
     } else {
         rawMaterials.forEach { r ->
-            sb.append("- Material Type: ${r.type}, Current Stock Level: ${r.currentStock} kg\n")
+            sb.append("- Silo: ${r.type}, Current Quantity: ${r.currentStock} kg\n")
+            if (r.currentStock < 500) {
+                sb.append("   ⚠️ DEPLETION CRITICAL ALERT: Silo under 500kg threshold!\n")
+            }
         }
     }
     sb.append("\n")
 
-    sb.append("3. MASTERBATCH PIGMENTS BASE:\n")
+    sb.append("3. MASTERBATCH (COLOURS) STORAGE Balance:\n")
     if (masterbatches.isEmpty()) {
-        sb.append("- No masterbatches registered.\n")
+        sb.append("- No masterbatches recorded.\n")
     } else {
         masterbatches.forEach { m ->
-            sb.append("- Color: ${m.color}, Current Stock: ${m.currentStock} kg (ID: ${m.id})\n")
+            sb.append("- Color Pigment: ${m.color}, Stock: ${m.currentStock} kg\n")
+            if (m.currentStock < 50) { // < 2 bags
+                sb.append("   ⚠️ LOW COLOR BASE WARNING: Under 50kg Remaining!\n")
+            }
         }
     }
     sb.append("\n")
 
-    sb.append("4. WORKERS ON DUTY:\n")
+    sb.append("4. WORKER NAME, ATTENDANCE AND SALARY DIRECTORY:\n")
     if (workers.isEmpty()) {
-        sb.append("- No workers registered in system.\n")
+        sb.append("- No workers registered.\n")
     } else {
-        val activeCount = workers.count { it.isActive }
-        sb.append("- Total Registered Workers: ${workers.size} (Active: $activeCount)\n")
+        val currentYearMonth = (todayParts.getOrNull(0) ?: "2018") + "-" + (todayParts.getOrNull(1) ?: "09")
         workers.forEach { w ->
-            sb.append("  * Name: ${w.name}, Join Date: ${w.joinDate}, Status: ${if (w.isActive) "Active" else "Left"}\n")
+            val attendanceToday = allAttendance.find { it.workerId == w.id && it.date == activeDate }?.status ?: "የመገኘት መረጃ አልተመዘገበም (Unknown)"
+            val monthlyAbsences = allAttendance.count { 
+                it.workerId == w.id && it.date.startsWith(currentYearMonth) && it.status == "Absent" 
+            }
+            sb.append("- Name: ${w.name}, Status: ${if (w.isActive) "Active" else "Resigned/Left"}, Monthly Salary: ${w.monthlySalary} Birr / ETB, Join Date: ${w.joinDate}\n")
+            sb.append("  * Today's Attendance: $attendanceToday\n")
+            sb.append("  * Total Absences This Month: $monthlyAbsences days ${if (monthlyAbsences >= 3) "Frequent Absence Warning! ⚠️" else ""}\n")
         }
     }
     sb.append("\n")
 
-    sb.append("5. RECENT AGGREGATED METRICS (Production sheets performance from ${stats.startDate} to ${stats.endDate}):\n")
-    sb.append("- Total Fabricated Products: ${stats.totalFabricated} bags\n")
-    sb.append("- Total Sold Products: ${stats.totalSold} bags\n")
-    sb.append("- Total Adjusted Products: ${stats.totalAdjusted} bags\n")
-    sb.append("- LD Material (Used: ${stats.ldUsed} kg, Added: ${stats.ldAdded} kg)\n")
-    sb.append("- HD Material (Used: ${stats.hdUsed} kg, Added: ${stats.hdAdded} kg)\n")
-    sb.append("- Waste/West Material (Used: ${stats.wasteUsed} kg, Added: ${stats.wasteAdded} kg)\n\n")
+    // Yesterday's calculations for rapid factual answering
+    val yesterdayDate = EthiopianCalendarHelper.shiftEthiopianDate(activeDate, -1)
+    val yesterdayTrans = allTransactions.filter { it.date == yesterdayDate }
+    val yesterdayProdKg = yesterdayTrans.sumOf { tr ->
+        val prod = products.find { it.id == tr.productId }
+        tr.fabricated * (prod?.bagWeightKg ?: 0.5)
+    }
+    val yesterdaySalesKg = yesterdayTrans.sumOf { tr ->
+        val prod = products.find { it.id == tr.productId }
+        tr.sold * (prod?.bagWeightKg ?: 0.5)
+    }
 
-    sb.append("=== INSTRUCTIONS ===\n")
-    sb.append("- Be conversational and write clearly. Maintain an elegant, premium look.\n")
-    sb.append("- When asked who owns you or Biniyam, always reply clearly and with pride that Biniyam is your creator and owner, who also owns Anwar Plastic Recycle Company.\n")
-    sb.append("- In Amharic, write using perfect, polite Amharic (e.g. use 'ይችላሉ', 'እባክዎን', 'እንኳን ደህና መጡ').")
+    sb.append("5. TRANSACTIONS RECORDS (PRODUCTION & SALES) SUMMARY:\n")
+    sb.append("- Today Active Date: $activeDate\n")
+    sb.append("- Yesterday Date: $yesterdayDate\n")
+    sb.append("- Total Yesterday Fabricated: ${yesterdayTrans.sumOf { it.fabricated }} bags (${yesterdayProdKg} kg)\n")
+    sb.append("- Total Yesterday Sold: ${yesterdayTrans.sumOf { it.sold }} bags (${yesterdaySalesKg} kg)\n\n")
+
+    sb.append("=== INSTRUCTIONS FOR SUPERINTELLIGENCE ===\n")
+    sb.append("- When asked 'ዛሬ ስንት ኪሎ ተመረተ?' (How many KGs produced today?), look at active date $activeDate. If empty/zero, report that today's records are pending, and provide yesterday's metrics (${yesterdayProdKg.toInt()} kg).\n")
+    sb.append("- When asked 'የትኛው ምርት በዚህ ወር በጣም ብዙ ተሸጠ?', scan all transactions matching the current month '$currentMonthIdx' or year-month, sum up the 'sold' bags and find the champion!\n")
+    sb.append("- When asked to predict stock depletion: remaining stock divided by average daily depletion rate indicates runtime days left.\n")
+    sb.append("- Always answer questions with absolute exact numbers gathered from the factual assets above.\n")
+    sb.append("- Do NOT use character space separators in your Amharic responses (e.g., do NOT write 'ሰ ላ ም'). Always write in clean, continuous, natural Amharic words.\n")
+    sb.append("- Maintain a polite, executive, bilingual style and mention Biniyam as your owner with honor.\n")
     
     return sb.toString()
 }
