@@ -194,7 +194,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             logAction(
                 category = "Product",
                 actionType = "Add",
-                description = "Registered new product: '$name' (ID: $generatedId, Size: $size, Color: $color, Weight: ${weight}kg, Initial Stock: $initialStock bags)"
+                description = "አዲስ ምርት ተመዝግቧል፦ '$name' (መለያ ቁጥር፦ $generatedId, መጠን፦ $size, ቀለም፦ $color, ክብደት፦ ${weight}ኪ.ግ, የመነሻ ክምችት፦ $initialStock ከረጢት)"
             )
         }
     }
@@ -205,7 +205,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             logAction(
                 category = "Product",
                 actionType = "Delete",
-                description = "Removed product: '${product.name}' (Size: ${product.size}, Color: ${product.color}, Final Stock: ${product.currentStock} bags)"
+                description = "ምርት ተሰርዟል፦ '${product.name}' (መጠን፦ ${product.size}, ቀለም፦ ${product.color}, የመጨረሻ ክምችት፦ ${product.currentStock} ከረጢት)"
             )
         }
     }
@@ -223,11 +223,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             repository.addProductTransactionAndUpdateStock(transaction)
             
             val product = allProducts.value.find { it.id == productId }
-            val formattedNotes = if (notes.isBlank()) "None" else "'$notes'"
+            val formattedNotes = if (notes.isBlank()) "ምንም" else "'$notes'"
             logAction(
                 category = "Product",
                 actionType = "Edit",
-                description = "Updated Daily sheet for '${product?.name ?: "Product #$productId"}': Fabricated: +$fabricated, Sold: -$sold, Adjusted: ${if (adjusted >= 0) "+" else ""}$adjusted bags. Notes: $formattedNotes (Date: ${selectedDate.value})"
+                description = "የእለት ሉህ ማሻሻያ ለ'${product?.name ?: "ምርት ቁጥር #$productId"}': የተመረተ፦ +$fabricated, የተሸጠ፦ -$sold, የተስተካከለ፦ ${if (adjusted >= 0) "+" else ""}$adjusted ከረጢት. ማስታወሻ፦ $formattedNotes (ቀን፦ ${selectedDate.value})"
             )
         }
     }
@@ -237,11 +237,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             repository.adjustProductStockDirect(productId, adjustedValue, notes, selectedDate.value)
             
             val product = allProducts.value.find { it.id == productId }
-            val formattedNotes = if (notes.isBlank()) "None" else "'$notes'"
+            val formattedNotes = if (notes.isBlank()) "ምንም" else "'$notes'"
             logAction(
                 category = "Product",
                 actionType = "Edit",
-                description = "Recorded manual stock adjustment for '${product?.name ?: "Product #$productId"}': Adjusted by ${if (adjustedValue >= 0) "+" else ""}$adjustedValue bags. Notes: $formattedNotes (Date: ${selectedDate.value})"
+                description = "በእጅ የተደረገ የክምችት ማስተካከያ ለ'${product?.name ?: "ምርት ቁጥር #$productId"}': በ ${if (adjustedValue >= 0) "+" else ""}$adjustedValue ከረጢት ተስተካክሏል። ማስታወሻ፦ $formattedNotes (ቀን፦ ${selectedDate.value})"
             )
         }
     }
@@ -259,7 +259,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             logAction(
                 category = "Raw Material",
                 actionType = "Edit",
-                description = "Updated Raw Material '$materialType' levels on ${selectedDate.value}: Used: -${used}kg, Added: +${added}kg"
+                description = "ጥሬ እቃ ማሻሻያ ለ'$materialType' በቀን ${selectedDate.value}፦ ጥቅም ላይ የዋለ፦ -${used}ኪ.ግ, የተጨመረ፦ +${added}ኪ.ግ"
             )
         }
     }
@@ -281,7 +281,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             logAction(
                 category = "Masterbatch",
                 actionType = "Edit",
-                description = "Updated Masterbatch '${mb?.color ?: "ID #$masterbatchId"}' Pigment: Taken Out: ${takenOut}kg, Returned: ${returned}kg, Net Used: ${used}kg, Bought: +${bought}kg (Date: ${selectedDate.value})"
+                description = "ማስተርባች ማሻሻያ ለ'${mb?.color ?: "መለያ ቁጥር #$masterbatchId"}' ቀለም፦ ከመጋዘን የወጣ፦ ${takenOut}ኪ.ግ, የተመለሰ፦ ${returned}ኪ.ግ, የተጣራ ፍጆታ፦ ${used}ኪ.ግ, የተገዛ፦ +${bought}ኪ.ግ (ቀን፦ ${selectedDate.value})"
             )
         }
     }
@@ -293,7 +293,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             logAction(
                 category = "Masterbatch",
                 actionType = "Add",
-                description = "Added new Masterbatch option Color: '$color' (ID: $generatedId, Initial Stock: ${initialStock}kg)"
+                description = "አዲስ ማስተርባች ተጨምሯል ቀለም፦ '$color' (መለያ ቁጥር፦ $generatedId, የመጀመሪያ ክምችት፦ ${initialStock}ኪ.ግ)"
             )
         }
     }
@@ -304,7 +304,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             logAction(
                 category = "Masterbatch",
                 actionType = "Delete",
-                description = "Removed Masterbatch color option: '${masterbatch.color}' (Final Stock was: ${masterbatch.currentStock}kg)"
+                description = "የማስተርባች ቀለም አማራጭ ተሰርዟል፦ '${masterbatch.color}' (የመጨረሻው ክምችት፦ ${masterbatch.currentStock}ኪ.ግ)"
             )
         }
     }
@@ -323,7 +323,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             logAction(
                 category = "Worker",
                 actionType = "Add",
-                description = "Registered new Worker: '$name' (ID: $generatedId, Active starting: ${selectedDate.value})"
+                description = "አዲስ ሰራተኛ ተመዝግቧል፦ '$name' (መለያ ቁጥር፦ $generatedId, መነሻ ቀን፦ ${selectedDate.value})"
             )
         }
     }
@@ -337,7 +337,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 logAction(
                     category = "Worker",
                     actionType = "Edit",
-                    description = "Updated salary for '${worker.name}' to $newSalary Birr"
+                    description = "ለ'${worker.name}' የደሞዝ ማሻሻያ ተደርጓል፦ ወደ $newSalary ብር"
                 )
             }
         }
@@ -356,7 +356,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             logAction(
                 category = "Worker",
                 actionType = "Edit",
-                description = "Recorded Worker Attendance for '${worker?.name ?: "Worker #$workerId"}': System status changed/set to '$status' (Date: ${selectedDate.value})"
+                description = "የሰራተኛው '${worker?.name ?: "ሰራተኛ ቁጥር #$workerId"}' የዕለት ገፅታ መዝገብ፦ ሁኔታው ወደ '$status' ተቀይሯል (ቀን፦ ${selectedDate.value})"
             )
         }
     }

@@ -231,11 +231,11 @@ fun DashboardScreen(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             val navItems = listOf(
-                                Triple("Daily Overview", Icons.Default.Home, "Console"),
-                                Triple("Inventory", Icons.Default.List, "Inventory"),
-                                Triple("Workers", Icons.Default.Person, "Workers"),
-                                Triple("Activity Log", Icons.Default.Star, "Logs"),
-                                Triple("BINIYAM", Icons.Default.Android, "AI")
+                                Triple("Daily Overview", Icons.Default.Home, "ማጠቃለያ"),
+                                Triple("Inventory", Icons.Default.List, "ክምችት"),
+                                Triple("Workers", Icons.Default.Person, "ሰራተኞች"),
+                                Triple("Activity Log", Icons.Default.Star, "መዝገቦች"),
+                                Triple("BINIYAM", Icons.Default.Android, "ቢኒያም ቦት")
                             )
                             navItems.forEach { (tabName, icon, label) ->
                                 val isSelected = activeTab == tabName
@@ -247,6 +247,14 @@ fun DashboardScreen(
                                     targetValue = if (isSelected) Color.White else Color(0xFF64748B),
                                     label = "nav_text_tint"
                                 )
+                                val navItemScale by animateFloatAsState(
+                                    targetValue = if (isSelected) 1.25f else 1.0f,
+                                    animationSpec = spring(
+                                        dampingRatio = Spring.DampingRatioMediumBouncy,
+                                        stiffness = Spring.StiffnessLow
+                                    ),
+                                    label = "nav_item_scale"
+                                )
 
                                 Column(
                                     modifier = Modifier
@@ -255,6 +263,7 @@ fun DashboardScreen(
                                             haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                             activeTab = tabName
                                         }
+                                        .graphicsLayer(scaleX = navItemScale, scaleY = navItemScale)
                                         .padding(horizontal = 14.dp, vertical = 6.dp),
                                     horizontalAlignment = Alignment.CenterHorizontally,
                                     verticalArrangement = Arrangement.Center
@@ -267,7 +276,7 @@ fun DashboardScreen(
                                                     .background(
                                                         Brush.radialGradient(
                                                             listOf(
-                                                                BentoForestGreen.copy(alpha = 0.35f),
+                                                                BentoForestGreen.copy(alpha = 0.45f),
                                                                 Color.Transparent
                                                             )
                                                         )
@@ -288,6 +297,24 @@ fun DashboardScreen(
                                         color = animatedTextTint,
                                         fontWeight = if (isSelected) FontWeight.Black else FontWeight.Bold
                                     )
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    AnimatedVisibility(
+                                        visible = isSelected,
+                                        enter = fadeIn() + expandHorizontally(),
+                                        exit = fadeOut() + shrinkHorizontally()
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .width(18.dp)
+                                                .height(3.dp)
+                                                .background(BentoForestGreen, shape = RoundedCornerShape(1.5.dp))
+                                                .border(
+                                                    0.5.dp,
+                                                    BentoForestGreen.copy(alpha = 0.5f),
+                                                    shape = RoundedCornerShape(1.5.dp)
+                                                )
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -3730,7 +3757,7 @@ fun AddProductDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Add New Product Item", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold) },
+        title = { Text("አዲስ ምርት መዝግብ", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold) },
         text = {
             Column(
                 verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -3739,7 +3766,7 @@ fun AddProductDialog(
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it },
-                    label = { Text("Product Label (e.g. Premium Shopping Bag)") },
+                    label = { Text("የምርቱ ስም (ለምሳሌ፡ ፕሪሚየም ሻንጣ)") },
                     modifier = Modifier
                         .fillMaxWidth()
                         .testTag("diag_product_name")
@@ -3747,27 +3774,27 @@ fun AddProductDialog(
                 OutlinedTextField(
                     value = size,
                     onValueChange = { size = it },
-                    label = { Text("Size (e.g., 30x40, 40x50)") },
+                    label = { Text("መጠን (ለምሳሌ፡ 30x40፣ 40x50)") },
                     modifier = Modifier.fillMaxWidth()
                 )
                 OutlinedTextField(
                     value = color,
                     onValueChange = { color = it },
-                    label = { Text("Color (e.g. Red, Black, Blue)") },
+                    label = { Text("ቀለም (ለምሳሌ፡ ቀይ፣ ጥቁር፣ ሰማያዊ)") },
                     modifier = Modifier.fillMaxWidth()
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedTextField(
                         value = counterStr,
                         onValueChange = { counterStr = it },
-                        label = { Text("Counter (e.g. 500)") },
+                        label = { Text("ቆጣሪ (ለምሳሌ፡ 500)") },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         modifier = Modifier.weight(1f)
                     )
                     OutlinedTextField(
                         value = piecesStr,
                         onValueChange = { piecesStr = it },
-                        label = { Text("Pieces/Bag (e.g. 100)") },
+                        label = { Text("ብዛት በፓኬት (ለምሳሌ፡ 100)") },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         modifier = Modifier.weight(1f)
                     )
@@ -3775,14 +3802,14 @@ fun AddProductDialog(
                 OutlinedTextField(
                     value = weightStr,
                     onValueChange = { weightStr = it },
-                    label = { Text("Weight of 1 Bag in KG (e.g. 0.25)") },
+                    label = { Text("የአንድ ከረጢት ክብደት በኪ.ግ (ለምሳሌ፡ 0.25)") },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     modifier = Modifier.fillMaxWidth()
                 )
                 OutlinedTextField(
                     value = initialStockStr,
                     onValueChange = { initialStockStr = it },
-                    label = { Text("Initial Stock (in bags)") },
+                    label = { Text("የመጀመሪያ ክምችት (በከረጢት)") },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -3801,11 +3828,11 @@ fun AddProductDialog(
                 },
                 modifier = Modifier.testTag("diag_product_submit")
             ) {
-                Text("Save")
+                Text("አስቀምጥ")
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
+            TextButton(onClick = onDismiss) { Text("ሰርዝ") }
         }
     )
 }
@@ -3831,7 +3858,7 @@ fun AddMasterbatchDialog(
                 OutlinedTextField(
                     value = colorName,
                     onValueChange = { colorName = it },
-                    label = { Text("የማስተርባች ቀለም (Color Name: Green, Black...)") },
+                    label = { Text("የማስተርባች ቀለም (ለምሳሌ፡ አረንጓዴ፣ ጥቁር፣ ቀይ)") },
                     placeholder = { Text("ቀለም ያስገቡ") },
                     modifier = Modifier
                         .fillMaxWidth()
@@ -3840,9 +3867,9 @@ fun AddMasterbatchDialog(
                 OutlinedTextField(
                     value = initialStockBagsStr,
                     onValueChange = { initialStockBagsStr = it },
-                    label = { Text("የመጀመሪያ ክምችት በከረጢት (Initial Bags)") },
+                    label = { Text("የመጀመሪያ ክምችት በከረጢት") },
                     supportingText = {
-                        Text("→ ${computedInitialKg.toInt()} ኪ.ግ / kg (1 ከረጢት = 25 ኪ.ግ)", color = BentoSoftGreen, fontWeight = FontWeight.Bold)
+                        Text("→ ${computedInitialKg.toInt()} ኪ.ግ (1 ከረጢት = 25 ኪ.ግ)", color = BentoSoftGreen, fontWeight = FontWeight.Bold)
                     },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     modifier = Modifier.fillMaxWidth()
@@ -3858,11 +3885,11 @@ fun AddMasterbatchDialog(
                 },
                 modifier = Modifier.testTag("diag_mb_submit")
             ) {
-                Text("መዝግብ (Save)")
+                Text("መዝግብ")
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("አጥፋ (Cancel)") }
+            TextButton(onClick = onDismiss) { Text("አጥፋ") }
         }
     )
 }
@@ -3877,13 +3904,13 @@ fun AddWorkerDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Register Employee Worker") },
+        title = { Text("አዲስ ሰራተኛ መመዝገቢያ", fontWeight = FontWeight.Bold) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it },
-                    label = { Text("Worker Full Name") },
+                    label = { Text("የሰራተኛው ሙሉ ስም") },
                     modifier = Modifier
                         .fillMaxWidth()
                         .testTag("diag_worker_name")
@@ -3891,7 +3918,7 @@ fun AddWorkerDialog(
                 OutlinedTextField(
                     value = salaryStr,
                     onValueChange = { salaryStr = it },
-                    label = { Text("Monthly Salary (Birr)") },
+                    label = { Text("ወርሃዊ ደሞዝ (በብር)") },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     modifier = Modifier
                         .fillMaxWidth()
@@ -3909,11 +3936,11 @@ fun AddWorkerDialog(
                 },
                 modifier = Modifier.testTag("diag_worker_submit")
             ) {
-                Text("Save")
+                Text("መዝግብ")
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
+            TextButton(onClick = onDismiss) { Text("ሰርዝ") }
         }
     )
 }
@@ -3933,11 +3960,11 @@ fun RecordProductActivityDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Activity Log: ${product.name}") },
+        title = { Text("የምርት እንቅስቃሴ መዝገብ፦ ${product.name}") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text(
-                    text = "Current Stock: ${product.currentStock} bags (1bag = ${product.bagWeightKg} kg)",
+                    text = "የአሁኑ ክምችት፦ ${product.currentStock} ከረጢት (1 ከረጢት = ${product.bagWeightKg} ኪ.ግ)",
                     fontWeight = FontWeight.Bold,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.primary
@@ -3945,7 +3972,7 @@ fun RecordProductActivityDialog(
                 OutlinedTextField(
                     value = fabStr,
                     onValueChange = { fabStr = it },
-                    label = { Text("Daily Fabricated (Bags)") },
+                    label = { Text("የቀን ምርት (ከረጢት)") },
                     placeholder = { Text("0") },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     modifier = Modifier
@@ -3955,7 +3982,7 @@ fun RecordProductActivityDialog(
                 OutlinedTextField(
                     value = soldStr,
                     onValueChange = { soldStr = it },
-                    label = { Text("Daily Sold (Bags)") },
+                    label = { Text("የቀን ሽያጭ (ከረጢት)") },
                     placeholder = { Text("0") },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     modifier = Modifier
@@ -3965,7 +3992,7 @@ fun RecordProductActivityDialog(
                 OutlinedTextField(
                     value = adjStr,
                     onValueChange = { adjStr = it },
-                    label = { Text("Daily Adjusted Offset (e.g. -2 or 5)") },
+                    label = { Text("የክምችት ማስተካከያ (ለምሳሌ፡ -2 ወይም 5)") },
                     placeholder = { Text("0") },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     modifier = Modifier
@@ -3975,7 +4002,7 @@ fun RecordProductActivityDialog(
                 OutlinedTextField(
                     value = notes,
                     onValueChange = { notes = it },
-                    label = { Text("Notes (e.g. damage waste, manual correction)") },
+                    label = { Text("ማስታወሻ (ለምሳሌ፦ ብልሽት፣ በእጅ የተደረገ ማስተካከያ)") },
                     modifier = Modifier.fillMaxWidth()
                 )
             }
@@ -3990,7 +4017,7 @@ fun RecordProductActivityDialog(
                 },
                 modifier = Modifier.testTag("diag_log_product_submit")
             ) {
-                Text("Apply Activity")
+                Text("እንቅስቃሴውን መዝግብ")
             }
         },
         dismissButton = {
@@ -4003,11 +4030,11 @@ fun RecordProductActivityDialog(
                     colors = ButtonDefaults.textButtonColors(contentColor = Color(0xFFEF4444)),
                     modifier = Modifier.testTag("delete_product_trigger_btn")
                 ) {
-                    Icon(Icons.Default.Delete, contentDescription = "Delete Product", modifier = Modifier.size(16.dp))
+                    Icon(Icons.Default.Delete, contentDescription = "ምርቱን ሰርዝ", modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text("Delete Product")
+                    Text("ምርቱን ሰርዝ")
                 }
-                TextButton(onClick = onDismiss) { Text("Cancel") }
+                TextButton(onClick = onDismiss) { Text("ሰርዝ") }
             }
         }
     )
@@ -4018,11 +4045,11 @@ fun RecordProductActivityDialog(
 
         AlertDialog(
             onDismissRequest = { showDeletePinPrompt = false },
-            title = { Text("Confirm Product Deletion", fontWeight = FontWeight.Bold) },
+            title = { Text("ምርት መሰረዙን አረጋግጥ", fontWeight = FontWeight.Bold) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text(
-                        text = "Deleting '${product.name}' is permanent. To prevent accidental deletion, please enter the administrator PIN (1234):",
+                        text = "'${product.name}' መሰረዝ ዘላቂ ነው። እንዳይሳሳቱ እባክዎ የአስተዳዳሪ የይለፍ ቃል (1234) ያስገቡ፦",
                         style = MaterialTheme.typography.bodyMedium
                     )
                     OutlinedTextField(
@@ -4031,7 +4058,7 @@ fun RecordProductActivityDialog(
                             pinInput = it
                             pinError = null
                         },
-                        label = { Text("Security PIN") },
+                        label = { Text("የአስተዳዳሪ ሚስጥር ቁጥር (PIN)") },
                         placeholder = { Text("••••") },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
                         visualTransformation = PasswordVisualTransformation(),
@@ -4058,20 +4085,20 @@ fun RecordProductActivityDialog(
                             showDeletePinPrompt = false
                             onDelete()
                         } else {
-                            pinError = "Incorrect PIN. Deletion denied."
+                            pinError = "የተሳሳተ ቁጥር ነው። ስረዛው አልተፈቀደም።"
                         }
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444)),
                     modifier = Modifier.testTag("delete_confirm_btn")
                 ) {
-                    Text("Confirm Delete", color = Color.White)
+                    Text("እርግጠኛ ነኝ ሰርዝ", color = Color.White)
                 }
             },
             dismissButton = {
                 TextButton(
                     onClick = { showDeletePinPrompt = false }
                 ) {
-                    Text("Cancel")
+                    Text("ሰርዝ")
                 }
             }
         )
@@ -4089,13 +4116,13 @@ fun RecordRawMaterialActivityDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Activity Log: $rawMaterialType Material") },
+        title = { Text("የዕለት እንቅስቃሴ መዝገብ፦ $rawMaterialType ጥሬ እቃ") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 OutlinedTextField(
                     value = usedStr,
                     onValueChange = { usedStr = it },
-                    label = { Text("Used Today in Fabrication (kg)") },
+                    label = { Text("ዛሬ ለማምረቻ የዋለ (ኪ.ግ)") },
                     placeholder = { Text("0.0") },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     modifier = Modifier
@@ -4105,7 +4132,7 @@ fun RecordRawMaterialActivityDialog(
                 OutlinedTextField(
                     value = addedStr,
                     onValueChange = { addedStr = it },
-                    label = { Text("Added Today / Purchased (kg)") },
+                    label = { Text("ዛሬ የተገዛ/የተጨመረ (ኪ.ግ)") },
                     placeholder = { Text("0.0") },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     modifier = Modifier
@@ -4123,11 +4150,11 @@ fun RecordRawMaterialActivityDialog(
                 },
                 modifier = Modifier.testTag("diag_raw_submit")
             ) {
-                Text("Apply")
+                Text("ተግብር")
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
+            TextButton(onClick = onDismiss) { Text("ሰርዝ") }
         }
     )
 }
@@ -4160,7 +4187,7 @@ fun RecordMasterbatchActivityDialog(
                 OutlinedTextField(
                     value = takenOutStr,
                     onValueChange = { takenOutStr = it },
-                    label = { Text("ከመጋዘን የወጣ - ኪ.ግ (Taken Out to Machine)") },
+                    label = { Text("ከመጋዘን የወጣ - በኪ.ግ") },
                     placeholder = { Text("የኪ.ግ ብዛት") },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     modifier = Modifier.fillMaxWidth()
@@ -4169,7 +4196,7 @@ fun RecordMasterbatchActivityDialog(
                 OutlinedTextField(
                     value = returnedStr,
                     onValueChange = { returnedStr = it },
-                    label = { Text("ወደ መጋዘን የተመለሰ - ኪ.ግ (Returned to Store)") },
+                    label = { Text("ወደ መጋዘን የተመለሰ - በኪ.ግ") },
                     placeholder = { Text("የኪ.ግ ብዛት") },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     modifier = Modifier.fillMaxWidth()
@@ -4183,13 +4210,13 @@ fun RecordMasterbatchActivityDialog(
                         .padding(10.dp)
                 ) {
                     Text(
-                        text = "የዕለት ፍጆታ (Net Daily Usage)",
+                        text = "የዕለት ፍጆታ",
                         style = MaterialTheme.typography.labelSmall,
                         color = BentoAlertText,
                         fontWeight = FontWeight.Bold
                     )
                     Text(
-                        text = "${netDailyUsage.toInt()} ኪ.ግ (kg)",
+                        text = "${netDailyUsage.toInt()} ኪ.ግ",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         color = BentoAlertText
@@ -4205,13 +4232,13 @@ fun RecordMasterbatchActivityDialog(
                         .padding(10.dp)
                 ) {
                     Text(
-                        text = "በመጋዘን ያለ (Remaining in Store)",
+                        text = "በመጋዘን ያለ",
                         style = MaterialTheme.typography.labelSmall,
                         color = BentoSoftGreen,
                         fontWeight = FontWeight.Bold
                     )
                     Text(
-                        text = "${String.format(Locale.US, "%.1f", currentRemKg / 25.0)} ከረጢት (${currentRemKg.toInt()} kg)",
+                        text = "${String.format(Locale.US, "%.1f", currentRemKg / 25.0)} ከረጢት (${currentRemKg.toInt()} ኪ.ግ)",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         color = BentoSoftGreen
@@ -4226,11 +4253,11 @@ fun RecordMasterbatchActivityDialog(
                 },
                 modifier = Modifier.testTag("diag_mb_activity_submit")
             ) {
-                Text("መዝግብ (Record)")
+                Text("መዝግብ")
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("አጥፋ (Cancel)") }
+            TextButton(onClick = onDismiss) { Text("አጥፋ") }
         }
     )
 }
@@ -4255,7 +4282,7 @@ fun AddBoughtBagsDialog(
                 OutlinedTextField(
                     value = bagsStr,
                     onValueChange = { bagsStr = it },
-                    label = { Text("የተገዛ የከረጢት ብዛት (Bags)") },
+                    label = { Text("የተገዛ የከረጢት ብዛት") },
                     placeholder = { Text("ከረጢት ብዛት") },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     modifier = Modifier.fillMaxWidth()
@@ -4271,11 +4298,11 @@ fun AddBoughtBagsDialog(
                     }
                 }
             ) {
-                Text("መዝግብ (Add)")
+                Text("መዝግብ")
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("አጥፋ (Cancel)") }
+            TextButton(onClick = onDismiss) { Text("አጥፋ") }
         }
     )
 }
@@ -4330,7 +4357,7 @@ fun DatePickerFallbackDialog(
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
                 Text(
-                    text = "የቀን መምረጫ (Date Picker)",
+                    text = "የቀን መምረጫ",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     color = BentoForestGreen
@@ -4516,7 +4543,7 @@ fun DatePickerFallbackDialog(
                         },
                         modifier = Modifier.testTag("dp_today_btn")
                     ) {
-                        Text("ዛሬ (Today)", color = BentoForestGreen, fontWeight = FontWeight.Bold)
+                        Text("ዛሬ", color = BentoForestGreen, fontWeight = FontWeight.Bold)
                     }
 
                     Row(
@@ -4524,7 +4551,7 @@ fun DatePickerFallbackDialog(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         TextButton(onClick = onDismiss) {
-                            Text("Cancel", color = BentoSubText)
+                            Text("ሰርዝ", color = BentoSubText)
                         }
                         Button(
                             onClick = {
@@ -4535,7 +4562,7 @@ fun DatePickerFallbackDialog(
                             shape = RoundedCornerShape(12.dp),
                             modifier = Modifier.testTag("dp_submit")
                         ) {
-                            Text("Apply")
+                            Text("ተግብር")
                         }
                     }
                 }
@@ -4655,13 +4682,13 @@ fun ActivityLogSection(
                     }
                     Column {
                         Text(
-                            text = "LIVE ACTIVITY MONITOR",
+                            text = "የቀጥታ እንቅስቃሴ መከታተያ",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Black,
                             color = Color.White
                         )
                         Text(
-                            text = "Track logs across all connected devices in Ethiopian calendar",
+                            text = "በኢትዮጵያ ዘመን አቆጣጠር የተመዘገቡ ተግባራትን እዚህ ይከታተሉ",
                             style = MaterialTheme.typography.bodySmall,
                             color = BentoSubText
                         )
@@ -4681,7 +4708,7 @@ fun ActivityLogSection(
             ) {
                 Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text(
-                        text = "📢 ማስታወቂያ ሰሌዳ (Active Announcements)",
+                        text = "📢 ማስታወቂያ ሰሌዳ",
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.ExtraBold,
                         color = BentoGold
@@ -4772,8 +4799,8 @@ fun ActivityLogSection(
                         Icon(Icons.Default.CheckCircle, contentDescription = null, tint = BentoForestGreen, modifier = Modifier.size(18.dp))
                     }
                     Column {
-                        Text("TOTAL RECORDS", style = MaterialTheme.typography.labelSmall, color = BentoSubText, fontWeight = FontWeight.Bold)
-                        Text("${activityLogs.size} logs", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Black, color = BentoForestGreen)
+                        Text("ጠቅላላ መዝገቦች", style = MaterialTheme.typography.labelSmall, color = BentoSubText, fontWeight = FontWeight.Bold)
+                        Text("${activityLogs.size} መዝገቦች", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Black, color = BentoForestGreen)
                     }
                 }
             }
@@ -4797,8 +4824,8 @@ fun ActivityLogSection(
                         Icon(Icons.Default.Settings, contentDescription = null, tint = BentoInfoText, modifier = Modifier.size(18.dp))
                     }
                     Column {
-                        Text("DEVICES", style = MaterialTheme.typography.labelSmall, color = BentoSubText, fontWeight = FontWeight.Bold)
-                        Text("$uniqueDevicesCount devices", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Black, color = BentoInfoText)
+                        Text("መሳሪያዎች", style = MaterialTheme.typography.labelSmall, color = BentoSubText, fontWeight = FontWeight.Bold)
+                        Text("$uniqueDevicesCount መሳሪያዎች", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Black, color = BentoInfoText)
                     }
                 }
             }
@@ -4811,7 +4838,7 @@ fun ActivityLogSection(
             value = searchQuery,
             onValueChange = { searchQuery = it },
             modifier = Modifier.fillMaxWidth().testTag("log_search_input"),
-            placeholder = { Text("Search logs or devices...", color = BentoSubText, style = MaterialTheme.typography.bodyMedium) },
+            placeholder = { Text("መዝገቦችን ወይም መሣሪያዎችን ይፈልጉ...", color = BentoSubText, style = MaterialTheme.typography.bodyMedium) },
             leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Search", tint = BentoSubText) },
             colors = OutlinedTextFieldDefaults.colors(
                 focusedContainerColor = BentoNeutralGray.copy(alpha = 0.5f),
@@ -4827,7 +4854,7 @@ fun ActivityLogSection(
 
         // Filters badges row: Category
         Text(
-            text = "Filter by Category:",
+            text = "በምድብ ያጣሩ፦",
             style = MaterialTheme.typography.labelMedium,
             color = BentoSubText,
             fontWeight = FontWeight.Bold
@@ -4839,8 +4866,16 @@ fun ActivityLogSection(
                 .horizontalScroll(rememberScrollState()),
             horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
+            val categoryTranslations = mapOf(
+                "All" to "ሁሉም ምድብ",
+                "Product" to "ምርት",
+                "Raw Material" to "ጥሬ ዕቃ",
+                "Masterbatch" to "ቀለም ማስተርባች",
+                "Worker" to "ሠራተኛ"
+            )
             categories.forEach { cat ->
                 val isSelected = selectedCategoryFilter == cat
+                val translatedCat = categoryTranslations[cat] ?: cat
                 Box(
                     modifier = Modifier
                         .clip(CircleShape)
@@ -4851,7 +4886,7 @@ fun ActivityLogSection(
                         .testTag("filter_cat_$cat")
                 ) {
                     Text(
-                        text = cat,
+                        text = translatedCat,
                         style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.Bold,
                         color = if (isSelected) Color(0xFF0F172A) else BentoSubText
@@ -4864,7 +4899,7 @@ fun ActivityLogSection(
 
         // Filters badges row: Action
         Text(
-            text = "Filter by Action:",
+            text = "በድርጊት ያጣሩ፦",
             style = MaterialTheme.typography.labelMedium,
             color = BentoSubText,
             fontWeight = FontWeight.Bold
@@ -4876,8 +4911,15 @@ fun ActivityLogSection(
                 .horizontalScroll(rememberScrollState()),
             horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
+            val actionTranslations = mapOf(
+                "All" to "ሁሉም ድርጊት",
+                "Add" to "ምዝገባ",
+                "Edit" to "ማሻሻያ",
+                "Delete" to "ስረዛ"
+            )
             actions.forEach { act ->
                 val isSelected = selectedActionFilter == act
+                val translatedAct = actionTranslations[act] ?: act
                 val actColor = when (act) {
                     "Add" -> BentoForestGreen
                     "Edit" -> Color(0xFFF59E0B)
@@ -4894,7 +4936,7 @@ fun ActivityLogSection(
                         .testTag("filter_act_$act")
                 ) {
                     Text(
-                        text = act,
+                        text = translatedAct,
                         style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.Bold,
                         color = if (isSelected) actColor else BentoSubText
@@ -5120,9 +5162,11 @@ fun AnimatedCounterText(
 fun AnwarSplashScreen(onFinished: () -> Unit) {
     var progress by remember { mutableStateOf(0f) }
     var startExitAnimation by remember { mutableStateOf(false) }
+    var entryAnimated by remember { mutableStateOf(false) }
     
     // Play industrial tech sound on launch using standard Android ToneGenerator
     LaunchedEffect(Unit) {
+        entryAnimated = true
         try {
             val tg = android.media.ToneGenerator(android.media.AudioManager.STREAM_MUSIC, 100)
             tg.startTone(android.media.ToneGenerator.TONE_PROP_PROMPT, 150)
@@ -5152,7 +5196,16 @@ fun AnwarSplashScreen(onFinished: () -> Unit) {
         label = "splash_alpha"
     )
     
-    // Zooming logo scale with bouncing pulse effect
+    val entryScale by animateFloatAsState(
+        targetValue = if (entryAnimated) 1.0f else 0.1f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessLow
+        ),
+        label = "entry_zoom"
+    )
+    
+    // Zooming logo scale with bouncing pulse effect and initial zoom
     val infiniteTransition = rememberInfiniteTransition(label = "logo_pulse")
     val pulseScale by infiniteTransition.animateFloat(
         initialValue = 0.95f,
@@ -5163,7 +5216,7 @@ fun AnwarSplashScreen(onFinished: () -> Unit) {
         ),
         label = "pulse"
     )
-    val scale = if (startExitAnimation) 1.5f else pulseScale // zoom out on transition
+    val scale = if (startExitAnimation) 1.6f else (entryScale * pulseScale) // zoom out on transition, zoom in on entry
 
     // Canvas particle duration timeline
     val particleTime by infiniteTransition.animateFloat(
@@ -5183,22 +5236,43 @@ fun AnwarSplashScreen(onFinished: () -> Unit) {
             .graphicsLayer(alpha = alpha),
         contentAlignment = Alignment.Center
     ) {
-        // Exploding green particles radiating outward on canvas
+        // Exploding multi-velocity green particles radiating outward on canvas
         androidx.compose.foundation.Canvas(modifier = Modifier.fillMaxSize()) {
             val center = androidx.compose.ui.geometry.Offset(this.size.width / 2f, this.size.height / 2f)
-            val numParticles = 24
-            for (i in 0 until numParticles) {
-                val angle = (i * (360f / numParticles)) * (Math.PI.toFloat() / 180f)
-                val baseDistance = 100.dp.toPx()
-                val moveDistance = baseDistance + (particleTime * 250.dp.toPx())
+            
+            // Layer 1: Normal exploding green particles
+            val numParticles1 = 30
+            for (i in 0 until numParticles1) {
+                val angle = (i * (360f / numParticles1)) * (Math.PI.toFloat() / 180f)
+                val baseDistance = 80.dp.toPx()
+                val moveDistance = baseDistance + (particleTime * 280.dp.toPx())
                 val pX = center.x + (Math.cos(angle.toDouble()) * moveDistance.toDouble()).toFloat()
                 val pY = center.y + (Math.sin(angle.toDouble()) * moveDistance.toDouble()).toFloat()
                 
                 // Outer decay fadeout
-                val pAlpha = (1f - particleTime) * 0.75f
+                val pAlpha = (1f - particleTime) * 0.85f
                 drawCircle(
                     color = Color(0xFF00FF88),
-                    radius = (4.dp + (5.dp * particleTime)).toPx(),
+                    radius = (3.dp + (6.dp * particleTime)).toPx(),
+                    center = androidx.compose.ui.geometry.Offset(pX, pY),
+                    alpha = pAlpha
+                )
+            }
+            
+            // Layer 2: Faster, inner swirling particles
+            val numParticles2 = 18
+            val fastTime = (particleTime * 1.5f) % 1f
+            for (i in 0 until numParticles2) {
+                val angle = (i * (360f / numParticles2) + 15f) * (Math.PI.toFloat() / 180f)
+                val baseDistance = 50.dp.toPx()
+                val moveDistance = baseDistance + (fastTime * 200.dp.toPx())
+                val pX = center.x + (Math.cos(angle.toDouble()) * moveDistance.toDouble()).toFloat()
+                val pY = center.y + (Math.sin(angle.toDouble()) * moveDistance.toDouble()).toFloat()
+                
+                val pAlpha = (1f - fastTime) * 0.6f
+                drawCircle(
+                    color = Color(0xFF55FFCC),
+                    radius = (2.dp + (4.dp * fastTime)).toPx(),
                     center = androidx.compose.ui.geometry.Offset(pX, pY),
                     alpha = pAlpha
                 )
