@@ -1554,7 +1554,8 @@ fun BentoGridOverviewPanel(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp),
+            .background(Color(0xFF050505))
+            .padding(horizontal = 16.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         val periods = remember {
@@ -1596,8 +1597,8 @@ fun BentoGridOverviewPanel(
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(24.dp),
-            colors = CardDefaults.cardColors(containerColor = Color(0xFF0F121E)),
-            border = BorderStroke(1.dp, BentoBorder)
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF0A0C11)),
+            border = BorderStroke(1.dp, Color(0xFF1E293B).copy(alpha = 0.4f))
         ) {
             Box(
                 modifier = Modifier
@@ -1605,8 +1606,8 @@ fun BentoGridOverviewPanel(
                     .background(
                         Brush.verticalGradient(
                             colors = listOf(
-                                BentoLightGreen.copy(alpha = 0.25f),
-                                Color(0xFF0F121E)
+                                Color(0xFF00FF88).copy(alpha = 0.08f),
+                                Color(0xFF0A0C11)
                             )
                         )
                     )
@@ -1637,7 +1638,7 @@ fun BentoGridOverviewPanel(
                             val center = Offset(size.width / 2, size.height / 2)
                             val outerRadius = size.width * 0.45f
                             val innerRadius = size.width * 0.25f
-                            val gearColor = BentoSoftGreen
+                            val gearColor = Color(0xFF00FF88)
 
                             rotate(rotationAngle, pivot = center) {
                                 drawCircle(
@@ -1654,11 +1655,11 @@ fun BentoGridOverviewPanel(
                                 )
                                 for (i in 0 until 8) {
                                     val angleDeg = i * 45f
-                                    val angleRad = Math.toRadians(angleDeg.toDouble())
-                                    val startX = center.x + innerRadius * Math.cos(angleRad).toFloat()
-                                    val startY = center.y + innerRadius * Math.sin(angleRad).toFloat()
-                                    val endX = center.x + outerRadius * Math.cos(angleRad).toFloat()
-                                    val endY = center.y + outerRadius * Math.sin(angleRad).toFloat()
+                                    val angleRad = java.lang.Math.toRadians(angleDeg.toDouble())
+                                    val startX = center.x + innerRadius * java.lang.Math.cos(angleRad).toFloat()
+                                    val startY = center.y + innerRadius * java.lang.Math.sin(angleRad).toFloat()
+                                    val endX = center.x + outerRadius * java.lang.Math.cos(angleRad).toFloat()
+                                    val endY = center.y + outerRadius * java.lang.Math.sin(angleRad).toFloat()
                                     drawLine(
                                         color = gearColor,
                                         start = Offset(startX, startY),
@@ -1672,7 +1673,7 @@ fun BentoGridOverviewPanel(
 
                         Column {
                             Text(
-                                text = "የአንዋር ማምረቻ ማዕከል", // translated
+                                text = "የአንዋር ማምረቻ ማዕከል",
                                 style = MaterialTheme.typography.labelSmall,
                                 fontWeight = FontWeight.Bold,
                                 color = BentoGold,
@@ -1688,12 +1689,12 @@ fun BentoGridOverviewPanel(
                         }
                     }
 
-                    // Slide anim premium switcher
+                    // Slide anim premium switcher (Day / Week / Month / Year)
                     val selectedIndex = periods.indexOfFirst { it.first == reportPeriod }.coerceAtLeast(0)
                     Box(
                         modifier = Modifier
-                            .background(Color(0xFF161618), RoundedCornerShape(20.dp))
-                            .border(1.dp, BentoBorder, RoundedCornerShape(20.dp))
+                            .background(Color(0xFF050505), RoundedCornerShape(20.dp))
+                            .border(1.dp, Color(0xFF1E293B).copy(alpha = 0.6f), RoundedCornerShape(20.dp))
                             .padding(2.dp)
                     ) {
                         val indicatorOffset by animateDpAsState(
@@ -1705,7 +1706,7 @@ fun BentoGridOverviewPanel(
                             modifier = Modifier
                                 .offset(x = indicatorOffset)
                                 .size(width = 54.dp, height = 26.dp)
-                                .background(BentoForestGreen, RoundedCornerShape(16.dp))
+                                .background(Color(0xFF00FF88), RoundedCornerShape(16.dp))
                         )
                         Row(horizontalArrangement = Arrangement.spacedBy(0.dp)) {
                             periods.forEachIndexed { idx, (prodPeriod, label) ->
@@ -1716,6 +1717,7 @@ fun BentoGridOverviewPanel(
                                             interactionSource = remember { MutableInteractionSource() },
                                             indication = null
                                         ) {
+                                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                             onPeriodSelect(prodPeriod)
                                         },
                                     contentAlignment = Alignment.Center
@@ -1724,7 +1726,7 @@ fun BentoGridOverviewPanel(
                                         text = label,
                                         style = MaterialTheme.typography.labelSmall,
                                         fontWeight = FontWeight.Bold,
-                                        color = if (reportPeriod == prodPeriod) Color.White else BentoSubText
+                                        color = if (reportPeriod == prodPeriod) Color.Black else Color(0xFF8C9E94)
                                     )
                                 }
                             }
@@ -1781,9 +1783,9 @@ fun BentoGridOverviewPanel(
             horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             val neonTransition = rememberInfiniteTransition(label = "glow_kpi")
-            val neonAlpha by neonTransition.animateFloat(
-                initialValue = 0.25f,
-                targetValue = 0.95f,
+            val glowAlpha by neonTransition.animateFloat(
+                initialValue = 0.35f,
+                targetValue = 1.0f,
                 animationSpec = infiniteRepeatable(
                     animation = tween(1200, easing = FastOutSlowInEasing),
                     repeatMode = RepeatMode.Reverse
@@ -1791,72 +1793,72 @@ fun BentoGridOverviewPanel(
                 label = "neon_pulse"
             )
 
-            // Total Produced
+            // Total Produced Card with glowing green active outline & gold number text with count-up
             Card(
                 modifier = Modifier.weight(1f),
                 shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(containerColor = BentoLightGreen.copy(alpha = 0.25f)),
-                border = BorderStroke(1.5.dp, BentoSoftGreen.copy(alpha = neonAlpha))
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF0B1410)),
+                border = BorderStroke(2.dp, Color(0xFF00FF88).copy(alpha = glowAlpha))
             ) {
                 Column(modifier = Modifier.padding(14.dp)) {
                     Text(
-                        text = "ጠቅላላ የተመረተ", // translated
+                        text = "ጠቅላላ የተመረተ",
                         style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.ExtraBold,
-                        color = BentoSoftGreen
+                        color = Color(0xFF00FF88)
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     AnimatedCounterText(
                         targetValue = todayKgProduced.toInt(),
-                        suffix = " ኪ.ግ", // translated
-                        style = MaterialTheme.typography.displayMedium,
-                        color = BentoSoftGreen
+                        suffix = " ኪ.ግ",
+                        style = MaterialTheme.typography.headlineMedium,
+                        color = BentoGold,
+                        fontWeight = FontWeight.Black
                     )
-                    Text("ዛሬ የተመረተ", style = MaterialTheme.typography.labelSmall, color = BentoSubText) // translated
+                    Text("ዛሬ የተመረተ", style = MaterialTheme.typography.labelSmall, color = Color(0xFF8C9E94))
                 }
             }
 
-            // Total Sold
+            // Total Sold Card with glowing green active outline & gold number text with count-up
             Card(
                 modifier = Modifier.weight(1f),
                 shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(containerColor = Color(0xFF0F121E)),
-                border = BorderStroke(1.5.dp, BentoForestGreen.copy(alpha = neonAlpha / 2f))
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF0B1114)),
+                border = BorderStroke(2.dp, Color(0xFF00FF88).copy(alpha = glowAlpha))
             ) {
                 Column(modifier = Modifier.padding(14.dp)) {
                     Text(
-                        text = "ጠቅላላ የተሸጠ", // translated
+                        text = "ጠቅላላ የተሸጠ",
                         style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.ExtraBold,
-                        color = BentoForestGreen
+                        color = Color(0xFF00FF88)
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     AnimatedCounterText(
                         targetValue = todayKgSold.toInt(),
-                        suffix = " ኪ.ግ", // translated
-                        style = MaterialTheme.typography.displayMedium,
-                        color = Color.White
+                        suffix = " ኪ.ግ",
+                        style = MaterialTheme.typography.headlineMedium,
+                        color = BentoGold,
+                        fontWeight = FontWeight.Black
                     )
-                    Text("ዛሬ የተሸጠ", style = MaterialTheme.typography.labelSmall, color = BentoSubText) // translated
+                    Text("ዛሬ የተሸጠ", style = MaterialTheme.typography.labelSmall, color = Color(0xFF8C9E94))
                 }
             }
         }
 
-
-
-        // --- FACTORY PERFORMANCE SUMMARY ---
+        // --- FACTORY PERFORMANCE SUMMARY & WEEKLY BAR CHART + CIRCULAR PROGRESS ---
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(24.dp),
-            colors = CardDefaults.cardColors(containerColor = BentoNeutralGray),
-            border = BorderStroke(1.dp, BentoBorder)
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF0A0D10)),
+            border = BorderStroke(1.dp, Color(0xFF1E293B))
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Text(
-                    text = "የማምረቻ ማጠቃለያና ግምገማ", // translated (Factory Performance Summary)
+                    text = "የማምረቻ ማጠቃለያና ግምገማ",
                     style = MaterialTheme.typography.labelSmall,
                     fontWeight = FontWeight.ExtraBold,
-                    color = BentoForestGreen,
+                    color = Color(0xFF00FF88),
                     letterSpacing = 1.sp
                 )
                 Spacer(modifier = Modifier.height(14.dp))
@@ -1872,17 +1874,17 @@ fun BentoGridOverviewPanel(
                             horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
                             Column(modifier = Modifier.weight(1f)) {
-                                Text("የሳምንት ጠቅላላ", style = MaterialTheme.typography.labelSmall, color = BentoSubText, fontWeight = FontWeight.Bold)
+                                Text("የሳምንት ጠቅላላ", style = MaterialTheme.typography.labelSmall, color = Color(0xFF8C9E94), fontWeight = FontWeight.Bold)
                                 Spacer(modifier = Modifier.height(4.dp))
-                                Text("${weekKg.toInt()} ኪ.ግ", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold, color = BentoTextDark, fontFamily = FontFamily.Monospace)
-                                Text("$weekBags ማዳበሪያ", style = MaterialTheme.typography.labelSmall, color = BentoSubText)
+                                Text("${weekKg.toInt()} ኪ.ግ", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold, color = Color.White, fontFamily = FontFamily.Monospace)
+                                Text("$weekBags ማዳበሪያ", style = MaterialTheme.typography.labelSmall, color = Color(0xFF8C9E94))
                             }
-                            Box(modifier = Modifier.width(1.dp).height(50.dp).background(BentoBorder))
+                            Box(modifier = Modifier.width(1.dp).height(50.dp).background(Color(0xFF1E293B)))
                             Column(modifier = Modifier.weight(1f)) {
-                                Text("የወር ጠቅላላ", style = MaterialTheme.typography.labelSmall, color = BentoSubText, fontWeight = FontWeight.Bold)
+                                Text("የወር ጠቅላላ", style = MaterialTheme.typography.labelSmall, color = Color(0xFF8C9E94), fontWeight = FontWeight.Bold)
                                 Spacer(modifier = Modifier.height(4.dp))
-                                Text("${monthKg.toInt()} ኪ.ግ", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold, color = BentoTextDark, fontFamily = FontFamily.Monospace)
-                                Text("$monthBags ማዳበሪያ", style = MaterialTheme.typography.labelSmall, color = BentoSubText)
+                                Text("${monthKg.toInt()} ኪ.ግ", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold, color = Color.White, fontFamily = FontFamily.Monospace)
+                                Text("$monthBags ማዳበሪያ", style = MaterialTheme.typography.labelSmall, color = Color(0xFF8C9E94))
                             }
                         }
                     }
@@ -1898,40 +1900,61 @@ fun BentoGridOverviewPanel(
 
                     Box(
                         modifier = Modifier
-                            .size(70.dp)
-                            .background(Color.Black.copy(alpha = 0.3f), CircleShape)
-                            .border(1.dp, BentoBorder, CircleShape),
+                            .size(76.dp)
+                            .background(Color(0xFF050907), CircleShape)
+                            .border(1.5.dp, Color(0xFF122C20), CircleShape),
                         contentAlignment = Alignment.Center
                     ) {
-                        Canvas(modifier = Modifier.size(54.dp)) {
-                            // Grey track ring
+                        Canvas(modifier = Modifier.size(56.dp)) {
+                            // Dark track background
                             drawCircle(
-                                color = BentoBorder,
+                                color = Color(0xFF0A2215),
                                 radius = size.width / 2,
-                                style = Stroke(width = 5.dp.toPx())
+                                style = Stroke(width = 6.dp.toPx())
                             )
-                            // Green glowing ring progress arc
+                            // Glowing green circular sweep/arc
                             drawArc(
-                                color = BentoSoftGreen,
+                                brush = Brush.sweepGradient(
+                                    listOf(Color(0xFF02361D), Color(0xFF00FF88), Color(0xFF00FF88))
+                                ),
                                 startAngle = -90f,
                                 sweepAngle = animatedProgressFraction * 360f,
                                 useCenter = false,
-                                style = Stroke(width = 5.dp.toPx(), cap = StrokeCap.Round)
+                                style = Stroke(width = 6.dp.toPx(), cap = StrokeCap.Round)
                             )
+                            
+                            // High-tech tip glowing particle
+                            if (animatedProgressFraction > 0f) {
+                                val angleRad = java.lang.Math.toRadians((-90f + animatedProgressFraction * 360f).toDouble())
+                                val radiusPx = size.width / 2
+                                val tipX = center.x + radiusPx * java.lang.Math.cos(angleRad).toFloat()
+                                val tipY = center.y + radiusPx * java.lang.Math.sin(angleRad).toFloat()
+                                drawCircle(
+                                    color = Color.White,
+                                    radius = 3.dp.toPx(),
+                                    center = Offset(tipX, tipY)
+                                )
+                                drawCircle(
+                                    color = Color(0xFF00FF88),
+                                    radius = 6.dp.toPx(),
+                                    center = Offset(tipX, tipY),
+                                    style = Stroke(width = 1.5.dp.toPx())
+                                )
+                            }
                         }
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Text(
                                 text = "${(progressFraction * 100).toInt()}%",
                                 style = MaterialTheme.typography.labelSmall,
                                 fontWeight = FontWeight.Black,
-                                color = Color.White,
+                                color = Color(0xFF00FF88),
                                 fontFamily = FontFamily.Monospace
                             )
                             Text(
-                                text = "ግብ", // Target
+                                text = "ግብ",
                                 style = MaterialTheme.typography.labelSmall,
                                 fontSize = 8.sp,
-                                color = BentoSubText
+                                color = Color(0xFF8C9E94)
                             )
                         }
                     }
@@ -1942,7 +1965,7 @@ fun BentoGridOverviewPanel(
                 Text(
                     text = "ሳምንታዊ የምርት እንቅስቃሴ (ኪ.ግ)",
                     style = MaterialTheme.typography.labelSmall,
-                    color = BentoSubText,
+                    color = Color(0xFF8C9E94),
                     fontWeight = FontWeight.Bold
                 )
                 Spacer(modifier = Modifier.height(10.dp))
@@ -1963,10 +1986,10 @@ fun BentoGridOverviewPanel(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(110.dp)
-                        .background(Color(0xFF030A07), RoundedCornerShape(12.dp))
-                        .border(1.dp, BentoBorder.copy(alpha = 0.5f), RoundedCornerShape(12.dp))
-                        .padding(horizontal = 10.dp, vertical = 12.dp),
+                        .height(120.dp)
+                        .background(Color(0xFF040605), RoundedCornerShape(16.dp))
+                        .border(1.5.dp, Color(0xFF122C20), RoundedCornerShape(16.dp))
+                        .padding(horizontal = 12.dp, vertical = 12.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.Bottom
                 ) {
@@ -1984,22 +2007,22 @@ fun BentoGridOverviewPanel(
                                 text = if (value > 0) "${value.toInt()}" else "-",
                                 style = MaterialTheme.typography.labelSmall,
                                 fontSize = 8.sp,
-                                color = if (value > 0) BentoSoftGreen else Color.Gray,
+                                color = if (value > 0) Color(0xFF00FF88) else Color.Gray,
                                 fontWeight = FontWeight.Bold,
                                 fontFamily = FontFamily.Monospace
                             )
                             Spacer(modifier = Modifier.height(4.dp))
                             
-                            // Bar representation
+                            // Bar representation with custom gradient green bars
                             Box(
                                 modifier = Modifier
                                     .width(14.dp)
-                                    .height((50.dp * fraction * chartBarScale).coerceAtLeast(3.dp))
+                                    .height((60.dp * fraction * chartBarScale).coerceAtLeast(3.dp))
                                     .background(
                                         brush = Brush.verticalGradient(
                                             colors = listOf(
-                                                BentoSoftGreen,
-                                                Color(0xFF0D1F17)
+                                                Color(0xFF00FF88),
+                                                Color(0xFF071F14)
                                             )
                                         ),
                                         shape = RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp)
@@ -2026,8 +2049,8 @@ fun BentoGridOverviewPanel(
                 .fillMaxWidth()
                 .testTag("shift_sheet_card"),
             shape = RoundedCornerShape(24.dp),
-            colors = CardDefaults.cardColors(containerColor = BentoNeutralGray),
-            border = BorderStroke(1.dp, BentoBorder)
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF080B10)),
+            border = BorderStroke(1.dp, Color(0xFF1E293B))
         ) {
             Column(
                 modifier = Modifier
@@ -2042,22 +2065,21 @@ fun BentoGridOverviewPanel(
                 ) {
                     Column {
                         Text(
-                            text = "የእለቱ የምርት መመዝገቢያ ሉህ", // translated
+                            text = "የእለቱ የምርት መመዝገቢያ ሉህ",
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.ExtraBold,
-                            color = BentoForestGreen,
+                            color = Color(0xFF00FF88),
                             letterSpacing = 1.sp
                         )
                     }
                     
                     Button(
                         onClick = { 
-                            // Quick Action to Trigger host AddProduct modal
                             onProductClick(Product(id = 0, name = "", size = "30x40", color = "Red", counter = 500, piecesPerBag = 100, bagWeightKg = 0.25, currentStock = 0))
                         },
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = BentoLightGreen,
-                            contentColor = BentoForestGreen
+                            containerColor = Color(0xFF122C20),
+                            contentColor = Color(0xFF00FF88)
                         ),
                         shape = RoundedCornerShape(12.dp),
                         contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
@@ -2065,18 +2087,18 @@ fun BentoGridOverviewPanel(
                     ) {
                         Icon(Icons.Default.Add, contentDescription = "Add New Product Size", modifier = Modifier.size(12.dp))
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text("አዲስ መጠን", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold) // translated
+                        Text("አዲስ መጠን", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
                     }
                 }
 
-                HorizontalDivider(color = BentoBorder.copy(alpha = 0.5f))
+                HorizontalDivider(color = Color(0xFF1E293B).copy(alpha = 0.5f))
 
                 if (products.isEmpty()) {
                     Box(
                         modifier = Modifier.fillMaxWidth().padding(vertical = 24.dp),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text("ምንም አይነት ምርት አልተመዘገበም። ለመጀመር «አዲስ መጠን» የሚለውን ይጫኑ።", style = MaterialTheme.typography.bodySmall, color = BentoSubText) // translated
+                        Text("ምንም አይነት ምርት አልተመዘገበም። ለመጀመር «አዲስ መጠን» የሚለውን ይጫኑ።", style = MaterialTheme.typography.bodySmall, color = Color(0xFF8C9E94))
                     }
                 }
 
@@ -2096,267 +2118,316 @@ fun BentoGridOverviewPanel(
                         fabVal == (todayTrans?.fabricated ?: 0) && sldVal == (todayTrans?.sold ?: 0)
                     }
 
+                    val savePulseTransition = rememberInfiniteTransition(label = "save_pulse")
+                    val savePulseScale by savePulseTransition.animateFloat(
+                        initialValue = 1.0f,
+                        targetValue = 1.15f,
+                        animationSpec = infiniteRepeatable(
+                            animation = tween(800, easing = FastOutSlowInEasing),
+                            repeatMode = RepeatMode.Reverse
+                        ),
+                        label = "save_scale"
+                    )
+                    val savePulseAlpha by savePulseTransition.animateFloat(
+                        initialValue = 0.6f,
+                        targetValue = 0.0f,
+                        animationSpec = infiniteRepeatable(
+                            animation = tween(800, easing = FastOutSlowInEasing),
+                            repeatMode = RepeatMode.Reverse
+                        ),
+                        label = "save_alpha"
+                    )
+
+                    // Product Card as dark glass card with left green accent border
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(containerColor = BentoBg.copy(alpha = 0.60f)),
-                        border = BorderStroke(1.5.dp, BentoBorder.copy(alpha = 0.5f))
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFF0F1215)),
+                        border = BorderStroke(1.dp, Color(0xFF1E293B).copy(alpha = 0.6f))
                     ) {
-                        Column(
-                            modifier = Modifier.fillMaxWidth().padding(16.dp),
-                            verticalArrangement = Arrangement.spacedBy(14.dp)
-                        ) {
-                            // Row 1: Header (Product Name)
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = "${product.name} (${product.color})",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    color = BentoTextDark
-                                )
-                            }
+                        Row(modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
+                            // Green left accent border
+                            Box(
+                                modifier = Modifier
+                                    .width(6.dp)
+                                    .fillMaxHeight()
+                                    .background(Color(0xFF00FF88))
+                            )
 
-                            // Dedicated Details & Stats Sheet (Size, Counter, Pieces Per Bag, Bag Weight, Stock)
                             Column(
                                 modifier = Modifier
-                                    .fillMaxWidth()
-                                    .background(Color(0xFF0F172A).copy(alpha = 0.5f), RoundedCornerShape(12.dp))
-                                    .border(1.dp, BentoBorder.copy(alpha = 0.3f), RoundedCornerShape(12.dp))
-                                    .padding(14.dp),
-                                verticalArrangement = Arrangement.spacedBy(10.dp) // Generous padding/spacing between each detail line
+                                    .weight(1f)
+                                    .padding(16.dp),
+                                verticalArrangement = Arrangement.spacedBy(14.dp)
                             ) {
-                                // 1. Size
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(
-                                        text = "መጠን (Size)", // Amharic & technical term
-                                        style = MaterialTheme.typography.bodyMedium, // Slightly larger text
-                                        color = BentoSubText,
-                                        fontWeight = FontWeight.Medium
-                                    )
-                                    Text(
-                                        text = "${product.size}",
-                                        style = MaterialTheme.typography.bodyMedium, // Slightly larger text
-                                        color = Color.White,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
+                                // Product name large and bold
+                                Text(
+                                    text = "${product.name} (${product.color})",
+                                    style = MaterialTheme.typography.titleLarge,
+                                    fontWeight = FontWeight.Black,
+                                    color = Color.White
+                                )
 
-                                // 2. Counter
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
+                                // Clearly spaced Product details sheet
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .background(Color(0xFF07090C), RoundedCornerShape(12.dp))
+                                        .border(1.dp, Color(0xFF1E293B).copy(alpha = 0.4f), RoundedCornerShape(12.dp))
+                                        .padding(14.dp),
+                                    verticalArrangement = Arrangement.spacedBy(10.dp)
                                 ) {
-                                    Text(
-                                        text = "ማሽን መቁጠሪያ", // Amharic
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = BentoSubText,
-                                        fontWeight = FontWeight.Medium
-                                    )
-                                    Text(
-                                        text = "${product.counter}",
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = Color.White,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
-
-                                // 3. Pieces Per Bag
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(
-                                        text = "በአንድ ሉህ የሚወጣው ብዛት", // Amharic
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = BentoSubText,
-                                        fontWeight = FontWeight.Medium
-                                    )
-                                    Text(
-                                        text = "${product.piecesPerBag}",
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = Color.White,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
-
-                                // 4. Bag Weight (kg)
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(
-                                        text = "የአንድ ባግ ክብደት (ኪ.ግ)", // Amharic
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = BentoSubText,
-                                        fontWeight = FontWeight.Medium
-                                    )
-                                    Text(
-                                        text = "${product.bagWeightKg} kg",
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = Color.White,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
-
-                                // 5. Current Stock Level (bags + kg in green)
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(
-                                        text = "አሁን በክምችት ላይ ያለው መጠን", // Amharic
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = BentoSubText,
-                                        fontWeight = FontWeight.Medium
-                                    )
-                                    Column(horizontalAlignment = Alignment.End) {
+                                    // 1. Size
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
                                         Text(
-                                            text = "${product.currentStock} ባጎች", // translated
+                                            text = "መጠን (Size)",
                                             style = MaterialTheme.typography.bodyMedium,
-                                            fontWeight = FontWeight.Bold,
-                                            color = BentoSoftGreen
+                                            color = Color(0xFF8C9E94),
+                                            fontWeight = FontWeight.Bold
                                         )
                                         Text(
-                                            text = "(${String.format("%.1f", product.currentStock * product.bagWeightKg)} ኪ.ግ)",
-                                            style = MaterialTheme.typography.labelSmall,
-                                            fontWeight = FontWeight.Bold,
-                                            color = BentoSoftGreen
+                                            text = product.size,
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = Color.White,
+                                            fontWeight = FontWeight.ExtraBold
                                         )
                                     }
-                                }
-                            }
 
-                            // Interactive Input Form Area
-                            Column(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                // Labels and Dynamic Calculated weight suffixes
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    val enteredFab = producedInput.toIntOrNull() ?: 0
-                                    val fabSuffix = if (enteredFab > 0) " (${String.format("%.1f", enteredFab * product.bagWeightKg)} ኪ.ግ)" else ""
-                                    Text(
-                                        text = "የተመረተ$fabSuffix",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = BentoForestGreen,
-                                        fontWeight = FontWeight.Bold,
-                                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                                        modifier = Modifier.weight(1.0f)
-                                    )
-
-                                    val enteredSold = soldInput.toIntOrNull() ?: 0
-                                    val soldSuffix = if (enteredSold > 0) " (${String.format("%.1f", enteredSold * product.bagWeightKg)} ኪ.ግ)" else ""
-                                    Text(
-                                        text = "የተሸጠ$soldSuffix", // changed from የተጫነ to የተሸጠ
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = BentoInfoText,
-                                        fontWeight = FontWeight.Bold,
-                                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                                        modifier = Modifier.weight(1.0f)
-                                    )
-                                    Spacer(modifier = Modifier.width(64.dp))
-                                }
-
-                                // Row 2: Inputs and save button in a sleek lower-height layout
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    // Bags Produced Input (Smaller in height)
-                                    OutlinedTextField(
-                                        value = producedInput,
-                                        onValueChange = { producedInput = it },
-                                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                        placeholder = { 
-                                            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                                Text("0", style = TextStyle(fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.Gray)) 
-                                            }
-                                        },
-                                        textStyle = TextStyle(fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White, textAlign = TextAlign.Center),
-                                        singleLine = true,
-                                        modifier = Modifier
-                                            .height(54.dp)
-                                            .weight(1.0f)
-                                            .testTag("sheet_fab_input_${product.id}"),
-                                        shape = RoundedCornerShape(10.dp),
-                                        colors = OutlinedTextFieldDefaults.colors(
-                                            focusedTextColor = Color.White,
-                                            unfocusedTextColor = Color.White,
-                                            focusedContainerColor = Color(0xFF1E293B),
-                                            unfocusedContainerColor = Color(0xFF1E293B),
-                                            focusedBorderColor = BentoForestGreen,
-                                            unfocusedBorderColor = BentoBorder,
-                                            focusedPlaceholderColor = Color.Gray,
-                                            unfocusedPlaceholderColor = Color.Gray
-                                        )
-                                    )
-
-                                    // Bags Sold Input (Smaller in height)
-                                    OutlinedTextField(
-                                        value = soldInput,
-                                        onValueChange = { soldInput = it },
-                                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                        placeholder = { 
-                                            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                                Text("0", style = TextStyle(fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.Gray)) 
-                                            }
-                                        },
-                                        textStyle = TextStyle(fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White, textAlign = TextAlign.Center),
-                                        singleLine = true,
-                                        modifier = Modifier
-                                            .height(54.dp)
-                                            .weight(1.0f)
-                                            .testTag("sheet_sold_input_${product.id}"),
-                                        shape = RoundedCornerShape(10.dp),
-                                        colors = OutlinedTextFieldDefaults.colors(
-                                            focusedTextColor = Color.White,
-                                            unfocusedTextColor = Color.White,
-                                            focusedContainerColor = Color(0xFF1E293B),
-                                            unfocusedContainerColor = Color(0xFF1E293B),
-                                            focusedBorderColor = BentoForestGreen,
-                                            unfocusedBorderColor = BentoBorder,
-                                            focusedPlaceholderColor = Color.Gray,
-                                            unfocusedPlaceholderColor = Color.Gray
-                                        )
-                                    )
-
-                                    // Interactive Quick Save Action Button
-                                    IconButton(
-                                        onClick = {
-                                            focusManager.clearFocus()
-                                            val fVal = producedInput.toIntOrNull() ?: 0
-                                            val sVal = soldInput.toIntOrNull() ?: 0
-                                            viewModel.recordProductDailyActivity(product.id, fVal, sVal, 0, "Daily entry update")
-                                        },
-                                        modifier = Modifier
-                                            .size(width = 56.dp, height = 54.dp)
-                                            .clip(RoundedCornerShape(10.dp))
-                                            .background(if (isSaved) Color(0xFF065F46) else BentoForestGreen)
-                                            .testTag("sheet_save_btn_${product.id}")
+                                    // 2. Counter
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        Icon(
-                                            imageVector = if (isSaved) Icons.Default.Check else Icons.Default.Done,
-                                            contentDescription = "Save values",
-                                            tint = Color.White,
-                                            modifier = Modifier.size(24.dp)
+                                        Text(
+                                            text = "ማሽን መቁጠሪያ (Counter)",
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = Color(0xFF8C9E94),
+                                            fontWeight = FontWeight.Bold
                                         )
+                                        Text(
+                                            text = "${product.counter}",
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = Color.White,
+                                            fontWeight = FontWeight.ExtraBold
+                                        )
+                                    }
+
+                                    // 3. Pieces per Bag
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = "ቁርጥራጮች (Pieces/Bag)",
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = Color(0xFF8C9E94),
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                        Text(
+                                            text = "${product.piecesPerBag}",
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = Color.White,
+                                            fontWeight = FontWeight.ExtraBold
+                                        )
+                                    }
+
+                                    // 4. Weight per Bag (kg)
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = "ክብደት (Weight/Bag)",
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = Color(0xFF8C9E94),
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                        Text(
+                                            text = "${product.bagWeightKg} kg",
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = Color.White,
+                                            fontWeight = FontWeight.ExtraBold
+                                        )
+                                    }
+
+                                    // 5. Stock Level (bags + kg in green)
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = "አሁን በክምችት ላይ ያለው (Stock)",
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = Color(0xFF8C9E94),
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                        Column(horizontalAlignment = Alignment.End) {
+                                            Text(
+                                                text = "${product.currentStock} ማዳበሪያ",
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                fontWeight = FontWeight.Black,
+                                                color = Color(0xFF00FF88)
+                                            )
+                                            Text(
+                                                text = "(${String.format("%.1f", product.currentStock * product.bagWeightKg)} ኪ.ግ)",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                fontWeight = FontWeight.Bold,
+                                                color = Color(0xFF00FF88)
+                                            )
+                                        }
+                                    }
+                                }
+
+                                // የተመረተ and የተሸጠ labels centered exactly above their input boxes with premium green focused borders
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    // Column 1: Produced label & Produced Input with premium green focused border
+                                    Column(
+                                        modifier = Modifier.weight(1f),
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        val enteredFab = producedInput.toIntOrNull() ?: 0
+                                        val fabSuffix = if (enteredFab > 0) " (${String.format("%.1f", enteredFab * product.bagWeightKg)}kg)" else ""
+                                        Text(
+                                            text = "የተመረተ$fabSuffix",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = Color(0xFF00FF88),
+                                            fontWeight = FontWeight.Black,
+                                            textAlign = TextAlign.Center
+                                        )
+                                        OutlinedTextField(
+                                            value = producedInput,
+                                            onValueChange = { producedInput = it },
+                                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                            placeholder = { 
+                                                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                                    Text("0", style = TextStyle(fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.Gray)) 
+                                                }
+                                            },
+                                            textStyle = TextStyle(fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White, textAlign = TextAlign.Center),
+                                            singleLine = true,
+                                            modifier = Modifier
+                                                .height(54.dp)
+                                                .fillMaxWidth()
+                                                .testTag("sheet_fab_input_${product.id}"),
+                                            shape = RoundedCornerShape(10.dp),
+                                            colors = OutlinedTextFieldDefaults.colors(
+                                                focusedTextColor = Color.White,
+                                                unfocusedTextColor = Color.White,
+                                                focusedContainerColor = Color(0xFF0D0F13),
+                                                unfocusedContainerColor = Color(0xFF050608),
+                                                focusedBorderColor = Color(0xFF00FF88), // Premium green focused border!
+                                                unfocusedBorderColor = Color(0xFF1E293B),
+                                                focusedPlaceholderColor = Color.Gray,
+                                                unfocusedPlaceholderColor = Color.Gray
+                                            )
+                                        )
+                                    }
+
+                                    // Column 2: Sold label & Sold Input with premium green focused border
+                                    Column(
+                                        modifier = Modifier.weight(1f),
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        val enteredSold = soldInput.toIntOrNull() ?: 0
+                                        val soldSuffix = if (enteredSold > 0) " (${String.format("%.1f", enteredSold * product.bagWeightKg)}kg)" else ""
+                                        Text(
+                                            text = "የተሸጠ$soldSuffix",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = Color(0xFF00FF88),
+                                            fontWeight = FontWeight.Black,
+                                            textAlign = TextAlign.Center
+                                        )
+                                        OutlinedTextField(
+                                            value = soldInput,
+                                            onValueChange = { soldInput = it },
+                                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                            placeholder = { 
+                                                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                                    Text("0", style = TextStyle(fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.Gray)) 
+                                                }
+                                            },
+                                            textStyle = TextStyle(fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White, textAlign = TextAlign.Center),
+                                            singleLine = true,
+                                            modifier = Modifier
+                                                .height(54.dp)
+                                                .fillMaxWidth()
+                                                .testTag("sheet_sold_input_${product.id}"),
+                                            shape = RoundedCornerShape(10.dp),
+                                            colors = OutlinedTextFieldDefaults.colors(
+                                                focusedTextColor = Color.White,
+                                                unfocusedTextColor = Color.White,
+                                                focusedContainerColor = Color(0xFF0D0F13),
+                                                unfocusedContainerColor = Color(0xFF050608),
+                                                focusedBorderColor = Color(0xFF00FF88), // Premium green focused border!
+                                                unfocusedBorderColor = Color(0xFF1E293B),
+                                                focusedPlaceholderColor = Color.Gray,
+                                                unfocusedPlaceholderColor = Color.Gray
+                                            )
+                                        )
+                                    }
+
+                                    // Save button with green success pulse animation
+                                    Column(
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        Text(
+                                            text = "",
+                                            style = MaterialTheme.typography.labelSmall
+                                        )
+                                        Box(
+                                            contentAlignment = Alignment.Center,
+                                            modifier = Modifier.size(width = 56.dp, height = 54.dp)
+                                        ) {
+                                            if (isSaved) {
+                                                // Glowing pulsing ring behind on save success
+                                                Box(
+                                                    modifier = Modifier
+                                                        .size(width = 56.dp, height = 54.dp)
+                                                        .scale(savePulseScale)
+                                                        .background(Color(0xFF00FF88).copy(alpha = savePulseAlpha), RoundedCornerShape(10.dp))
+                                                )
+                                            }
+                                            IconButton(
+                                                onClick = {
+                                                    focusManager.clearFocus()
+                                                    val fVal = producedInput.toIntOrNull() ?: 0
+                                                    val sVal = soldInput.toIntOrNull() ?: 0
+                                                    viewModel.recordProductDailyActivity(product.id, fVal, sVal, 0, "Daily entry update")
+                                                },
+                                                modifier = Modifier
+                                                    .fillMaxSize()
+                                                    .clip(RoundedCornerShape(10.dp))
+                                                    .background(if (isSaved) Color(0xFF00FF88) else Color(0xFF131A17))
+                                                    .border(
+                                                        width = 1.5.dp,
+                                                        color = if (isSaved) Color(0xFF00FF88) else Color(0xFF1E293B),
+                                                        shape = RoundedCornerShape(10.dp)
+                                                    )
+                                                    .testTag("sheet_save_btn_${product.id}")
+                                            ) {
+                                                Icon(
+                                                    imageVector = if (isSaved) Icons.Default.Check else Icons.Default.Done,
+                                                    contentDescription = "Save values",
+                                                    tint = if (isSaved) Color.Black else Color.White,
+                                                    modifier = Modifier.size(24.dp)
+                                                )
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -2365,36 +2436,36 @@ fun BentoGridOverviewPanel(
                 }
                 
                 // Card total summation line
-                HorizontalDivider(color = BentoBorder.copy(alpha = 0.5f))
+                HorizontalDivider(color = Color(0xFF1E293B).copy(alpha = 0.5f))
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(BentoLightGreen.copy(alpha = 0.15f), RoundedCornerShape(12.dp))
-                        .border(1.dp, BentoForestGreen.copy(alpha = 0.2f), RoundedCornerShape(12.dp))
+                        .background(Color(0xFF0E1411), RoundedCornerShape(12.dp))
+                        .border(1.dp, Color(0xFF122C20), RoundedCornerShape(12.dp))
                         .padding(12.dp),
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    Text("ነጠላ የምዝገባ ሉህ አጠቃላይ ድምር", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Black, color = BentoForestGreen)
+                    Text("ነጠላ የምዝገባ ሉህ አጠቃላይ ድምር", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Black, color = Color(0xFF00FF88))
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text("ዛሬ የተመረተ ጠቅላላ (ኪ.ግ)፦", style = MaterialTheme.typography.labelSmall, color = BentoTextDark)
-                        Text("${todayKgProduced.toInt()} ኪ.ግ", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = BentoForestGreen, fontFamily = FontFamily.Monospace)
+                        Text("ዛሬ የተመረተ ጠቅላላ (ኪ.ግ)፦", style = MaterialTheme.typography.labelSmall, color = Color.White)
+                        Text("${todayKgProduced.toInt()} ኪ.ግ", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = Color(0xFF00FF88), fontFamily = FontFamily.Monospace)
                     }
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text("ዛሬ የተሸጠ ጠቅላላ (ኪ.ግ)፦", style = MaterialTheme.typography.labelSmall, color = BentoTextDark)
-                        Text("${todayKgSold.toInt()} ኪ.ግ", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = BentoInfoText, fontFamily = FontFamily.Monospace)
+                        Text("ዛሬ የተሸጠ ጠቅላላ (ኪ.ግ)፦", style = MaterialTheme.typography.labelSmall, color = Color.White)
+                        Text("${todayKgSold.toInt()} ኪ.ግ", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = Color(0xFF00FF88), fontFamily = FontFamily.Monospace)
                     }
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text("በመጋዘን ላይ የሚገኝ ጠቅላላ ክምችት፦", style = MaterialTheme.typography.labelSmall, color = BentoTextDark)
-                        Text("${warehouseTotalKg.toInt()} ኪ.ግ", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = BentoForestGreen, fontFamily = FontFamily.Monospace)
+                        Text("በመጋዘን ላይ የሚገኝ ጠቅላላ ክምችት፦", style = MaterialTheme.typography.labelSmall, color = Color.White)
+                        Text("${warehouseTotalKg.toInt()} ኪ.ግ", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = Color(0xFF00FF88), fontFamily = FontFamily.Monospace)
                     }
                 }
             }
