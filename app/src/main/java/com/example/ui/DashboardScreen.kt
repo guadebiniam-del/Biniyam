@@ -21,6 +21,13 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
@@ -1491,51 +1498,178 @@ fun BentoGridOverviewPanel(
             .padding(horizontal = 16.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        
-        // Date active range indicator & Segment Selector
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 4.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = "Viewing details: ${stats.startDate} to ${stats.endDate}",
-                style = MaterialTheme.typography.labelSmall,
-                color = BentoSubText,
-                fontWeight = FontWeight.Medium
+        val periods = remember {
+            listOf(
+                Pair(MainViewModel.ReportPeriod.Daily, "Day"),
+                Pair(MainViewModel.ReportPeriod.Weekly, "Week"),
+                Pair(MainViewModel.ReportPeriod.Monthly, "Month"),
+                Pair(MainViewModel.ReportPeriod.Yearly, "Year")
             )
-            
-            Row(
+        }
+
+        // Calculate Ethiopian weekly production list
+        val weeklyDays = remember(selectedDateStr) {
+            val parts = selectedDateStr.split("-")
+            val ethYear = parts.getOrNull(0)?.toIntOrNull() ?: 2018
+            val ethMonth = parts.getOrNull(1)?.toIntOrNull() ?: 9
+            val ethDay = parts.getOrNull(2)?.toIntOrNull() ?: 22
+            val jdn = EthiopianCalendarHelper.ethiopianToJdn(ethYear, ethMonth, ethDay)
+            val dayOfWeek = (jdn + 1) % 7 // 0 is Sunday, 1 is Monday ... 6 is Saturday
+            val offsetToMonday = if (dayOfWeek == 0) 6 else dayOfWeek - 1
+            val mondayJdn = jdn - offsetToMonday
+            (0..6).map { i ->
+                val t = EthiopianCalendarHelper.jdnToEthiopian(mondayJdn + i)
+                String.format(Locale.US, "%04d-%02d-%02d", t.first, t.second, t.third)
+            }
+        }
+
+        val weeklyProductionData = remember(allTransactions, products, weeklyDays) {
+            weeklyDays.map { day ->
+                val dayTrans = allTransactions.filter { it.date == day }
+                dayTrans.sumOf { t ->
+                    val p = products.find { it.id == t.productId }
+                    t.fabricated * (p?.bagWeightKg ?: 0.5)
+                }
+            }
+        }
+
+        // 1. Beautiful Animated Summary Card & Period Pill Switcher Row
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(24.dp),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF0F121E)),
+            border = BorderStroke(1.dp, BentoBorder)
+        ) {
+            Box(
                 modifier = Modifier
-                    .background(Color.White, RoundedCornerShape(8.dp))
-                    .border(1.dp, BentoBorder, RoundedCornerShape(8.dp))
-                    .padding(2.dp),
-                horizontalArrangement = Arrangement.spacedBy(2.dp)
+                    .fillMaxWidth()
+                    .background(
+                        Brush.verticalGradient(
+                            colors = listOf(
+                                BentoLightGreen.copy(alpha = 0.25f),
+                                Color(0xFF0F121E)
+                            )
+                        )
+                    )
+                    .padding(16.dp)
             ) {
-                val periods = listOf(
-                    Pair(MainViewModel.ReportPeriod.Daily, "Day"),
-                    Pair(MainViewModel.ReportPeriod.Weekly, "Week"),
-                    Pair(MainViewModel.ReportPeriod.Monthly, "Month"),
-                    Pair(MainViewModel.ReportPeriod.Yearly, "Year")
-                )
-                periods.forEach { (periodType, label) ->
-                    val isSelected = reportPeriod == periodType
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // Small animated factory/machine icon (Rotating Mechanical Gear on Canvas)
+                        val infiniteRot = rememberInfiniteTransition(label = "gear_rot")
+                        val rotationAngle by infiniteRot.animateFloat(
+                            initialValue = 0f,
+                            targetValue = 360f,
+                            animationSpec = infiniteRepeatable(
+                                animation = tween(5000, easing = LinearEasing),
+                                repeatMode = RepeatMode.Restart
+                            ),
+                            label = "gear_angle"
+                        )
+
+                        Canvas(modifier = Modifier.size(38.dp)) {
+                            val center = Offset(size.width / 2, size.height / 2)
+                            val outerRadius = size.width * 0.45f
+                            val innerRadius = size.width * 0.25f
+                            val gearColor = BentoSoftGreen
+
+                            rotate(rotationAngle, pivot = center) {
+                                drawCircle(
+                                    color = gearColor,
+                                    radius = size.width * 0.12f,
+                                    center = center,
+                                    style = Stroke(width = 3.dp.toPx())
+                                )
+                                drawCircle(
+                                    color = gearColor,
+                                    radius = innerRadius,
+                                    center = center,
+                                    style = Stroke(width = 3.5.dp.toPx())
+                                )
+                                for (i in 0 until 8) {
+                                    val angleDeg = i * 45f
+                                    val angleRad = Math.toRadians(angleDeg.toDouble())
+                                    val startX = center.x + innerRadius * Math.cos(angleRad).toFloat()
+                                    val startY = center.y + innerRadius * Math.sin(angleRad).toFloat()
+                                    val endX = center.x + outerRadius * Math.cos(angleRad).toFloat()
+                                    val endY = center.y + outerRadius * Math.sin(angleRad).toFloat()
+                                    drawLine(
+                                        color = gearColor,
+                                        start = Offset(startX, startY),
+                                        end = Offset(endX, endY),
+                                        strokeWidth = 5.dp.toPx(),
+                                        cap = StrokeCap.Round
+                                    )
+                                }
+                            }
+                        }
+
+                        Column {
+                            Text(
+                                text = "ANWAR INDUSTRIAL CONSOLE",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = BentoGold,
+                                letterSpacing = 1.sp
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = EthiopianCalendarHelper.formatEthiopianDateFriendly(selectedDateStr),
+                                style = MaterialTheme.typography.bodyLarge,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = Color.White
+                            )
+                        }
+                    }
+
+                    // Slide anim premium switcher
+                    val selectedIndex = periods.indexOfFirst { it.first == reportPeriod }.coerceAtLeast(0)
                     Box(
                         modifier = Modifier
-                            .clip(RoundedCornerShape(6.dp))
-                            .background(if (isSelected) BentoForestGreen else Color.Transparent)
-                            .clickable { onPeriodSelect(periodType) }
-                            .padding(horizontal = 8.dp, vertical = 4.dp)
-                            .testTag("scope_tab_$label")
+                            .background(Color(0xFF161618), RoundedCornerShape(20.dp))
+                            .border(1.dp, BentoBorder, RoundedCornerShape(20.dp))
+                            .padding(2.dp)
                     ) {
-                        Text(
-                            text = label,
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = if (isSelected) Color.White else BentoSubText
+                        val indicatorOffset by animateDpAsState(
+                            targetValue = (56.dp * selectedIndex),
+                            animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+                            label = "pill_offset"
                         )
+                        Box(
+                            modifier = Modifier
+                                .offset(x = indicatorOffset)
+                                .size(width = 54.dp, height = 26.dp)
+                                .background(BentoForestGreen, RoundedCornerShape(16.dp))
+                        )
+                        Row(horizontalArrangement = Arrangement.spacedBy(0.dp)) {
+                            periods.forEachIndexed { idx, (prodPeriod, label) ->
+                                Box(
+                                    modifier = Modifier
+                                        .size(width = 54.dp, height = 26.dp)
+                                        .clickable(
+                                            interactionSource = remember { MutableInteractionSource() },
+                                            indication = null
+                                        ) {
+                                            onPeriodSelect(prodPeriod)
+                                        },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = label,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (reportPeriod == prodPeriod) Color.White else BentoSubText
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -1578,11 +1712,6 @@ fun BentoGridOverviewPanel(
                         fontWeight = FontWeight.ExtraBold,
                         color = if (isSunday) BentoAlertText else BentoForestGreen
                     )
-                    Text(
-                        text = if (isSunday) "All years work schedule operates Monday-Saturday. Enjoy your weekly rest!" else "Fill industrial bag production, weights, sales numbers and stock targets seamlessly.",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = BentoSubText
-                    )
                 }
             }
         }
@@ -1592,35 +1721,224 @@ fun BentoGridOverviewPanel(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
+            val neonTransition = rememberInfiniteTransition(label = "glow_kpi")
+            val neonAlpha by neonTransition.animateFloat(
+                initialValue = 0.25f,
+                targetValue = 0.95f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(1200, easing = FastOutSlowInEasing),
+                    repeatMode = RepeatMode.Reverse
+                ),
+                label = "neon_pulse"
+            )
+
+            // Total Produced
             Card(
                 modifier = Modifier.weight(1f),
                 shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(containerColor = BentoLightGreen.copy(alpha = 0.2f)),
-                border = BorderStroke(1.dp, BentoForestGreen.copy(alpha = 0.3f))
+                colors = CardDefaults.cardColors(containerColor = BentoLightGreen.copy(alpha = 0.25f)),
+                border = BorderStroke(1.5.dp, BentoSoftGreen.copy(alpha = neonAlpha))
             ) {
                 Column(modifier = Modifier.padding(14.dp)) {
-                    Text("TOTAL PRODUCED", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.ExtraBold, color = BentoForestGreen)
+                    Text(
+                        text = "TOTAL PRODUCED",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = BentoSoftGreen
+                    )
                     Spacer(modifier = Modifier.height(4.dp))
-                    AnimatedCounterText(targetValue = todayKgProduced.toInt(), suffix = " KG", style = MaterialTheme.typography.displayMedium, color = BentoForestGreen)
+                    AnimatedCounterText(
+                        targetValue = todayKgProduced.toInt(),
+                        suffix = " KG",
+                        style = MaterialTheme.typography.displayMedium,
+                        color = BentoSoftGreen
+                    )
                     Text("Fabricated Today", style = MaterialTheme.typography.labelSmall, color = BentoSubText)
                 }
             }
+
+            // Total Sold
             Card(
                 modifier = Modifier.weight(1f),
                 shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(containerColor = BentoInfoBg.copy(alpha = 0.2f)),
-                border = BorderStroke(1.dp, BentoInfoText.copy(alpha = 0.3f))
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF0F121E)),
+                border = BorderStroke(1.5.dp, BentoForestGreen.copy(alpha = neonAlpha / 2f))
             ) {
                 Column(modifier = Modifier.padding(14.dp)) {
-                    Text("TOTAL SOLD", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.ExtraBold, color = BentoInfoText)
+                    Text(
+                        text = "TOTAL SOLD",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = BentoForestGreen
+                    )
                     Spacer(modifier = Modifier.height(4.dp))
-                    AnimatedCounterText(targetValue = todayKgSold.toInt(), suffix = " KG", style = MaterialTheme.typography.displayMedium, color = BentoInfoText)
+                    AnimatedCounterText(
+                        targetValue = todayKgSold.toInt(),
+                        suffix = " KG",
+                        style = MaterialTheme.typography.displayMedium,
+                        color = Color.White
+                    )
                     Text("Shipped Today", style = MaterialTheme.typography.labelSmall, color = BentoSubText)
                 }
             }
         }
 
-        // --- WEEKLY AND MONTHLY PRODUCTION ACHIEVEMENTS ---
+        // --- LIVE ANIMATED WEEKLY PRODUCTION GRAPH ---
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(24.dp),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF0F121E)),
+            border = BorderStroke(1.dp, BentoBorder)
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text(
+                            text = "WEEKLY YIELD TRACKING",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = BentoGold,
+                            letterSpacing = 1.sp
+                        )
+                        Text(
+                            text = "Daily raw material & compound fabrications",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = BentoSubText
+                        )
+                    }
+                    Box(
+                        modifier = Modifier
+                            .background(BentoForestGreen.copy(alpha = 0.15f), RoundedCornerShape(6.dp))
+                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                    ) {
+                        Text(
+                            text = "LIVE GRAPH",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = BentoSoftGreen,
+                            fontWeight = FontWeight.Black
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(18.dp))
+
+                var chartAnimationTrigger by remember { mutableStateOf(false) }
+                LaunchedEffect(Unit) {
+                    chartAnimationTrigger = true
+                }
+                val chartProgress by animateFloatAsState(
+                    targetValue = if (chartAnimationTrigger) 1f else 0f,
+                    animationSpec = tween(1500, easing = FastOutSlowInEasing),
+                    label = "bar_chart_elevation"
+                )
+
+                val maxProductKg = remember(weeklyProductionData) {
+                    val mx = weeklyProductionData.maxOrNull() ?: 0.0
+                    if (mx == 0.0) 1000.0 else mx
+                }
+
+                Canvas(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(120.dp)
+                ) {
+                    val width = size.width
+                    val height = size.height
+                    val paddingLeft = 45.dp.toPx()
+                    val paddingRight = 10.dp.toPx()
+                    val paddingTop = 10.dp.toPx()
+                    val paddingBottom = 20.dp.toPx()
+
+                    val graphWidth = width - paddingLeft - paddingRight
+                    val graphHeight = height - paddingTop - paddingBottom
+
+                    // Draw subtle grid lines (0%, 50%, 100%)
+                    val steps = 3
+                    for (i in 0 until steps) {
+                        val frac = i.toFloat() / (steps - 1)
+                        val y = paddingTop + graphHeight * (1f - frac)
+                        
+                        drawLine(
+                            color = BentoBorder.copy(alpha = 0.35f),
+                            start = Offset(paddingLeft, y),
+                            end = Offset(width - paddingRight, y),
+                            strokeWidth = 1.dp.toPx()
+                        )
+                    }
+
+                    // Render Bars
+                    val barCount = 7
+                    val spacing = graphWidth / barCount
+                    val barWidth = 18.dp.toPx()
+
+                    for (i in 0 until barCount) {
+                        val kg = weeklyProductionData.getOrElse(i) { 0.0 }
+                        val activeHeight = (kg / maxProductKg).toFloat() * graphHeight * chartProgress
+                        
+                        val x = paddingLeft + (i * spacing) + (spacing - barWidth) / 2
+
+                        // Draw background track
+                        drawRoundRect(
+                            color = BentoBorder.copy(alpha = 0.2f),
+                            topLeft = Offset(x, paddingTop),
+                            size = Size(barWidth, graphHeight),
+                            cornerRadius = CornerRadius(4.dp.toPx(), 4.dp.toPx())
+                        )
+
+                        // Draw glowing bar
+                        if (activeHeight > 0f) {
+                            val rectTop = paddingTop + graphHeight - activeHeight
+                            drawRoundRect(
+                                brush = Brush.verticalGradient(
+                                    colors = listOf(BentoSoftGreen, BentoForestGreen)
+                                ),
+                                topLeft = Offset(x, rectTop),
+                                size = Size(barWidth, activeHeight),
+                                cornerRadius = CornerRadius(4.dp.toPx(), 4.dp.toPx())
+                            )
+                        }
+                    }
+                }
+
+                // Labels beneath graph
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = 45.dp, end = 10.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    val amharicDays = listOf("ሰኞ", "ማክ", "ረቡ", "ሐሙ", "አርብ", "ቅዳ", "እሁ")
+                    amharicDays.forEachIndexed { idx, day ->
+                        val isToday = idx == remember(selectedDateStr) {
+                            val parts = selectedDateStr.split("-")
+                            val y = parts.getOrNull(0)?.toIntOrNull() ?: 2018
+                            val m = parts.getOrNull(1)?.toIntOrNull() ?: 9
+                            val d = parts.getOrNull(2)?.toIntOrNull() ?: 22
+                            val jdn = EthiopianCalendarHelper.ethiopianToJdn(y, m, d)
+                            val dayOfWeek = (jdn + 1) % 7 // 0 is Sunday, 1 is Monday...
+                            if (dayOfWeek == 0) 6 else dayOfWeek - 1
+                        }
+                        Box(
+                            modifier = Modifier.width(18.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = day,
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = if (isToday) FontWeight.ExtraBold else FontWeight.Medium,
+                                color = if (isToday) BentoSoftGreen else BentoSubText
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        // --- FACTORY PERFORMANCE SUMMARY ---
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(24.dp),
@@ -1635,21 +1953,80 @@ fun BentoGridOverviewPanel(
                     color = BentoForestGreen,
                     letterSpacing = 1.sp
                 )
-                Spacer(modifier = Modifier.height(10.dp))
+                Spacer(modifier = Modifier.height(14.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
+                    // Left: Monthly & Weekly stats
                     Column(modifier = Modifier.weight(1f)) {
-                        Text("WEEKLY TOTALS", style = MaterialTheme.typography.labelSmall, color = BentoSubText, fontWeight = FontWeight.Bold)
-                        Text("${weekKg.toInt()} kg", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.ExtraBold, color = BentoTextDark)
-                        Text("$weekBags bags fabricated", style = MaterialTheme.typography.labelSmall, color = BentoSubText)
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("WEEKLY TOTALS", style = MaterialTheme.typography.labelSmall, color = BentoSubText, fontWeight = FontWeight.Bold)
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text("${weekKg.toInt()} kg", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold, color = BentoTextDark)
+                                Text("$weekBags bags fabricated", style = MaterialTheme.typography.labelSmall, color = BentoSubText)
+                            }
+                            Box(modifier = Modifier.width(1.dp).height(50.dp).background(BentoBorder))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("MONTHLY TOTALS", style = MaterialTheme.typography.labelSmall, color = BentoSubText, fontWeight = FontWeight.Bold)
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text("${monthKg.toInt()} kg", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold, color = BentoTextDark)
+                                Text("$monthBags bags fabricated", style = MaterialTheme.typography.labelSmall, color = BentoSubText)
+                            }
+                        }
                     }
-                    Box(modifier = Modifier.width(1.dp).height(50.dp).background(BentoBorder))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text("MONTHLY TOTALS", style = MaterialTheme.typography.labelSmall, color = BentoSubText, fontWeight = FontWeight.Bold)
-                        Text("${monthKg.toInt()} kg", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.ExtraBold, color = BentoTextDark)
-                        Text("$monthBags bags fabricated", style = MaterialTheme.typography.labelSmall, color = BentoSubText)
+
+                    // Right: Circular Progress Ring (Monthly Target progress fraction)
+                    val monthlyTarget = 20000.0
+                    val progressFraction = (monthKg / monthlyTarget).coerceIn(0.0, 1.0).toFloat()
+                    val animatedProgressFraction by animateFloatAsState(
+                        targetValue = progressFraction,
+                        animationSpec = tween(1500, easing = FastOutSlowInEasing),
+                        label = "circular_progress_anim"
+                    )
+
+                    Box(
+                        modifier = Modifier
+                            .size(70.dp)
+                            .background(Color.Black.copy(alpha = 0.3f), CircleShape)
+                            .border(1.dp, BentoBorder, CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Canvas(modifier = Modifier.size(54.dp)) {
+                            // Grey track ring
+                            drawCircle(
+                                color = BentoBorder,
+                                radius = size.width / 2,
+                                style = Stroke(width = 5.dp.toPx())
+                            )
+                            // Green glowing ring progress arc
+                            drawArc(
+                                color = BentoSoftGreen,
+                                startAngle = -90f,
+                                sweepAngle = animatedProgressFraction * 360f,
+                                useCenter = false,
+                                style = Stroke(width = 5.dp.toPx(), cap = StrokeCap.Round)
+                            )
+                        }
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(
+                                text = "${(progressFraction * 100).toInt()}%",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Black,
+                                color = Color.White
+                            )
+                            Text(
+                                text = "TARGET",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontSize = 8.sp,
+                                color = BentoSubText
+                            )
+                        }
                     }
                 }
             }
@@ -1682,11 +2059,6 @@ fun BentoGridOverviewPanel(
                             fontWeight = FontWeight.ExtraBold,
                             color = BentoForestGreen,
                             letterSpacing = 1.sp
-                        )
-                        Text(
-                            text = "Record item counts for selected day",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = BentoSubText
                         )
                     }
                     
