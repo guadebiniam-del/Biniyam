@@ -31,6 +31,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.SpanStyle
@@ -769,53 +770,91 @@ fun DashboardScreen(
                                             )
 
                                             val daysRemaining = 30 - ethDay
-                                            if (ethDay == 30) {
-                                                Box(
-                                                    modifier = Modifier
-                                                        .fillMaxWidth()
-                                                        .background(BentoForestGreen.copy(alpha = 0.15f), RoundedCornerShape(12.dp))
-                                                        .border(1.dp, BentoForestGreen, RoundedCornerShape(12.dp))
-                                                        .padding(vertical = 12.dp, horizontal = 16.dp),
-                                                    contentAlignment = Alignment.Center
+                                            val progressPayday = (ethDay.toFloat() / 30f).coerceIn(0f, 1f)
+                                            val animationProgressPayday by animateFloatAsState(
+                                                targetValue = progressPayday,
+                                                animationSpec = tween(1200, easing = FastOutSlowInEasing),
+                                                label = "payday_bar"
+                                            )
+
+                                            Spacer(modifier = Modifier.height(10.dp))
+
+                                            Column(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .background(Color(0xFF030D08), RoundedCornerShape(14.dp))
+                                                    .border(1.2.dp, BentoBorder, RoundedCornerShape(14.dp))
+                                                    .padding(14.dp),
+                                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                                            ) {
+                                                Row(
+                                                    modifier = Modifier.fillMaxWidth(),
+                                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                                    verticalAlignment = Alignment.CenterVertically
                                                 ) {
                                                     Text(
-                                                        text = "🎉 ዛሬ የደሞዝ ቀን ነው!",
-                                                        style = MaterialTheme.typography.bodyMedium,
+                                                        text = "የክፍያ ዑደት መቁጠሪያ (Payday)",
+                                                        style = MaterialTheme.typography.labelSmall,
+                                                        color = BentoSubText,
+                                                        fontWeight = FontWeight.Bold
+                                                    )
+                                                    Text(
+                                                        text = "$ethDay / 30 ቀን",
+                                                        style = MaterialTheme.typography.labelSmall,
+                                                        color = BentoSoftGreen,
                                                         fontWeight = FontWeight.Black,
-                                                        color = BentoSoftGreen
+                                                        fontFamily = FontFamily.Monospace
                                                     )
                                                 }
-                                            } else if (daysRemaining > 0) {
+
+                                                // Smooth glass linear loader bar
                                                 Box(
                                                     modifier = Modifier
                                                         .fillMaxWidth()
-                                                        .background(Color(0xFF1E293B), RoundedCornerShape(12.dp))
-                                                        .border(1.dp, BentoBorder.copy(alpha = 0.4f), RoundedCornerShape(12.dp))
-                                                        .padding(vertical = 12.dp, horizontal = 16.dp),
-                                                    contentAlignment = Alignment.Center
+                                                        .height(10.dp)
+                                                        .background(Color(0xFF1E293B), RoundedCornerShape(50.dp))
                                                 ) {
-                                                    Text(
-                                                        text = "ደሞዝ ቀን፡ ቀን 30 - $daysRemaining ቀናት ይቀራሉ",
-                                                        style = MaterialTheme.typography.bodyMedium,
-                                                        fontWeight = FontWeight.Bold,
-                                                        color = Color.White
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .fillMaxWidth(animationProgressPayday)
+                                                            .fillMaxHeight()
+                                                            .background(
+                                                                brush = Brush.horizontalGradient(
+                                                                    colors = listOf(BentoForestGreen, BentoSoftGreen)
+                                                                ),
+                                                                shape = RoundedCornerShape(50.dp)
+                                                            )
                                                     )
                                                 }
-                                            } else {
-                                                Box(
-                                                    modifier = Modifier
-                                                        .fillMaxWidth()
-                                                        .background(Color(0xFF1E293B), RoundedCornerShape(12.dp))
-                                                        .border(1.dp, BentoBorder.copy(alpha = 0.4f), RoundedCornerShape(12.dp))
-                                                        .padding(vertical = 12.dp, horizontal = 16.dp),
-                                                    contentAlignment = Alignment.Center
-                                                ) {
-                                                    Text(
-                                                        text = "የደሞዝ ክፍያ ቀን አልፏል (ቀን 30)",
-                                                        style = MaterialTheme.typography.bodyMedium,
-                                                        fontWeight = FontWeight.Bold,
-                                                        color = BentoSubText
-                                                    )
+
+                                                if (ethDay == 30) {
+                                                    Row(
+                                                        verticalAlignment = Alignment.CenterVertically,
+                                                        modifier = Modifier.padding(top = 4.dp)
+                                                    ) {
+                                                        Text("🎉", fontSize = 16.sp)
+                                                        Spacer(modifier = Modifier.width(6.dp))
+                                                        Text(
+                                                            text = "ዛሬ የዘወር ክፍያ (ደሞዝ) ቀን ነው! ክፍያዎችን ያደራጁ::",
+                                                            style = MaterialTheme.typography.bodySmall,
+                                                            fontWeight = FontWeight.Bold,
+                                                            color = BentoSoftGreen
+                                                        )
+                                                    }
+                                                } else {
+                                                    Row(
+                                                        verticalAlignment = Alignment.CenterVertically,
+                                                        modifier = Modifier.padding(top = 4.dp)
+                                                    ) {
+                                                        Text("⏱️", fontSize = 14.sp)
+                                                        Spacer(modifier = Modifier.width(6.dp))
+                                                        Text(
+                                                            text = "ለሚቀጥለው ክፍያ ቀሪ ቀናት፦ $daysRemaining ቀናት ይቀራሉ",
+                                                            style = MaterialTheme.typography.bodySmall,
+                                                            fontWeight = FontWeight.Bold,
+                                                            color = Color.White
+                                                        )
+                                                    }
                                                 }
                                             }
                                         }
@@ -891,14 +930,6 @@ fun DashboardScreen(
                                                             fontWeight = if (absentDays > 0) FontWeight.Bold else FontWeight.Normal,
                                                             color = if (absentDays > 0) BentoAlertText else BentoSubText
                                                         )
-
-                                                        Text(
-                                                            text = "የተሰራ ቀን፡ $daysWorkedSoFar ቀን",
-                                                            style = MaterialTheme.typography.bodySmall,
-                                                            fontWeight = FontWeight.Medium,
-                                                            color = BentoSoftGreen
-                                                        )
-
                                                         Row(
                                                             horizontalArrangement = Arrangement.spacedBy(4.dp),
                                                             verticalAlignment = Alignment.CenterVertically
@@ -933,22 +964,23 @@ fun DashboardScreen(
                                                         Text(
                                                             text = "${String.format("%.2f", earnedSalary)} ብር",
                                                             style = MaterialTheme.typography.titleLarge,
-                                                            fontWeight = FontWeight.ExtraBold,
-                                                            color = if (absentDays > 0) BentoAlertText else BentoSoftGreen
+                                                            fontWeight = FontWeight.Black,
+                                                            color = BentoGold, // Large gold colored text
+                                                            fontFamily = FontFamily.Monospace
                                                         )
 
                                                         if (absentDays > 0) {
                                                             Text(
-                                                                text = "ቅጣት፡ -${String.format("%.2f", deduction)} ብር",
+                                                                text = "ቅጣት (ቅነሳ)፦ -${String.format("%.2f", deduction)} ብር",
                                                                 style = MaterialTheme.typography.bodySmall,
                                                                 fontWeight = FontWeight.Bold,
-                                                                color = BentoAlertText
+                                                                color = BentoAlertText, // Red warning deduction
+                                                                fontFamily = FontFamily.Monospace
                                                             )
                                                         }
                                                     }
                                                 }
                                             }
-
                                             if (idx < activeWorkers.size - 1) {
                                                 HorizontalDivider(
                                                     color = BentoForestGreen.copy(alpha = 0.3f),
@@ -1449,6 +1481,22 @@ fun BentoGridOverviewPanel(
     val allTransactions = viewModel.allProductTransactions.collectAsStateWithLifecycle().value
     val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
 
+    // Live ticking traditional Ethiopian clock (offset by 6 hours from system time)
+    var clockTime by remember { mutableStateOf("") }
+    LaunchedEffect(Unit) {
+        while (true) {
+            val calendar = java.util.Calendar.getInstance()
+            val sec = calendar.get(java.util.Calendar.SECOND)
+            val min = calendar.get(java.util.Calendar.MINUTE)
+            val hr = calendar.get(java.util.Calendar.HOUR_OF_DAY)
+            val ethHr = if (hr >= 6) hr - 6 else hr + 18
+            val ethDayNightSuffix = if (hr in 6..17) "ቀን" else "ማታ"
+            val displayEthHr = if (ethHr > 12) ethHr - 12 else if (ethHr == 0) 12 else ethHr
+            clockTime = String.format("%02d:%02d:%02d %s", displayEthHr, min, sec, ethDayNightSuffix)
+            kotlinx.coroutines.delay(1000)
+        }
+    }
+
     // Let's compute weekly and monthly targets based on selectedDateStr and allTransactions
     val isSunday = remember(selectedDateStr) {
         val parts = selectedDateStr.split("-")
@@ -1624,7 +1672,7 @@ fun BentoGridOverviewPanel(
 
                         Column {
                             Text(
-                                text = "ANWAR INDUSTRIAL CONSOLE",
+                                text = "የአንዋር ማምረቻ ማዕከል", // translated
                                 style = MaterialTheme.typography.labelSmall,
                                 fontWeight = FontWeight.Bold,
                                 color = BentoGold,
@@ -1632,8 +1680,8 @@ fun BentoGridOverviewPanel(
                             )
                             Spacer(modifier = Modifier.height(2.dp))
                             Text(
-                                text = EthiopianCalendarHelper.formatEthiopianDateFriendly(selectedDateStr),
-                                style = MaterialTheme.typography.bodyLarge,
+                                text = if (clockTime.isNotEmpty()) "ሰዓት፡ $clockTime | " + EthiopianCalendarHelper.formatEthiopianDateFriendly(selectedDateStr) else EthiopianCalendarHelper.formatEthiopianDateFriendly(selectedDateStr),
+                                style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.ExtraBold,
                                 color = Color.White
                             )
@@ -1718,7 +1766,7 @@ fun BentoGridOverviewPanel(
                 }
                 Column(modifier = Modifier.weight(1.0f)) {
                     Text(
-                        text = if (isSunday) "SUNDAY BREAK — OPERATIONS PAUSED" else "ACTIVE SHIFT RECORD",
+                        text = if (isSunday) "የእሁድ እረፍት — ስራዎች በጊዜያዊነት ቆመዋል" else "ንቁ የስራ እንቅስቃሴ መዝገብ",
                         style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.ExtraBold,
                         color = if (isSunday) BentoAlertText else BentoForestGreen
@@ -1752,7 +1800,7 @@ fun BentoGridOverviewPanel(
             ) {
                 Column(modifier = Modifier.padding(14.dp)) {
                     Text(
-                        text = "TOTAL PRODUCED",
+                        text = "ጠቅላላ የተመረተ", // translated
                         style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.ExtraBold,
                         color = BentoSoftGreen
@@ -1760,11 +1808,11 @@ fun BentoGridOverviewPanel(
                     Spacer(modifier = Modifier.height(4.dp))
                     AnimatedCounterText(
                         targetValue = todayKgProduced.toInt(),
-                        suffix = " KG",
+                        suffix = " ኪ.ግ", // translated
                         style = MaterialTheme.typography.displayMedium,
                         color = BentoSoftGreen
                     )
-                    Text("Fabricated Today", style = MaterialTheme.typography.labelSmall, color = BentoSubText)
+                    Text("ዛሬ የተመረተ", style = MaterialTheme.typography.labelSmall, color = BentoSubText) // translated
                 }
             }
 
@@ -1777,7 +1825,7 @@ fun BentoGridOverviewPanel(
             ) {
                 Column(modifier = Modifier.padding(14.dp)) {
                     Text(
-                        text = "TOTAL SOLD",
+                        text = "ጠቅላላ የተሸጠ", // translated
                         style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.ExtraBold,
                         color = BentoForestGreen
@@ -1785,11 +1833,11 @@ fun BentoGridOverviewPanel(
                     Spacer(modifier = Modifier.height(4.dp))
                     AnimatedCounterText(
                         targetValue = todayKgSold.toInt(),
-                        suffix = " KG",
+                        suffix = " ኪ.ግ", // translated
                         style = MaterialTheme.typography.displayMedium,
                         color = Color.White
                     )
-                    Text("Shipped Today", style = MaterialTheme.typography.labelSmall, color = BentoSubText)
+                    Text("ዛሬ የተሸጠ", style = MaterialTheme.typography.labelSmall, color = BentoSubText) // translated
                 }
             }
         }
@@ -1805,7 +1853,7 @@ fun BentoGridOverviewPanel(
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Text(
-                    text = "FACTORY PERFORMANCE SUMMARY",
+                    text = "የማምረቻ ማጠቃለያና ግምገማ", // translated (Factory Performance Summary)
                     style = MaterialTheme.typography.labelSmall,
                     fontWeight = FontWeight.ExtraBold,
                     color = BentoForestGreen,
@@ -1824,17 +1872,17 @@ fun BentoGridOverviewPanel(
                             horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
                             Column(modifier = Modifier.weight(1f)) {
-                                Text("WEEKLY TOTALS", style = MaterialTheme.typography.labelSmall, color = BentoSubText, fontWeight = FontWeight.Bold)
+                                Text("የሳምንት ጠቅላላ", style = MaterialTheme.typography.labelSmall, color = BentoSubText, fontWeight = FontWeight.Bold)
                                 Spacer(modifier = Modifier.height(4.dp))
-                                Text("${weekKg.toInt()} kg", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold, color = BentoTextDark)
-                                Text("$weekBags bags fabricated", style = MaterialTheme.typography.labelSmall, color = BentoSubText)
+                                Text("${weekKg.toInt()} ኪ.ግ", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold, color = BentoTextDark, fontFamily = FontFamily.Monospace)
+                                Text("$weekBags ማዳበሪያ", style = MaterialTheme.typography.labelSmall, color = BentoSubText)
                             }
                             Box(modifier = Modifier.width(1.dp).height(50.dp).background(BentoBorder))
                             Column(modifier = Modifier.weight(1f)) {
-                                Text("MONTHLY TOTALS", style = MaterialTheme.typography.labelSmall, color = BentoSubText, fontWeight = FontWeight.Bold)
+                                Text("የወር ጠቅላላ", style = MaterialTheme.typography.labelSmall, color = BentoSubText, fontWeight = FontWeight.Bold)
                                 Spacer(modifier = Modifier.height(4.dp))
-                                Text("${monthKg.toInt()} kg", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold, color = BentoTextDark)
-                                Text("$monthBags bags fabricated", style = MaterialTheme.typography.labelSmall, color = BentoSubText)
+                                Text("${monthKg.toInt()} ኪ.ግ", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold, color = BentoTextDark, fontFamily = FontFamily.Monospace)
+                                Text("$monthBags ማዳበሪያ", style = MaterialTheme.typography.labelSmall, color = BentoSubText)
                             }
                         }
                     }
@@ -1876,13 +1924,95 @@ fun BentoGridOverviewPanel(
                                 text = "${(progressFraction * 100).toInt()}%",
                                 style = MaterialTheme.typography.labelSmall,
                                 fontWeight = FontWeight.Black,
-                                color = Color.White
+                                color = Color.White,
+                                fontFamily = FontFamily.Monospace
                             )
                             Text(
-                                text = "TARGET",
+                                text = "ግብ", // Target
                                 style = MaterialTheme.typography.labelSmall,
                                 fontSize = 8.sp,
                                 color = BentoSubText
+                            )
+                        }
+                    }
+                }
+
+                // Interactive Premium Weekly Bar Chart
+                Spacer(modifier = Modifier.height(20.dp))
+                Text(
+                    text = "ሳምንታዊ የምርት እንቅስቃሴ (ኪ.ግ)",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = BentoSubText,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(10.dp))
+
+                var chartAnimateTrigger by remember { mutableStateOf(false) }
+                LaunchedEffect(Unit) {
+                    chartAnimateTrigger = true
+                }
+                val chartBarScale by animateFloatAsState(
+                    targetValue = if (chartAnimateTrigger) 1f else 0.05f,
+                    animationSpec = tween(1400, easing = FastOutSlowInEasing),
+                    label = "chart_bars_scale"
+                )
+
+                val amharicDays = listOf("ሰኞ", "ማክሰ", "ረቡዕ", "ሐሙስ", "አርብ", "ቅዳሜ", "እሁድ")
+                val maxDayProd = weeklyProductionData.maxOrNull()?.coerceAtLeast(1.0) ?: 1.0
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(110.dp)
+                        .background(Color(0xFF030A07), RoundedCornerShape(12.dp))
+                        .border(1.dp, BentoBorder.copy(alpha = 0.5f), RoundedCornerShape(12.dp))
+                        .padding(horizontal = 10.dp, vertical = 12.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.Bottom
+                ) {
+                    weeklyProductionData.forEachIndexed { index, value ->
+                        val dayLabel = amharicDays.getOrElse(index) { "" }
+                        val fraction = (value / maxDayProd).toFloat()
+                        
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Bottom,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            // Value above bar
+                            Text(
+                                text = if (value > 0) "${value.toInt()}" else "-",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontSize = 8.sp,
+                                color = if (value > 0) BentoSoftGreen else Color.Gray,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = FontFamily.Monospace
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            
+                            // Bar representation
+                            Box(
+                                modifier = Modifier
+                                    .width(14.dp)
+                                    .height((50.dp * fraction * chartBarScale).coerceAtLeast(3.dp))
+                                    .background(
+                                        brush = Brush.verticalGradient(
+                                            colors = listOf(
+                                                BentoSoftGreen,
+                                                Color(0xFF0D1F17)
+                                            )
+                                        ),
+                                        shape = RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp)
+                                    )
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+                            // Day Label
+                            Text(
+                                text = dayLabel,
+                                style = MaterialTheme.typography.labelSmall,
+                                fontSize = 9.sp,
+                                color = Color.White.copy(alpha = 0.7f),
+                                fontWeight = FontWeight.Bold
                             )
                         }
                     }
@@ -1912,7 +2042,7 @@ fun BentoGridOverviewPanel(
                 ) {
                     Column {
                         Text(
-                            text = "PRODUCT SHIFT SHEET",
+                            text = "የእለቱ የምርት መመዝገቢያ ሉህ", // translated
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.ExtraBold,
                             color = BentoForestGreen,
@@ -1935,7 +2065,7 @@ fun BentoGridOverviewPanel(
                     ) {
                         Icon(Icons.Default.Add, contentDescription = "Add New Product Size", modifier = Modifier.size(12.dp))
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text("New Bag Size", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                        Text("አዲስ መጠን", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold) // translated
                     }
                 }
 
@@ -1946,7 +2076,7 @@ fun BentoGridOverviewPanel(
                         modifier = Modifier.fillMaxWidth().padding(vertical = 24.dp),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text("No product bag sizes defined. Add sizes to begin.", style = MaterialTheme.typography.bodySmall, color = BentoSubText)
+                        Text("ምንም አይነት ምርት አልተመዘገበም። ለመጀመር «አዲስ መጠን» የሚለውን ይጫኑ።", style = MaterialTheme.typography.bodySmall, color = BentoSubText) // translated
                     }
                 }
 
@@ -2006,7 +2136,7 @@ fun BentoGridOverviewPanel(
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Text(
-                                        text = "Size",
+                                        text = "መጠን (Size)", // Amharic & technical term
                                         style = MaterialTheme.typography.bodyMedium, // Slightly larger text
                                         color = BentoSubText,
                                         fontWeight = FontWeight.Medium
@@ -2026,7 +2156,7 @@ fun BentoGridOverviewPanel(
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Text(
-                                        text = "Counter",
+                                        text = "ማሽን መቁጠሪያ", // Amharic
                                         style = MaterialTheme.typography.bodyMedium,
                                         color = BentoSubText,
                                         fontWeight = FontWeight.Medium
@@ -2046,7 +2176,7 @@ fun BentoGridOverviewPanel(
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Text(
-                                        text = "Pieces Per Bag",
+                                        text = "በአንድ ሉህ የሚወጣው ብዛት", // Amharic
                                         style = MaterialTheme.typography.bodyMedium,
                                         color = BentoSubText,
                                         fontWeight = FontWeight.Medium
@@ -2066,7 +2196,7 @@ fun BentoGridOverviewPanel(
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Text(
-                                        text = "Bag Weight (kg)",
+                                        text = "የአንድ ባግ ክብደት (ኪ.ግ)", // Amharic
                                         style = MaterialTheme.typography.bodyMedium,
                                         color = BentoSubText,
                                         fontWeight = FontWeight.Medium
@@ -2086,20 +2216,20 @@ fun BentoGridOverviewPanel(
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Text(
-                                        text = "Current Stock Level",
+                                        text = "አሁን በክምችት ላይ ያለው መጠን", // Amharic
                                         style = MaterialTheme.typography.bodyMedium,
                                         color = BentoSubText,
                                         fontWeight = FontWeight.Medium
                                     )
                                     Column(horizontalAlignment = Alignment.End) {
                                         Text(
-                                            text = "${product.currentStock} Bags",
+                                            text = "${product.currentStock} ባጎች", // translated
                                             style = MaterialTheme.typography.bodyMedium,
                                             fontWeight = FontWeight.Bold,
                                             color = BentoSoftGreen
                                         )
                                         Text(
-                                            text = "(${String.format("%.1f", product.currentStock * product.bagWeightKg)} kg)",
+                                            text = "(${String.format("%.1f", product.currentStock * product.bagWeightKg)} ኪ.ግ)",
                                             style = MaterialTheme.typography.labelSmall,
                                             fontWeight = FontWeight.Bold,
                                             color = BentoSoftGreen
@@ -2120,7 +2250,7 @@ fun BentoGridOverviewPanel(
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     val enteredFab = producedInput.toIntOrNull() ?: 0
-                                    val fabSuffix = if (enteredFab > 0) " (${String.format("%.1f", enteredFab * product.bagWeightKg)} kg)" else ""
+                                    val fabSuffix = if (enteredFab > 0) " (${String.format("%.1f", enteredFab * product.bagWeightKg)} ኪ.ግ)" else ""
                                     Text(
                                         text = "የተመረተ$fabSuffix",
                                         style = MaterialTheme.typography.labelSmall,
@@ -2131,9 +2261,9 @@ fun BentoGridOverviewPanel(
                                     )
 
                                     val enteredSold = soldInput.toIntOrNull() ?: 0
-                                    val soldSuffix = if (enteredSold > 0) " (${String.format("%.1f", enteredSold * product.bagWeightKg)} kg)" else ""
+                                    val soldSuffix = if (enteredSold > 0) " (${String.format("%.1f", enteredSold * product.bagWeightKg)} ኪ.ግ)" else ""
                                     Text(
-                                        text = "የተጫነ$soldSuffix",
+                                        text = "የተሸጠ$soldSuffix", // changed from የተጫነ to የተሸጠ
                                         style = MaterialTheme.typography.labelSmall,
                                         color = BentoInfoText,
                                         fontWeight = FontWeight.Bold,
@@ -2244,27 +2374,27 @@ fun BentoGridOverviewPanel(
                         .padding(12.dp),
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    Text("DAILY SHEET GRAND TOTALS", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Black, color = BentoForestGreen)
+                    Text("ነጠላ የምዝገባ ሉህ አጠቃላይ ድምር", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Black, color = BentoForestGreen)
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text("Total KG Manufactured today:", style = MaterialTheme.typography.labelSmall, color = BentoTextDark)
-                        Text("${todayKgProduced.toInt()} KG", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = BentoForestGreen)
+                        Text("ዛሬ የተመረተ ጠቅላላ (ኪ.ግ)፦", style = MaterialTheme.typography.labelSmall, color = BentoTextDark)
+                        Text("${todayKgProduced.toInt()} ኪ.ግ", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = BentoForestGreen, fontFamily = FontFamily.Monospace)
                     }
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text("Total KG Shipped/Sold today:", style = MaterialTheme.typography.labelSmall, color = BentoTextDark)
-                        Text("${todayKgSold.toInt()} KG", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = BentoInfoText)
+                        Text("ዛሬ የተሸጠ ጠቅላላ (ኪ.ግ)፦", style = MaterialTheme.typography.labelSmall, color = BentoTextDark)
+                        Text("${todayKgSold.toInt()} ኪ.ግ", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = BentoInfoText, fontFamily = FontFamily.Monospace)
                     }
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text("Total Remaining Warehouse Stock:", style = MaterialTheme.typography.labelSmall, color = BentoTextDark)
-                        Text("${warehouseTotalKg.toInt()} KG", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = BentoForestGreen)
+                        Text("በመጋዘን ላይ የሚገኝ ጠቅላላ ክምችት፦", style = MaterialTheme.typography.labelSmall, color = BentoTextDark)
+                        Text("${warehouseTotalKg.toInt()} ኪ.ግ", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = BentoForestGreen, fontFamily = FontFamily.Monospace)
                     }
                 }
             }
@@ -2866,71 +2996,215 @@ fun RawMaterialMiniCard(
     onRecordClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val isLowStock = rawMaterial.currentStock < 1500.0
+    val transition = rememberInfiniteTransition(label = "pulse_warning")
+    val pulseBorderAlpha by transition.animateFloat(
+        initialValue = 0.2f,
+        targetValue = 1.0f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1000, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "pulse_alpha"
+    )
+
+    // Gauge calculation (Assuming max safe stock level capacity is 10000.0 kg)
+    val maxCapacity = 10000.0
+    val stockPercentage = (rawMaterial.currentStock / maxCapacity).coerceIn(0.0, 1.0).toFloat()
+    
+    val displayName = when (type.uppercase()) {
+        "LD" -> "LD ጥሬ እቃ"
+        "HD" -> "HD ጥሬ እቃ"
+        else -> "የእህል/ብክነት (Waste)"
+    }
+
     Card(
         modifier = modifier.testTag("raw_material_card_${type}"),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = BentoNeutralGray),
-        border = BorderStroke(1.dp, BentoBorder)
+        border = BorderStroke(
+            1.5.dp,
+            if (isLowStock) Color.Red.copy(alpha = pulseBorderAlpha) else BentoBorder.copy(alpha = 0.6f)
+        )
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(10.dp)
+                .padding(14.dp)
         ) {
-            // Header
+            // Header with low stock pulse notification
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = type,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Black,
-                    color = BentoForestGreen
-                )
+                Column {
+                    Text(
+                        text = displayName,
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Black,
+                        color = if (isLowStock) Color(0xFFFF5F5F) else BentoForestGreen
+                    )
+                    if (isLowStock) {
+                        Text(
+                            text = "እባክዎን ይጨምሩ!",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontSize = 8.sp,
+                            color = Color(0xFFFF3B3B),
+                            fontWeight = FontWeight.ExtraBold
+                        )
+                    }
+                }
+                
                 IconButton(
                     onClick = onRecordClick,
-                    modifier = Modifier.size(24.dp)
+                    modifier = Modifier
+                        .size(24.dp)
+                        .background(
+                            if (isLowStock) Color.Red.copy(alpha = 0.15f) else BentoForestGreen.copy(alpha = 0.15f),
+                            CircleShape
+                        )
                 ) {
                     Icon(
                         Icons.Default.Add,
-                        contentDescription = "Add log",
-                        tint = BentoForestGreen,
+                        contentDescription = "መዝገብ ጨምር",
+                        tint = if (isLowStock) Color.Red else BentoForestGreen,
                         modifier = Modifier.size(16.dp)
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
-            // Current stock
-            Text("Left in Stock:", style = MaterialTheme.typography.labelSmall, color = BentoSubText)
+            // Premium Visual Fuel Gauge Visualizer
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(60.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Canvas(modifier = Modifier.fillMaxSize()) {
+                    val w = size.width
+                    val h = size.height
+                    
+                    // Background track arc representing fuel level meter
+                    val strokeWidth = 6.dp.toPx()
+                    drawArc(
+                        color = Color(0xFF1E293B),
+                        startAngle = 180f,
+                        sweepAngle = 180f,
+                        useCenter = false,
+                        style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
+                    )
+                    
+                    // Dynamic fill color (Red if low stock, Gold/Green otherwise)
+                    val gaugeColor = when {
+                        isLowStock -> Color(0xFFFF3B3B)
+                        stockPercentage < 0.5f -> BentoGold
+                        else -> BentoSoftGreen
+                    }
+                    
+                    // Filled level arc
+                    drawArc(
+                        color = gaugeColor,
+                        startAngle = 180f,
+                        sweepAngle = stockPercentage * 180f,
+                        useCenter = false,
+                        style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
+                    )
+                    
+                    // Decorative glow pointer / needle
+                    val needleRad = Math.toRadians((180f + stockPercentage * 180f).toDouble())
+                    val needleLen = (w / 2) - 8.dp.toPx()
+                    val cx = w / 2
+                    val cy = h - 4.dp.toPx()
+                    
+                    val nx = cx + (needleLen * Math.cos(needleRad)).toFloat()
+                    val ny = cy + (needleLen * Math.sin(needleRad)).toFloat()
+                    
+                    drawLine(
+                        color = gaugeColor,
+                        start = androidx.compose.ui.geometry.Offset(cx, cy),
+                        end = androidx.compose.ui.geometry.Offset(nx, ny),
+                        strokeWidth = 2.5.dp.toPx()
+                    )
+                    
+                    drawCircle(
+                        color = Color.White,
+                        radius = 4.dp.toPx(),
+                        center = androidx.compose.ui.geometry.Offset(cx, cy)
+                    )
+                }
+                
+                // Overlay text inside the fuel gauge arc
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 6.dp)
+                ) {
+                    Text(
+                        text = "${(stockPercentage * 100).toInt()}%",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Black,
+                        color = Color.White,
+                        fontFamily = FontFamily.Monospace
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(6.dp))
+
+            // Text values format
+            Text("በክምችት የተረፈ፦", style = MaterialTheme.typography.labelSmall, fontSize = 9.sp, color = BentoSubText)
             Text(
-                text = "${rawMaterial.currentStock.toInt()} kg",
-                style = MaterialTheme.typography.bodyLarge,
+                text = "${rawMaterial.currentStock.toInt()} ኪ.ግ",
+                style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Black,
-                color = BentoTextDark
+                color = if (isLowStock) Color(0xFFFF3B3B) else Color.White,
+                fontFamily = FontFamily.Monospace
             )
 
             HorizontalDivider(
-                modifier = Modifier.padding(vertical = 6.dp),
-                color = BentoBorder.copy(alpha = 0.5f)
+                modifier = Modifier.padding(vertical = 8.dp),
+                color = BentoBorder.copy(alpha = 0.4f)
             )
 
-            // Dynamic Stats for scope
-            Text(
-                text = "Used: -${used.toInt()} kg",
-                style = MaterialTheme.typography.labelSmall,
-                color = BentoAlertText,
-                fontWeight = FontWeight.SemiBold
-            )
-            Text(
-                text = "Added: +${added.toInt()} kg",
-                style = MaterialTheme.typography.labelSmall,
-                color = BentoForestGreen,
-                fontWeight = FontWeight.SemiBold
-            )
+            // Dynamic tracking list representation
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column {
+                    Text(
+                        text = "የተቀነሰ",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontSize = 8.sp,
+                        color = BentoSubText
+                    )
+                    Text(
+                        text = "-${used.toInt()} ኪ.ግ",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = BentoAlertText,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily.Monospace
+                    )
+                }
+                Column(horizontalAlignment = Alignment.End) {
+                    Text(
+                        text = "የተጨመረ",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontSize = 8.sp,
+                        color = BentoSubText
+                    )
+                    Text(
+                        text = "+${added.toInt()} ኪ.ግ",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = BentoSoftGreen,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily.Monospace
+                    )
+                }
+            }
         }
     }
 }
@@ -2943,13 +3217,28 @@ fun MasterbatchCard(
     onDeleteClick: () -> Unit,
     onAddBoughtBagsClick: () -> Unit
 ) {
+    val isLowStock = masterbatch.currentStock < 100.0
+    val transition = rememberInfiniteTransition(label = "mb_pulse")
+    val pulseAlpha by transition.animateFloat(
+        initialValue = 0.2f,
+        targetValue = 1.0f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1000, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "mb_pulse_alpha"
+    )
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .testTag("masterbatch_card_${masterbatch.id}"),
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(containerColor = BentoNeutralGray),
-        border = BorderStroke(1.dp, BentoBorder)
+        border = BorderStroke(
+            1.5.dp,
+            if (isLowStock) Color.Red.copy(alpha = pulseAlpha) else BentoBorder.copy(alpha = 0.6f)
+        )
     ) {
         Row(
             modifier = Modifier
@@ -2992,12 +3281,23 @@ fun MasterbatchCard(
                                 .border(1.dp, Color.White.copy(alpha = 0.4f), CircleShape)
                         )
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "${masterbatch.color} ማስተርባች",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White
-                        )
+                        Column {
+                            Text(
+                                text = "${masterbatch.color} ማስተርባች",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White
+                            )
+                            if (isLowStock) {
+                                Text(
+                                    text = "ዝቅተኛ ክምችት!",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontSize = 8.sp,
+                                    color = Color(0xFFFF3B3B),
+                                    fontWeight = FontWeight.Black
+                                )
+                            }
+                        }
                     }
 
                     IconButton(
@@ -3164,92 +3464,97 @@ fun WorkerRowItem(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 6.dp)
+            .padding(vertical = 10.dp)
             .testTag("worker_row_${worker.id}"),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
-        Column(modifier = Modifier.weight(1.5f)) {
+        Column(modifier = Modifier.weight(1.3f)) {
             Text(
-                text = worker.name,
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.Bold,
-                color = if (worker.isActive) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                text = toAmharicName(worker.name), // Premium Large Amharic Name
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Black,
+                color = if (worker.isActive) Color.White else Color.White.copy(alpha = 0.5f)
             )
 
-            // If active, show stats range of that worker
+            Spacer(modifier = Modifier.height(3.dp))
+
+            // If active, show stats range of that worker in Amharic
             if (stats != null && worker.isActive) {
                 Text(
-                    text = "Attendance - On Duty: ${stats.daysOnDuty} days | Absent: ${stats.daysAbsent} days | Sun Off: ${stats.daysSundayOff}",
+                    text = "ቅኝት፦ ስራ ላይ፡ ${stats.daysOnDuty} ቀን | የቀረ፡ ${stats.daysAbsent} ቀን | እሁድ፡ ${stats.daysSundayOff} ቀን",
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = BentoSubText,
                     overflow = TextOverflow.Ellipsis,
-                    maxLines = 1
+                    maxLines = 1,
+                    fontFamily = FontFamily.Monospace
                 )
             } else if (!worker.isActive) {
                 Text(
-                    text = "Left Company (Resigned in database)",
+                    text = "ከኩባንያው የለቀቀ ሰራተኛ", // Translated
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.error
+                    color = BentoAlertText,
+                    fontWeight = FontWeight.Bold
                 )
             }
         }
 
-        Spacer(modifier = Modifier.width(8.dp))
+        Spacer(modifier = Modifier.width(6.dp))
 
-        // Right status toggle buttons
+        // Right status toggle buttons (completely premium pill buttons with smooth color transitions)
         if (worker.isActive) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 val statuses = listOf(
-                    Triple("On Duty", colorGreen(), "On Duty"),
-                    Triple("Absent", colorRed(), "Absent"),
-                    Triple("Sunday Off", colorBlue(), "Sunday Off"),
-                    Triple("Left", colorGray(), "Left Company")
+                    Triple("On Duty", Color(0xFF00FF88), "ስራ ላይ"), // Premium bright green
+                    Triple("Absent", Color(0xFFFF3B3B), "የቀረ"),    // Premium red
+                    Triple("Sunday Off", Color(0xFF3B82F6), "እሁድ"), // Vibrant blue
+                    Triple("Left", Color(0xFF6B7280), "የለቀቀ")       // Gray
                 )
 
-                statuses.forEach { (statusName, badgeColor, description) ->
+                statuses.forEach { (statusName, badgeColor, amharicLabel) ->
                     val isActiveStatus = activeAttendance?.status == statusName
 
                     Box(
                         modifier = Modifier
                             .clickable { onStatusSelect(statusName) }
                             .background(
-                                color = if (isActiveStatus) badgeColor else badgeColor.copy(alpha = 0.15f),
-                                shape = RoundedCornerShape(8.dp)
+                                color = if (isActiveStatus) badgeColor else badgeColor.copy(alpha = 0.12f),
+                                shape = RoundedCornerShape(50.dp) // Premium Pill shape
                             )
                             .border(
-                                width = 1.dp,
-                                color = if (isActiveStatus) badgeColor else badgeColor.copy(alpha = 0.4f),
-                                shape = RoundedCornerShape(8.dp)
+                                width = 1.3.dp,
+                                color = if (isActiveStatus) badgeColor else badgeColor.copy(alpha = 0.35f),
+                                shape = RoundedCornerShape(50.dp)
                             )
-                            .padding(horizontal = 6.dp, vertical = 4.dp)
+                            .padding(horizontal = 10.dp, vertical = 6.dp)
                             .testTag("worker_opt_${worker.id}_$statusName")
                     ) {
                         Text(
-                            text = statusName.substringBefore(" "), // Short labels: "On", "Abse", "Sun"
+                            text = amharicLabel, // Amharic localized label instead of English substring
                             style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = if (isActiveStatus) Color.White else badgeColor
+                            fontWeight = FontWeight.ExtraBold,
+                            fontSize = 10.sp,
+                            color = if (isActiveStatus) Color.Black else badgeColor
                         )
                     }
                 }
             }
         } else {
-            // Already resigned worker, provide re-active button
+            // Re-activate resigned worker
             Button(
                 onClick = { onStatusSelect("On Duty") },
-                shape = RoundedCornerShape(6.dp),
-                contentPadding = PaddingValues(horizontal = 8.dp),
+                shape = RoundedCornerShape(8.dp),
+                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                    containerColor = BentoLightGreen,
+                    contentColor = BentoForestGreen
                 ),
-                modifier = Modifier.height(28.dp)
+                modifier = Modifier.height(30.dp)
             ) {
-                Text("Re-hire / Back", style = MaterialTheme.typography.labelSmall)
+                Text("ዳግም መዝግብ / መልስ", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
             }
         }
     }
@@ -4686,10 +4991,21 @@ fun AnimatedCounterText(
 fun AnwarSplashScreen(onFinished: () -> Unit) {
     var progress by remember { mutableStateOf(0f) }
     var startExitAnimation by remember { mutableStateOf(false) }
+    
+    // Play industrial tech sound on launch using standard Android ToneGenerator
+    LaunchedEffect(Unit) {
+        try {
+            val tg = android.media.ToneGenerator(android.media.AudioManager.STREAM_MUSIC, 100)
+            tg.startTone(android.media.ToneGenerator.TONE_PROP_PROMPT, 150)
+            kotlinx.coroutines.delay(200)
+            tg.startTone(android.media.ToneGenerator.TONE_SUP_CONFIRM, 250)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
 
     LaunchedEffect(Unit) {
-        // Animate progress bar from 0 to 1 over 2.2 seconds
-        val duration = 2200f
+        val duration = 2500f
         val steps = 50
         val delayTime = (duration / steps).toLong()
         for (i in 1..steps) {
@@ -4697,28 +5013,69 @@ fun AnwarSplashScreen(onFinished: () -> Unit) {
             progress = i / steps.toFloat()
         }
         startExitAnimation = true
-        kotlinx.coroutines.delay(400) // allow fadeout animation
+        kotlinx.coroutines.delay(500) // allow fadeout animation
         onFinished()
     }
 
     val alpha by animateFloatAsState(
         targetValue = if (startExitAnimation) 0f else 1f,
-        animationSpec = tween(400),
+        animationSpec = tween(500),
         label = "splash_alpha"
     )
-    val scale by animateFloatAsState(
-        targetValue = if (startExitAnimation) 0.9f else 1f,
-        animationSpec = tween(400, easing = FastOutSlowInEasing),
-        label = "splash_scale"
+    
+    // Zooming logo scale with bouncing pulse effect
+    val infiniteTransition = rememberInfiniteTransition(label = "logo_pulse")
+    val pulseScale by infiniteTransition.animateFloat(
+        initialValue = 0.95f,
+        targetValue = 1.08f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1200, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "pulse"
+    )
+    val scale = if (startExitAnimation) 1.5f else pulseScale // zoom out on transition
+
+    // Canvas particle duration timeline
+    val particleTime by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(2000, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "particles"
     )
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black)
-            .graphicsLayer(alpha = alpha, scaleX = scale, scaleY = scale),
+            .background(Color(0xFF030504))
+            .graphicsLayer(alpha = alpha),
         contentAlignment = Alignment.Center
     ) {
+        // Exploding green particles radiating outward on canvas
+        androidx.compose.foundation.Canvas(modifier = Modifier.fillMaxSize()) {
+            val center = androidx.compose.ui.geometry.Offset(this.size.width / 2f, this.size.height / 2f)
+            val numParticles = 24
+            for (i in 0 until numParticles) {
+                val angle = (i * (360f / numParticles)) * (Math.PI.toFloat() / 180f)
+                val baseDistance = 100.dp.toPx()
+                val moveDistance = baseDistance + (particleTime * 250.dp.toPx())
+                val pX = center.x + (Math.cos(angle.toDouble()) * moveDistance.toDouble()).toFloat()
+                val pY = center.y + (Math.sin(angle.toDouble()) * moveDistance.toDouble()).toFloat()
+                
+                // Outer decay fadeout
+                val pAlpha = (1f - particleTime) * 0.75f
+                drawCircle(
+                    color = Color(0xFF00FF88),
+                    radius = (4.dp + (5.dp * particleTime)).toPx(),
+                    center = androidx.compose.ui.geometry.Offset(pX, pY),
+                    alpha = pAlpha
+                )
+            }
+        }
+
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
@@ -4726,9 +5083,10 @@ fun AnwarSplashScreen(onFinished: () -> Unit) {
             // Pulsing Anwar Logo Badge
             Box(
                 modifier = Modifier
-                    .size(130.dp)
-                    .background(Color.Black, shape = CircleShape)
-                    .border(2.dp, BentoGold, shape = CircleShape)
+                    .size(140.dp)
+                    .graphicsLayer(scaleX = scale, scaleY = scale)
+                    .background(Color(0xFF0D1F17), shape = CircleShape)
+                    .border(2.dp, Color(0xFF00FF88), shape = CircleShape)
                     .padding(3.dp),
                 contentAlignment = Alignment.Center
             ) {
@@ -4741,47 +5099,49 @@ fun AnwarSplashScreen(onFinished: () -> Unit) {
                     contentScale = androidx.compose.ui.layout.ContentScale.Crop
                 )
             }
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(30.dp))
             
             Text(
                 text = "ANWAR",
                 style = MaterialTheme.typography.displayLarge,
                 fontWeight = FontWeight.Black,
                 color = Color.White,
-                letterSpacing = 2.sp
+                letterSpacing = 4.sp,
+                fontFamily = FontFamily.Monospace
             )
             Spacer(modifier = Modifier.height(4.dp))
             
             Text(
-                text = "RECYCLING OPERATIONS CONSOLE",
-                style = MaterialTheme.typography.labelSmall,
+                text = "የፕላስቲክ መልሶ ማምረቻ ማዕከል", // Amharic
+                style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
-                color = Color(0xFFD4AF37), // Luxury Gold
-                letterSpacing = 2.sp
+                color = Color(0xFFFFD700), // Luxury Gold
+                letterSpacing = 1.sp
             )
             
             Spacer(modifier = Modifier.height(48.dp))
             
-            // Premium linear progress indicator
             Column(
-                modifier = Modifier.width(180.dp),
+                modifier = Modifier.width(220.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 LinearProgressIndicator(
                     progress = { progress },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(3.dp)
+                        .height(4.dp)
                         .clip(CircleShape),
-                    color = Color(0xFF10B981),
-                    trackColor = Color(0xFF1E293B)
+                    color = Color(0xFF00FF88),
+                    trackColor = Color(0xFF0D1F17)
                 )
-                Spacer(modifier = Modifier.height(10.dp))
+                Spacer(modifier = Modifier.height(14.dp))
                 Text(
-                    text = "BOOTING STATUS ${(progress * 100).toInt()}%",
+                    text = "የአንዋር ሲስተም በመነሳት ላይ ነው... ${(progress * 100).toInt()}%",
                     style = MaterialTheme.typography.labelSmall,
-                    color = Color.White.copy(alpha = 0.5f),
-                    letterSpacing = 1.sp
+                    color = Color(0xFF00FF88).copy(alpha = 0.8f),
+                    letterSpacing = 1.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = FontFamily.Monospace
                 )
             }
         }
