@@ -468,7 +468,8 @@ fun DashboardScreen(
                                 onMasterbatchClick = { selectedMasterbatchForActivity = it },
                                 reportPeriod = reportPeriod,
                                 onPeriodSelect = { viewModel.setReportPeriod(it) },
-                                viewModel = viewModel
+                                viewModel = viewModel,
+                                onAddProductClick = { showAddProductDialog = true }
                             )
                         }
                     }
@@ -1417,6 +1418,15 @@ fun DashboardScreen(
 }
 
 
+data class MachineConfig(
+    val index: Int,
+    val label: String,
+    val xPercent: Float,
+    val yPercent: Float,
+    val isSop: Boolean = false,
+    val defaultName: String
+)
+
 // --- BENTO GRID SYSTEM MAIN KPI PANEL ---
 @Composable
 fun BentoGridOverviewPanel(
@@ -1432,7 +1442,8 @@ fun BentoGridOverviewPanel(
     onMasterbatchClick: (Masterbatch) -> Unit,
     reportPeriod: MainViewModel.ReportPeriod,
     onPeriodSelect: (MainViewModel.ReportPeriod) -> Unit,
-    viewModel: MainViewModel
+    viewModel: MainViewModel,
+    onAddProductClick: () -> Unit
 ) {
     val selectedDateStr = viewModel.selectedDate.collectAsStateWithLifecycle().value
     val allTransactions = viewModel.allProductTransactions.collectAsStateWithLifecycle().value
@@ -1783,11 +1794,11 @@ fun BentoGridOverviewPanel(
             }
         }
 
-        // --- LIVE ANIMATED WEEKLY PRODUCTION GRAPH ---
+        // --- LIVE ANIMATED INDUSTRIAL FACTORY FLOOR OVERVIEW ---
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(24.dp),
-            colors = CardDefaults.cardColors(containerColor = Color(0xFF0F121E)),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF07090E)),
             border = BorderStroke(1.dp, BentoBorder)
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
@@ -1798,14 +1809,14 @@ fun BentoGridOverviewPanel(
                 ) {
                     Column {
                         Text(
-                            text = "WEEKLY YIELD TRACKING",
+                            text = "ANWAR INDUSTRIAL CONTROL CONSOLE",
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.ExtraBold,
                             color = BentoGold,
                             letterSpacing = 1.sp
                         )
                         Text(
-                            text = "Daily raw material & compound fabrications",
+                            text = "Interactive SCADA floor telemetry & active lines",
                             style = MaterialTheme.typography.labelSmall,
                             color = BentoSubText
                         )
@@ -1813,125 +1824,315 @@ fun BentoGridOverviewPanel(
                     Box(
                         modifier = Modifier
                             .background(BentoForestGreen.copy(alpha = 0.15f), RoundedCornerShape(6.dp))
-                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                            .padding(horizontal = 8.dp, vertical = 3.dp)
                     ) {
-                        Text(
-                            text = "LIVE GRAPH",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = BentoSoftGreen,
-                            fontWeight = FontWeight.Black
-                        )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            val pulseAlphaTransition = rememberInfiniteTransition(label = "pulse_sys")
+                            val sysAlpha by pulseAlphaTransition.animateFloat(
+                                initialValue = 0.3f,
+                                targetValue = 1f,
+                                animationSpec = infiniteRepeatable(
+                                    animation = tween(800, easing = LinearEasing),
+                                    repeatMode = RepeatMode.Reverse
+                                ),
+                                label = "sys_alpha"
+                            )
+                            Box(
+                                modifier = Modifier
+                                    .size(6.dp)
+                                    .background(BentoSoftGreen.copy(alpha = sysAlpha), CircleShape)
+                            )
+                            Text(
+                                text = "SYSTEM ONLINE",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = BentoSoftGreen,
+                                fontWeight = FontWeight.Black,
+                                fontSize = 9.sp
+                            )
+                        }
                     }
                 }
 
-                Spacer(modifier = Modifier.height(18.dp))
+                Spacer(modifier = Modifier.height(14.dp))
 
-                var chartAnimationTrigger by remember { mutableStateOf(false) }
-                LaunchedEffect(Unit) {
-                    chartAnimationTrigger = true
+                // Factory Floor blueprint & machines assembly section
+                val haptic = LocalHapticFeedback.current
+                val machinesList = remember {
+                    listOf(
+                        // Row 1 (L-01 to L-05) - Film Extrusion
+                        MachineConfig(0, "L-01", 0.05f, 0.20f, defaultName = "Film Line 01"),
+                        MachineConfig(1, "L-02", 0.19f, 0.20f, defaultName = "Film Line 02"),
+                        MachineConfig(2, "L-03", 0.33f, 0.20f, defaultName = "Film Line 03"),
+                        MachineConfig(3, "L-04", 0.47f, 0.20f, defaultName = "Film Line 04"),
+                        MachineConfig(4, "L-05", 0.61f, 0.20f, defaultName = "Film Line 05"),
+                        // Row 2 (L-06 to L-10) - Film Extrusion
+                        MachineConfig(5, "L-06", 0.05f, 0.58f, defaultName = "Film Line 06"),
+                        MachineConfig(6, "L-07", 0.19f, 0.58f, defaultName = "Film Line 07"),
+                        MachineConfig(7, "L-08", 0.33f, 0.58f, defaultName = "Film Line 08"),
+                        MachineConfig(8, "L-09", 0.47f, 0.58f, defaultName = "Film Line 09"),
+                        MachineConfig(9, "L-10", 0.61f, 0.58f, defaultName = "Film Line 10"),
+                        // SOP Machine (S-01 on separate section right)
+                        MachineConfig(10, "S-01", 0.83f, 0.39f, isSop = true, defaultName = "SOP Soap Line")
+                    )
                 }
-                val chartProgress by animateFloatAsState(
-                    targetValue = if (chartAnimationTrigger) 1f else 0f,
-                    animationSpec = tween(1500, easing = FastOutSlowInEasing),
-                    label = "bar_chart_elevation"
+
+                val filmProducts = remember(products) {
+                    products.filter { !it.name.contains("soap", ignoreCase = true) && !it.name.contains("ሳሙና", ignoreCase = true) }
+                }
+                val soapProducts = remember(products) {
+                    products.filter { it.name.contains("soap", ignoreCase = true) || it.name.contains("ሳሙና", ignoreCase = true) }
+                }
+
+                val machinePulseTransition = rememberInfiniteTransition(label = "pulse_telemetry")
+                val glowAlpha by machinePulseTransition.animateFloat(
+                    initialValue = 0.35f,
+                    targetValue = 0.95f,
+                    animationSpec = infiniteRepeatable(
+                        animation = tween(1300, easing = FastOutSlowInEasing),
+                        repeatMode = RepeatMode.Reverse
+                    ),
+                    label = "glow_pulse"
+                )
+                val dotScale by machinePulseTransition.animateFloat(
+                    initialValue = 0.8f,
+                    targetValue = 1.35f,
+                    animationSpec = infiniteRepeatable(
+                        animation = tween(900, easing = LinearOutSlowInEasing),
+                        repeatMode = RepeatMode.Reverse
+                    ),
+                    label = "dot_scale"
                 )
 
-                val maxProductKg = remember(weeklyProductionData) {
-                    val mx = weeklyProductionData.maxOrNull() ?: 0.0
-                    if (mx == 0.0) 1000.0 else mx
-                }
-
-                Canvas(
+                BoxWithConstraints(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(120.dp)
+                        .height(290.dp)
+                        .background(Color(0xFF060910), RoundedCornerShape(16.dp))
+                        .border(1.dp, BentoBorder, RoundedCornerShape(16.dp))
+                        .clip(RoundedCornerShape(16.dp))
                 ) {
-                    val width = size.width
-                    val height = size.height
-                    val paddingLeft = 45.dp.toPx()
-                    val paddingRight = 10.dp.toPx()
-                    val paddingTop = 10.dp.toPx()
-                    val paddingBottom = 20.dp.toPx()
+                    val containerWidth = maxWidth
+                    val containerHeight = maxHeight
 
-                    val graphWidth = width - paddingLeft - paddingRight
-                    val graphHeight = height - paddingTop - paddingBottom
+                    // 1. Blueprint Grid & Barrier Partitions drawn under elements
+                    Canvas(modifier = Modifier.fillMaxSize()) {
+                        val strokeW = 0.8.dp.toPx()
+                        val gridColor = BentoForestGreen.copy(alpha = 0.08f)
 
-                    // Draw subtle grid lines (0%, 50%, 100%)
-                    val steps = 3
-                    for (i in 0 until steps) {
-                        val frac = i.toFloat() / (steps - 1)
-                        val y = paddingTop + graphHeight * (1f - frac)
-                        
-                        drawLine(
-                            color = BentoBorder.copy(alpha = 0.35f),
-                            start = Offset(paddingLeft, y),
-                            end = Offset(width - paddingRight, y),
-                            strokeWidth = 1.dp.toPx()
-                        )
-                    }
-
-                    // Render Bars
-                    val barCount = 7
-                    val spacing = graphWidth / barCount
-                    val barWidth = 18.dp.toPx()
-
-                    for (i in 0 until barCount) {
-                        val kg = weeklyProductionData.getOrElse(i) { 0.0 }
-                        val activeHeight = (kg / maxProductKg).toFloat() * graphHeight * chartProgress
-                        
-                        val x = paddingLeft + (i * spacing) + (spacing - barWidth) / 2
-
-                        // Draw background track
-                        drawRoundRect(
-                            color = BentoBorder.copy(alpha = 0.2f),
-                            topLeft = Offset(x, paddingTop),
-                            size = Size(barWidth, graphHeight),
-                            cornerRadius = CornerRadius(4.dp.toPx(), 4.dp.toPx())
-                        )
-
-                        // Draw glowing bar
-                        if (activeHeight > 0f) {
-                            val rectTop = paddingTop + graphHeight - activeHeight
-                            drawRoundRect(
-                                brush = Brush.verticalGradient(
-                                    colors = listOf(BentoSoftGreen, BentoForestGreen)
-                                ),
-                                topLeft = Offset(x, rectTop),
-                                size = Size(barWidth, activeHeight),
-                                cornerRadius = CornerRadius(4.dp.toPx(), 4.dp.toPx())
+                        // Vertical Grid Lines
+                        val xSteps = 10
+                        for (i in 1 until xSteps) {
+                            val x = size.width * (i.toFloat() / xSteps)
+                            drawLine(
+                                color = gridColor,
+                                start = Offset(x, 0f),
+                                end = Offset(x, size.height),
+                                strokeWidth = strokeW
                             )
                         }
-                    }
-                }
 
-                // Labels beneath graph
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(start = 45.dp, end = 10.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    val amharicDays = listOf("ሰኞ", "ማክ", "ረቡ", "ሐሙ", "አርብ", "ቅዳ", "እሁ")
-                    amharicDays.forEachIndexed { idx, day ->
-                        val isToday = idx == remember(selectedDateStr) {
-                            val parts = selectedDateStr.split("-")
-                            val y = parts.getOrNull(0)?.toIntOrNull() ?: 2018
-                            val m = parts.getOrNull(1)?.toIntOrNull() ?: 9
-                            val d = parts.getOrNull(2)?.toIntOrNull() ?: 22
-                            val jdn = EthiopianCalendarHelper.ethiopianToJdn(y, m, d)
-                            val dayOfWeek = (jdn + 1) % 7 // 0 is Sunday, 1 is Monday...
-                            if (dayOfWeek == 0) 6 else dayOfWeek - 1
+                        // Horizontal Grid Lines
+                        val ySteps = 8
+                        for (i in 1 until ySteps) {
+                            val y = size.height * (i.toFloat() / ySteps)
+                            drawLine(
+                                color = gridColor,
+                                start = Offset(0f, y),
+                                end = Offset(size.width, y),
+                                strokeWidth = strokeW
+                            )
                         }
+
+                        // Security barrier partition separating SOP soap machine
+                        val partitionX = size.width * 0.77f
+                        drawLine(
+                            color = BentoGold.copy(alpha = 0.25f),
+                            start = Offset(partitionX, 0f),
+                            end = Offset(partitionX, size.height),
+                            strokeWidth = 1.5.dp.toPx(),
+                            pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(
+                                floatArrayOf(20f, 15f), 
+                                0f
+                            )
+                        )
+                    }
+
+                    // Centered High-Tech Watermark (Layered behind machines, above canvas grid lines)
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "ANWAR INDUSTRIAL FLOOR",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = Color.White.copy(alpha = 0.04f),
+                            letterSpacing = 4.sp,
+                            fontSize = 18.sp
+                        )
+                    }
+
+                    // Department Titles Watermarked Top Left and Top Right
+                    Text(
+                        text = "DEPT A: FILM EXTRUSION ASSEMBLY",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = BentoSoftGreen.copy(alpha = 0.22f),
+                        fontSize = 8.sp,
+                        modifier = Modifier.padding(12.dp).align(Alignment.TopStart)
+                    )
+
+                    Text(
+                        text = "DEPT B: SOAP (ሳሙና)",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = BentoGold.copy(alpha = 0.22f),
+                        fontSize = 8.sp,
+                        modifier = Modifier
+                            .padding(12.dp)
+                            .align(Alignment.TopEnd)
+                    )
+
+                    // 2. Machine Blocks Layout Mapping
+                    machinesList.forEach { machine ->
+                        val product = if (machine.isSop) {
+                            soapProducts.getOrNull(0)
+                        } else {
+                            filmProducts.getOrNull(machine.index)
+                        }
+
+                        // Today's transaction telemetry stats
+                        val todayTrans = product?.let { p ->
+                            allTransactions.find { it.productId == p.id && it.date == selectedDateStr }
+                        }
+                        val todayBags = todayTrans?.fabricated ?: 0
+                        val todayKg = todayBags * (product?.bagWeightKg ?: 0.5)
+                        val isRunning = todayKg > 0.0
+
+                        val mWidth = (containerWidth * 0.125f).coerceAtLeast(54.dp)
+                        val mHeight = 64.dp
+
+                        val startX = containerWidth * machine.xPercent
+                        val startY = containerHeight * machine.yPercent
+
+                        // Floating live KG counter
+                        if (isRunning) {
+                            Box(
+                                modifier = Modifier
+                                    .offset(
+                                        x = startX + (mWidth / 2f) - 24.dp,
+                                        y = startY - 14.dp
+                                    )
+                                    .background(
+                                        if (machine.isSop) BentoGold else BentoSoftGreen,
+                                        RoundedCornerShape(6.dp)
+                                    )
+                                    .border(
+                                        0.5.dp,
+                                        Color.White.copy(alpha = 0.4f),
+                                        RoundedCornerShape(6.dp)
+                                    )
+                                    .padding(horizontal = 4.dp, vertical = 1.dp)
+                            ) {
+                                Text(
+                                    text = "${todayKg.toInt()} kg",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Black,
+                                    fontSize = 8.sp,
+                                    color = Color.Black
+                                )
+                            }
+                        }
+
+                        // Machine Console Block
                         Box(
-                            modifier = Modifier.width(18.dp),
+                            modifier = Modifier
+                                .offset(x = startX, y = startY)
+                                .size(width = mWidth, height = mHeight)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(
+                                    if (isRunning) {
+                                        if (machine.isSop) Color(0xFF1E1705) else Color(0xFF061410)
+                                    } else {
+                                        Color(0xFF0B0D13)
+                                    }
+                                )
+                                .border(
+                                    width = 1.2.dp,
+                                    color = if (isRunning) {
+                                        if (machine.isSop) BentoGold.copy(alpha = glowAlpha) else BentoSoftGreen.copy(alpha = glowAlpha)
+                                    } else if (product != null) {
+                                        Color.White.copy(alpha = 0.15f)
+                                    } else {
+                                        Color.White.copy(alpha = 0.04f)
+                                    },
+                                    shape = RoundedCornerShape(8.dp)
+                                )
+                                .clickable {
+                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    if (product != null) {
+                                        onProductClick(product)
+                                    } else {
+                                        onAddProductClick()
+                                    }
+                                },
                             contentAlignment = Alignment.Center
                         ) {
-                            Text(
-                                text = day,
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = if (isToday) FontWeight.ExtraBold else FontWeight.Medium,
-                                color = if (isToday) BentoSoftGreen else BentoSubText
-                            )
+                            Column(
+                                modifier = Modifier.padding(4.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.Center
+                            ) {
+                                // Machine ID Label
+                                Text(
+                                    text = machine.label,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (machine.isSop) BentoGold else BentoSoftGreen,
+                                    fontSize = 11.sp
+                                )
+
+                                Spacer(modifier = Modifier.height(2.dp))
+
+                                // Dynamic Assigned Product/State Label
+                                Text(
+                                    text = if (product != null) {
+                                        product.name.take(7) + (if (product.name.length > 7) ".." else "")
+                                    } else {
+                                        "EMPTY"
+                                    },
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = if (product != null) BentoSubText else Color.White.copy(alpha = 0.2f),
+                                    fontSize = 7.sp,
+                                    maxLines = 1,
+                                    fontWeight = FontWeight.Medium
+                                )
+
+                                Spacer(modifier = Modifier.height(2.dp))
+
+                                // LED telemetry dot
+                                Canvas(modifier = Modifier.size(6.dp)) {
+                                    val ledColor = if (isRunning) {
+                                        if (machine.isSop) BentoGold else BentoSoftGreen
+                                    } else {
+                                        Color(0xFFDC2626) // Red color for offline/idle
+                                    }
+                                    
+                                    if (isRunning) {
+                                        drawCircle(
+                                            color = ledColor.copy(alpha = 0.35f),
+                                            radius = size.width * dotScale
+                                        )
+                                    }
+                                    drawCircle(
+                                        color = ledColor,
+                                        radius = size.width * 0.4f
+                                    )
+                                }
+                            }
                         }
                     }
                 }
