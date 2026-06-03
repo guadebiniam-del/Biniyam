@@ -3,43 +3,7 @@
     xmlns:tools="http://schemas.android.com/tools">
 
     <attribution
-        android:tag="null"
-        android:label="@string/app_name" />
-
-    <attribution
         android:tag="attributionTag"
-        android:label="@string/app_name" />
-
-    <attribution
-        android:tag="media"
-        android:label="@string/app_name" />
-
-    <attribution
-        android:tag="audio"
-        android:label="@string/app_name" />
-
-    <attribution
-        android:tag="ToneGenerator"
-        android:label="@string/app_name" />
-
-    <attribution
-        android:tag="location"
-        android:label="@string/app_name" />
-
-    <attribution
-        android:tag="com.example.anwarrecycle"
-        android:label="@string/app_name" />
-
-    <attribution
-        android:tag="com.example"
-        android:label="@string/app_name" />
-
-    <attribution
-        android:tag="firebase"
-        android:label="@string/app_name" />
-
-    <attribution
-        android:tag="google"
         android:label="@string/app_name" />
 
     <uses-permission android:name="android.permission.INTERNET" />

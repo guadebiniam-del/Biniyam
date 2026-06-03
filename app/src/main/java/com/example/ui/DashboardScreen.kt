@@ -486,18 +486,18 @@ fun DashboardScreen(
                             // --- SECTION 1: PRODUCTS INVENTORY ---
                             item {
                                 InventoryHeaderSection(
-                                    title = "PRODUCTS INVENTORY",
-                                    subtitle = "Daily fabricated bags, sales and on-hand stocks",
+                                    title = "የተመረቱ ከረጢቶች መዝገብ",
+                                    subtitle = "የዕለት ምርት፣ ሽያጭ እና በክምችት ላይ ያሉ ምርቶች",
                                     icon = Icons.Default.List,
                                     onAddClick = { showAddProductDialog = true },
-                                    addButtonText = "+ Add Product",
+                                    addButtonText = "+ ምርት ጨምር",
                                     addBtnTag = "add_product_section_btn"
                                 )
 
                                 Spacer(modifier = Modifier.height(12.dp))
 
                                 if (products.isEmpty()) {
-                                    EmptyStatePlaceholder("No products defined. Click + Add Product to start.")
+                                    EmptyStatePlaceholder("ምንም ምርት አልተመዘገበም። ለመጀመር «+ ምርት ጨምር» የሚለውን ይጫኑ።")
                                 } else {
                                     val chunkedProducts = products.chunked(2)
                                     chunkedProducts.forEach { rowProducts ->
@@ -527,8 +527,8 @@ fun DashboardScreen(
                             // --- SECTION 2: RAW MATERIALSFEEDSTOCK ---
                             item {
                                 InventoryHeaderSection(
-                                    title = "RAW MATERIALSFEEDSTOCK",
-                                    subtitle = "Daily feedstock consumption and arrivals",
+                                    title = "የጥሬ ዕቃዎች ክምችት",
+                                    subtitle = "የዕለት የጥሬ ዕቃ ፍጆታ እና ገቢ ምዝግብ",
                                     icon = Icons.Default.Build,
                                     onAddClick = null
                                 )
@@ -1480,6 +1480,7 @@ fun BentoGridOverviewPanel(
     val selectedDateStr = viewModel.selectedDate.collectAsStateWithLifecycle().value
     val allTransactions = viewModel.allProductTransactions.collectAsStateWithLifecycle().value
     val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
+    val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
 
     // Live ticking traditional Ethiopian clock (offset by 6 hours from system time)
     var clockTime by remember { mutableStateOf("") }
@@ -2398,7 +2399,7 @@ fun BentoGridOverviewPanel(
                                                 Box(
                                                     modifier = Modifier
                                                         .size(width = 56.dp, height = 54.dp)
-                                                        .scale(savePulseScale)
+                                                        .graphicsLayer(scaleX = savePulseScale, scaleY = savePulseScale)
                                                         .background(Color(0xFF00FF88).copy(alpha = savePulseAlpha), RoundedCornerShape(10.dp))
                                                 )
                                             }
@@ -2973,7 +2974,7 @@ fun ProductStockCard(
                         .padding(horizontal = 6.dp, vertical = 2.dp)
                 ) {
                     Text(
-                        text = "${product.currentStock} BAGS",
+                        text = "${product.currentStock} ማዳበሪያ",
                         style = MaterialTheme.typography.labelSmall,
                         fontSize = 9.sp,
                         fontWeight = FontWeight.Black,
@@ -2995,10 +2996,10 @@ fun ProductStockCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 val statsList = listOf(
-                    Triple("FABRICATED", "+${stats.fabricated}", BentoForestGreen),
-                    Triple("SOLD", "-${stats.sold}", BentoAlertText),
-                    Triple("ADJUSTED", "${if (stats.adjusted >= 0) "+" else ""}${stats.adjusted}", if (stats.adjusted >= 0) Color.White else BentoAlertText),
-                    Triple("IN STOCK", "${product.currentStock}", BentoGold)
+                    Triple("የተመረተ", "+${stats.fabricated}", Color(0xFF00FF88)),
+                    Triple("የተሸጠ", "-${stats.sold}", Color(0xFFFF5F5F)),
+                    Triple("የተስተካከለ", "${if (stats.adjusted >= 0) "+" else ""}${stats.adjusted}", if (stats.adjusted >= 0) Color.White else Color(0xFFFF5F5F)),
+                    Triple("በክምችት", "${product.currentStock}", Color(0xFFFBC02D))
                 )
 
                 statsList.forEachIndexed { index, (label, value, color) ->
@@ -3016,7 +3017,7 @@ fun ProductStockCard(
                     ) {
                         Text(
                             text = label,
-                            fontSize = 6.8.sp,
+                            fontSize = 7.sp,
                             color = BentoSubText,
                             fontWeight = FontWeight.Bold,
                             maxLines = 1,
@@ -3052,7 +3053,7 @@ fun ProductStockCard(
             ) {
                 Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(14.dp))
                 Spacer(modifier = Modifier.width(3.dp))
-                Text("Record Entry", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                Text("ዕለት ተግባር መዝግብ", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
             }
         }
     }
@@ -3082,26 +3083,33 @@ fun RawMaterialMiniCard(
     // Gauge calculation (Assuming max safe stock level capacity is 10000.0 kg)
     val maxCapacity = 10000.0
     val stockPercentage = (rawMaterial.currentStock / maxCapacity).coerceIn(0.0, 1.0).toFloat()
+
+    // Smooth gauge animation
+    val animatedPercentage by animateFloatAsState(
+        targetValue = stockPercentage,
+        animationSpec = tween(durationMillis = 1500, easing = FastOutSlowInEasing),
+        label = "gauge_animation"
+    )
     
     val displayName = when (type.uppercase()) {
         "LD" -> "LD ጥሬ እቃ"
         "HD" -> "HD ጥሬ እቃ"
-        else -> "የእህል/ብክነት (Waste)"
+        else -> "የብክነት/የእህል ጥሬ እቃ"
     }
 
     Card(
         modifier = modifier.testTag("raw_material_card_${type}"),
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = BentoNeutralGray),
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0x3B050907)), // Translucent space-gray glass effect
         border = BorderStroke(
-            1.5.dp,
-            if (isLowStock) Color.Red.copy(alpha = pulseBorderAlpha) else BentoBorder.copy(alpha = 0.6f)
+            2.dp,
+            if (isLowStock) Color(0xFFFF3B3B).copy(alpha = pulseBorderAlpha) else Color(0xFF1E293B).copy(alpha = 0.5f)
         )
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(14.dp)
+                .padding(16.dp)
         ) {
             // Header with low stock pulse notification
             Row(
@@ -3112,15 +3120,15 @@ fun RawMaterialMiniCard(
                 Column {
                     Text(
                         text = displayName,
-                        style = MaterialTheme.typography.titleSmall,
+                        style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Black,
-                        color = if (isLowStock) Color(0xFFFF5F5F) else BentoForestGreen
+                        color = if (isLowStock) Color(0xFFFF5F5F) else Color(0xFF00FF88)
                     )
                     if (isLowStock) {
                         Text(
                             text = "እባክዎን ይጨምሩ!",
                             style = MaterialTheme.typography.labelSmall,
-                            fontSize = 8.sp,
+                            fontSize = 9.sp,
                             color = Color(0xFFFF3B3B),
                             fontWeight = FontWeight.ExtraBold
                         )
@@ -3130,28 +3138,28 @@ fun RawMaterialMiniCard(
                 IconButton(
                     onClick = onRecordClick,
                     modifier = Modifier
-                        .size(24.dp)
+                        .size(28.dp)
                         .background(
-                            if (isLowStock) Color.Red.copy(alpha = 0.15f) else BentoForestGreen.copy(alpha = 0.15f),
+                            if (isLowStock) Color.Red.copy(alpha = 0.15f) else Color(0xFF122C20),
                             CircleShape
                         )
                 ) {
                     Icon(
                         Icons.Default.Add,
                         contentDescription = "መዝገብ ጨምር",
-                        tint = if (isLowStock) Color.Red else BentoForestGreen,
-                        modifier = Modifier.size(16.dp)
+                        tint = if (isLowStock) Color.Red else Color(0xFF00FF88),
+                        modifier = Modifier.size(18.dp)
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(14.dp))
 
             // Premium Visual Fuel Gauge Visualizer
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(60.dp),
+                    .height(64.dp),
                 contentAlignment = Alignment.Center
             ) {
                 Canvas(modifier = Modifier.fillMaxSize()) {
@@ -3159,9 +3167,9 @@ fun RawMaterialMiniCard(
                     val h = size.height
                     
                     // Background track arc representing fuel level meter
-                    val strokeWidth = 6.dp.toPx()
+                    val strokeWidth = 7.dp.toPx()
                     drawArc(
-                        color = Color(0xFF1E293B),
+                        color = Color(0xFF1E293B).copy(alpha = 0.6f),
                         startAngle = 180f,
                         sweepAngle = 180f,
                         useCenter = false,
@@ -3171,38 +3179,38 @@ fun RawMaterialMiniCard(
                     // Dynamic fill color (Red if low stock, Gold/Green otherwise)
                     val gaugeColor = when {
                         isLowStock -> Color(0xFFFF3B3B)
-                        stockPercentage < 0.5f -> BentoGold
-                        else -> BentoSoftGreen
+                        animatedPercentage < 0.5f -> Color(0xFFFBC02D)
+                        else -> Color(0xFF00FF88)
                     }
                     
                     // Filled level arc
                     drawArc(
                         color = gaugeColor,
                         startAngle = 180f,
-                        sweepAngle = stockPercentage * 180f,
+                        sweepAngle = animatedPercentage * 180f,
                         useCenter = false,
                         style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
                     )
                     
                     // Decorative glow pointer / needle
-                    val needleRad = Math.toRadians((180f + stockPercentage * 180f).toDouble())
-                    val needleLen = (w / 2) - 8.dp.toPx()
+                    val needleRad = java.lang.Math.toRadians((180f + animatedPercentage * 180f).toDouble())
+                    val needleLen = (w / 2) - 10.dp.toPx()
                     val cx = w / 2
                     val cy = h - 4.dp.toPx()
                     
-                    val nx = cx + (needleLen * Math.cos(needleRad)).toFloat()
-                    val ny = cy + (needleLen * Math.sin(needleRad)).toFloat()
+                    val nx = cx + (needleLen * java.lang.Math.cos(needleRad)).toFloat()
+                    val ny = cy + (needleLen * java.lang.Math.sin(needleRad)).toFloat()
                     
                     drawLine(
                         color = gaugeColor,
                         start = androidx.compose.ui.geometry.Offset(cx, cy),
                         end = androidx.compose.ui.geometry.Offset(nx, ny),
-                        strokeWidth = 2.5.dp.toPx()
+                        strokeWidth = 3.dp.toPx()
                     )
                     
                     drawCircle(
                         color = Color.White,
-                        radius = 4.dp.toPx(),
+                        radius = 4.5.dp.toPx(),
                         center = androidx.compose.ui.geometry.Offset(cx, cy)
                     )
                 }
@@ -3213,9 +3221,9 @@ fun RawMaterialMiniCard(
                     modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 6.dp)
                 ) {
                     Text(
-                        text = "${(stockPercentage * 100).toInt()}%",
+                        text = "${(animatedPercentage * 100).toInt()}%",
                         style = MaterialTheme.typography.labelSmall,
-                        fontSize = 11.sp,
+                        fontSize = 12.sp,
                         fontWeight = FontWeight.Black,
                         color = Color.White,
                         fontFamily = FontFamily.Monospace
@@ -3223,21 +3231,21 @@ fun RawMaterialMiniCard(
                 }
             }
 
-            Spacer(modifier = Modifier.height(6.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
             // Text values format
-            Text("በክምችት የተረፈ፦", style = MaterialTheme.typography.labelSmall, fontSize = 9.sp, color = BentoSubText)
+            Text("በክምችት የተረፈ፦", style = MaterialTheme.typography.labelSmall, fontSize = 9.sp, color = Color(0xFF8C9E94))
             Text(
                 text = "${rawMaterial.currentStock.toInt()} ኪ.ግ",
-                style = MaterialTheme.typography.titleMedium,
+                style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Black,
                 color = if (isLowStock) Color(0xFFFF3B3B) else Color.White,
                 fontFamily = FontFamily.Monospace
             )
 
             HorizontalDivider(
-                modifier = Modifier.padding(vertical = 8.dp),
-                color = BentoBorder.copy(alpha = 0.4f)
+                modifier = Modifier.padding(vertical = 10.dp),
+                color = Color(0xFF1E293B).copy(alpha = 0.5f)
             )
 
             // Dynamic tracking list representation
@@ -3249,13 +3257,14 @@ fun RawMaterialMiniCard(
                     Text(
                         text = "የተቀነሰ",
                         style = MaterialTheme.typography.labelSmall,
-                        fontSize = 8.sp,
-                        color = BentoSubText
+                        fontSize = 9.sp,
+                        color = Color(0xFF8C9E94),
+                        fontWeight = FontWeight.Bold
                     )
                     Text(
                         text = "-${used.toInt()} ኪ.ግ",
                         style = MaterialTheme.typography.labelSmall,
-                        color = BentoAlertText,
+                        color = Color(0xFFFF5F5F),
                         fontWeight = FontWeight.Bold,
                         fontFamily = FontFamily.Monospace
                     )
@@ -3264,13 +3273,14 @@ fun RawMaterialMiniCard(
                     Text(
                         text = "የተጨመረ",
                         style = MaterialTheme.typography.labelSmall,
-                        fontSize = 8.sp,
-                        color = BentoSubText
+                        fontSize = 9.sp,
+                        color = Color(0xFF8C9E94),
+                        fontWeight = FontWeight.Bold
                     )
                     Text(
                         text = "+${added.toInt()} ኪ.ግ",
                         style = MaterialTheme.typography.labelSmall,
-                        color = BentoSoftGreen,
+                        color = Color(0xFF00FF88),
                         fontWeight = FontWeight.Bold,
                         fontFamily = FontFamily.Monospace
                     )
@@ -3300,15 +3310,27 @@ fun MasterbatchCard(
         label = "mb_pulse_alpha"
     )
 
+    val amharicColor = when (masterbatch.color.lowercase().trim()) {
+        "black" -> "ጥቁር"
+        "white" -> "ነጭ"
+        "red" -> "ቀይ"
+        "blue" -> "ሰማያዊ"
+        "green" -> "አረንጓዴ"
+        "yellow" -> "ቢጫ"
+        "orange" -> "ብርቱካናማ"
+        "purple" -> "ሐምራዊ"
+        else -> masterbatch.color
+    }
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .testTag("masterbatch_card_${masterbatch.id}"),
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = BentoNeutralGray),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0x3B101524)), // Translucent space-gray glass effect
         border = BorderStroke(
             1.5.dp,
-            if (isLowStock) Color.Red.copy(alpha = pulseAlpha) else BentoBorder.copy(alpha = 0.6f)
+            if (isLowStock) Color(0xFFFF3B3B).copy(alpha = pulseAlpha) else Color(0xFF1E293B).copy(alpha = 0.5f)
         )
     ) {
         Row(
@@ -3320,11 +3342,11 @@ fun MasterbatchCard(
             // Left visual accent bar representing masterbatch color
             Box(
                 modifier = Modifier
-                    .width(6.dp)
+                    .width(8.dp)
                     .fillMaxHeight()
                     .background(
                         color = getMasterbatchColor(masterbatch.color),
-                        shape = RoundedCornerShape(topStart = 12.dp, bottomStart = 12.dp)
+                        shape = RoundedCornerShape(topStart = 20.dp, bottomStart = 20.dp)
                     )
             )
 
@@ -3333,7 +3355,7 @@ fun MasterbatchCard(
                 modifier = Modifier
                     .weight(1f)
                     .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
                 // Header Row (Color Name and Delete)
                 Row(
@@ -3344,26 +3366,26 @@ fun MasterbatchCard(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Box(
                             modifier = Modifier
-                                .size(10.dp)
+                                .size(12.dp)
                                 .background(
                                     color = getMasterbatchColor(masterbatch.color),
                                     shape = CircleShape
                                 )
-                                .border(1.dp, Color.White.copy(alpha = 0.4f), CircleShape)
+                                .border(1.5.dp, Color.White.copy(alpha = 0.5f), CircleShape)
                         )
-                        Spacer(modifier = Modifier.width(8.dp))
+                        Spacer(modifier = Modifier.width(10.dp))
                         Column {
                             Text(
-                                text = "${masterbatch.color} ማስተርባች",
+                                text = "$amharicColor ማስተርባች",
                                 style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
+                                fontWeight = FontWeight.Black,
                                 color = Color.White
                             )
                             if (isLowStock) {
                                 Text(
                                     text = "ዝቅተኛ ክምችት!",
                                     style = MaterialTheme.typography.labelSmall,
-                                    fontSize = 8.sp,
+                                    fontSize = 9.sp,
                                     color = Color(0xFFFF3B3B),
                                     fontWeight = FontWeight.Black
                                 )
@@ -3378,8 +3400,8 @@ fun MasterbatchCard(
                         Icon(
                             imageVector = Icons.Default.Delete,
                             contentDescription = "መዝገብ አጥፋ",
-                            tint = BentoAlertText.copy(alpha = 0.6f),
-                            modifier = Modifier.size(16.dp)
+                            tint = Color(0xFFFF5F5F).copy(alpha = 0.7f),
+                            modifier = Modifier.size(18.dp)
                         )
                     }
                 }
@@ -3388,16 +3410,16 @@ fun MasterbatchCard(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(Color.Black.copy(alpha = 0.2f), RoundedCornerShape(8.dp))
-                        .padding(12.dp)
+                        .background(Color.Black.copy(alpha = 0.25f), RoundedCornerShape(12.dp))
+                        .padding(14.dp)
                 ) {
                     Text(
-                        text = "በመጋዘን ያለ",
+                        text = "በመጋዘን ያለ፦",
                         style = MaterialTheme.typography.labelSmall,
-                        color = BentoSubText,
+                        color = Color(0xFF8C9E94),
                         fontWeight = FontWeight.Bold
                     )
-                    Spacer(modifier = Modifier.height(2.dp))
+                    Spacer(modifier = Modifier.height(4.dp))
                     
                     val totalKg = masterbatch.currentStock
                     val fullBags = (totalKg / 25).toInt()
@@ -3406,16 +3428,21 @@ fun MasterbatchCard(
 
                     Text(
                         text = stockText,
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = BentoSoftGreen
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Black,
+                        color = Color(0xFF00FF88)
                     )
                 }
 
-                // Daily in/out shown clearly and evenly spaced
+                // Daily tracking clearly laid out
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(Color(0xFF090D16), RoundedCornerShape(12.dp))
+                        .border(0.5.dp, Color(0xFF1E293B).copy(alpha = 0.4f), RoundedCornerShape(12.dp))
+                        .padding(12.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column(
                         modifier = Modifier.weight(1f),
@@ -3424,31 +3451,51 @@ fun MasterbatchCard(
                         Text(
                             text = "ከመጋዘን የወጣ",
                             style = MaterialTheme.typography.labelSmall,
-                            color = BentoSubText
+                            fontSize = 8.5.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF8C9E94)
                         )
+                        Spacer(modifier = Modifier.height(4.dp))
                         Text(
                             text = "${stats.takenOut.toInt()} ኪ.ግ",
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Black,
+                            color = Color.White,
+                            fontFamily = FontFamily.Monospace
                         )
                     }
+                    Box(
+                        modifier = Modifier
+                            .width(1.dp)
+                            .height(24.dp)
+                            .background(Color(0xFF1E293B))
+                    )
                     Column(
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier.weight(1.2f),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         Text(
                             text = "ወደ መጋዘን የተመለሰ",
                             style = MaterialTheme.typography.labelSmall,
-                            color = BentoSubText
+                            fontSize = 8.5.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF8C9E94)
                         )
+                        Spacer(modifier = Modifier.height(4.dp))
                         Text(
                             text = "${stats.returned.toInt()} ኪ.ግ",
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Black,
+                            color = Color.White,
+                            fontFamily = FontFamily.Monospace
                         )
                     }
+                    Box(
+                        modifier = Modifier
+                            .width(1.dp)
+                            .height(24.dp)
+                            .background(Color(0xFF1E293B))
+                    )
                     Column(
                         modifier = Modifier.weight(1f),
                         horizontalAlignment = Alignment.End
@@ -3456,13 +3503,17 @@ fun MasterbatchCard(
                         Text(
                             text = "የዕለት ፍጆታ",
                             style = MaterialTheme.typography.labelSmall,
-                            color = BentoAlertText
+                            fontSize = 8.5.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFFFF5F5F)
                         )
+                        Spacer(modifier = Modifier.height(4.dp))
                         Text(
                             text = "${stats.used.toInt()} ኪ.ግ",
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.ExtraBold,
-                            color = BentoAlertText
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Black,
+                            color = Color(0xFFFF3B3B),
+                            fontFamily = FontFamily.Monospace
                         )
                     }
                 }
@@ -3470,42 +3521,49 @@ fun MasterbatchCard(
                 // Action buttons
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    // + bag ግዢ Button
+                    // + bag ግዢ Button - premium green styling
                     Button(
                         onClick = onAddBoughtBagsClick,
-                        colors = ButtonDefaults.buttonColors(containerColor = BentoSoftGreen.copy(alpha = 0.15f), contentColor = BentoSoftGreen),
-                        shape = RoundedCornerShape(8.dp),
-                        border = BorderStroke(1.dp, BentoSoftGreen.copy(alpha = 0.5f)),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFF122C20), // premium dark green container
+                            contentColor = Color(0xFF00FF88)    // beautiful bright green text & icon
+                        ),
+                        shape = RoundedCornerShape(10.dp),
+                        border = BorderStroke(1.5.dp, Color(0xFF00FF88).copy(alpha = 0.5f)),
                         modifier = Modifier
                             .weight(1f)
-                            .height(36.dp),
-                        contentPadding = PaddingValues(0.dp)
+                            .height(40.dp),
+                        contentPadding = PaddingValues(horizontal = 4.dp)
                     ) {
                         Icon(
                             imageVector = Icons.Default.Add,
                             contentDescription = null,
+                            tint = Color(0xFF00FF88),
                             modifier = Modifier.size(16.dp)
                         )
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(
-                            text = "+ የተገዛ ቀለም ",
+                            text = "+ ማስተርባች ግዢ",
                             style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold
+                            fontWeight = FontWeight.ExtraBold
                         )
                     }
 
                     // Daily Ledger Log Button
                     Button(
                         onClick = onRecordClick,
-                        colors = ButtonDefaults.buttonColors(containerColor = Color.White.copy(alpha = 0.08f), contentColor = Color.White),
-                        shape = RoundedCornerShape(8.dp),
-                        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.2f)),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFF1E293B).copy(alpha = 0.5f),
+                            contentColor = Color.White
+                        ),
+                        shape = RoundedCornerShape(10.dp),
+                        border = BorderStroke(1.dp, Color(0xFF1E293B).copy(alpha = 0.7f)),
                         modifier = Modifier
                             .weight(1.2f)
-                            .height(36.dp),
-                        contentPadding = PaddingValues(0.dp)
+                            .height(40.dp),
+                        contentPadding = PaddingValues(horizontal = 4.dp)
                     ) {
                         Icon(
                             imageVector = Icons.Default.Edit,
