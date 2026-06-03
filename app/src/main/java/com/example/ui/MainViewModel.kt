@@ -14,7 +14,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val repository: InventoryRepository
 
     init {
-        repository = InventoryRepository()
+        repository = InventoryRepository.getInstance()
     }
 
     // --- SENSITIVE DATE MANAGEMENT ---
@@ -140,6 +140,47 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     val allWorkerAttendance: StateFlow<List<WorkerAttendance>> = repository.allAttendanceFlow
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    @Suppress("UNCHECKED_CAST")
+    val appState: StateFlow<AppState> = combine(
+        listOf(
+            allProducts,
+            allRawMaterials,
+            allMasterbatches,
+            allWorkers,
+            selectedDate,
+            currentAttendance,
+            allWorkerAttendance,
+            allProductTransactions,
+            allRawMaterialTransactions,
+            allMasterbatchTransactions,
+            allActivityLogs,
+            allAnnouncements,
+            appVersionState,
+            statsState,
+            workerAttendanceStats
+        )
+    ) { array ->
+        val attn = array[5] as List<WorkerAttendance>
+        AppState(
+            products = array[0] as List<Product>,
+            rawMaterials = array[1] as List<RawMaterial>,
+            masterbatches = array[2] as List<Masterbatch>,
+            workers = array[3] as List<Worker>,
+            selectedDate = array[4] as String,
+            currentAttendance = attn,
+            allWorkerAttendance = array[6] as List<WorkerAttendance>,
+            allProductTransactions = array[7] as List<ProductTransaction>,
+            allRawMaterialTransactions = array[8] as List<RawMaterialTransaction>,
+            allMasterbatchTransactions = array[9] as List<MasterbatchTransaction>,
+            activityLogs = array[10] as List<ActivityLog>,
+            announcements = array[11] as List<Announcement>,
+            appVersionInfo = array[12] as? AppVersion,
+            stats = array[13] as AggregatedStats,
+            workerStats = array[14] as List<WorkerAggStats>,
+            factoryStatus = if (attn.any { it.status == "On Duty" }) "ACTIVE" else "IDLE"
+        )
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), AppState())
 
     private fun allAttendanceFlow(): Flow<List<WorkerAttendance>> = repository.allAttendanceFlow
 

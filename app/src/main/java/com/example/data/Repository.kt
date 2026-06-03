@@ -16,7 +16,30 @@ import kotlin.random.Random
 
 class InventoryRepository {
 
-    private val db = FirebaseFirestore.getInstance()
+    private val db: FirebaseFirestore
+
+    companion object {
+        @Volatile
+        private var INSTANCE: InventoryRepository? = null
+
+        fun getInstance(): InventoryRepository {
+            return INSTANCE ?: synchronized(this) {
+                val instance = InventoryRepository()
+                INSTANCE = instance
+                instance
+            }
+        }
+    }
+
+    init {
+        // Explicitly enable offline state holding capabilities for premium offline resilience
+        val settings = com.google.firebase.firestore.FirebaseFirestoreSettings.Builder()
+            .setPersistenceEnabled(true)
+            .build()
+        val firestore = FirebaseFirestore.getInstance()
+        firestore.firestoreSettings = settings
+        db = firestore
+    }
 
     // Task awaiting helper for standard play-services Task
     private suspend fun <T> com.google.android.gms.tasks.Task<T>.awaitTask(): T = suspendCancellableCoroutine { continuation ->
