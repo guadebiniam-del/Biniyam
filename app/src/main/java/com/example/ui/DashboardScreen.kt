@@ -32,6 +32,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.*
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.data.*
@@ -62,9 +63,9 @@ import kotlin.math.sqrt
 const val CURRENT_APP_VERSION = "1.0.0"
 
 // God Mode Color & Gradient palette extensions
-val DarkToxicBg = Color(0xFF030A06) // Toxic forest black
+val DarkToxicBg = Color(0xFF000000) // Pure void black #000000
 val EmeraldGlow = Color(0xFF00FF88) // Glowing mint emerald neon
-val DarkGlassCard = Color(0xCC0A1A0F) // Semi transparent glassy dark green-black
+val DarkGlassCard = Color(0xFF050505) // Pure black card background #050505
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -253,14 +254,19 @@ fun CustomBottomNavigationBar(
         modifier = Modifier
             .fillMaxWidth()
             .windowInsetsPadding(WindowInsets.navigationBars)
-            .shadow(16.dp, RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)),
-        color = DarkGlassCard.copy(alpha = 0.95f),
-        border = BorderStroke(1.dp, Color(0xFF122C20))
+            .shadow(
+                elevation = 16.dp,
+                shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp),
+                ambientColor = EmeraldGlow,
+                spotColor = EmeraldGlow
+            ),
+        color = DarkGlassCard,
+        border = BorderStroke(1.dp, EmeraldGlow)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(vertical = 12.dp, horizontal = 4.dp),
+                .padding(vertical = 8.dp, horizontal = 4.dp),
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -304,7 +310,7 @@ fun CustomBottomNavigationBar(
                             .size(24.dp)
                             .graphicsLayer(scaleX = scale, scaleY = scale)
                     )
-                    Spacer(modifier = Modifier.height(6.dp))
+                    Spacer(modifier = Modifier.height(3.dp))
                     Text(
                         text = tab.label,
                         fontSize = 11.sp,
@@ -313,6 +319,22 @@ fun CustomBottomNavigationBar(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
+                    
+                    Box(
+                        modifier = Modifier
+                            .height(8.dp)
+                            .fillMaxWidth(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (isActive) {
+                            Box(
+                                modifier = Modifier
+                                    .size(5.dp)
+                                    .background(EmeraldGlow, CircleShape)
+                                    .shadow(4.dp, CircleShape)
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -488,11 +510,20 @@ fun StatsSummaryTile(title: String, valStr: String) {
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
         Text(title, color = Color(0xFF8C9E94), fontSize = 12.sp)
-        Text(valStr, color = EmeraldGlow, fontSize = 12.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+        AnimateCountUpText(
+            valueString = valStr,
+            color = Color(0xFFFFD700), // Premium cosmic gold
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Bold,
+            fontFamily = FontFamily.Monospace
+        )
     }
 }
 
 // ==================== (PRIMARY SCREEN 1) OVERVIEW/HOME SCREEN ====================
+data class PremiumAlert(val text: String, val type: AlertType)
+enum class AlertType { CRITICAL_STOCK, SALARY_COUNTDOWN }
+
 @Composable
 fun OverviewScreenContent(
     appState: AppState,
@@ -508,339 +539,588 @@ fun OverviewScreenContent(
     // Live clock ticker
     LaunchedEffect(Unit) {
         while (true) {
-            val format = SimpleDateFormat("hh:mm:ss a", Locale.getDefault())
+            val format = SimpleDateFormat("hh:mm:ss a", Locale.US)
             liveTimeStr = format.format(Date())
             kotlinx.coroutines.delay(1000)
         }
     }
 
-    LazyColumn(
+    // Dynamic animation coordinates for Drift Network Background
+    val infiniteTransition = rememberInfiniteTransition(label = "overview_drift")
+    val tick by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = (2 * Math.PI).toFloat(),
+        animationSpec = infiniteRepeatable(tween(42000, easing = LinearEasing), RepeatMode.Restart),
+        label = "tick"
+    )
+
+    // Pre-declare static drift coordinates (18 premium nodes)
+    val particlesCount = 18
+    val particles = remember {
+        List(particlesCount) {
+            Triple(
+                kotlin.random.Random.nextFloat(),
+                kotlin.random.Random.nextFloat(),
+                kotlin.random.Random.nextFloat() * 1.4f + 0.4f
+            )
+        }
+    }
+
+    // Typewriter state management
+    var typewriterText by remember { mutableStateOf("") }
+    val typewriterPhrases = listOf(
+        "OPERATING EFFICIENTLY",
+        "LEADING WITH INNOVATION",
+        "የፕላስቲክ ምርት ቁጥጥር",
+        "ANWAR FACTORY SYSTEM"
+    )
+
+    LaunchedEffect(Unit) {
+        var phraseIndex = 0
+        while (true) {
+            val word = typewriterPhrases[phraseIndex]
+            // Type characters forward
+            for (i in 0..word.length) {
+                typewriterText = word.substring(0, i)
+                kotlinx.coroutines.delay(75)
+            }
+            kotlinx.coroutines.delay(1500) // Pause on complete word
+            // Backspace delete
+            for (i in word.length downTo 0) {
+                typewriterText = word.substring(0, i)
+                kotlinx.coroutines.delay(35)
+            }
+            kotlinx.coroutines.delay(400)
+            phraseIndex = (phraseIndex + 1) % typewriterPhrases.size
+        }
+    }
+
+    // Entrance Animation coordination scales via graphicsLayer
+    var animateEntrance by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        animateEntrance = true
+    }
+
+    val heroAlpha by animateFloatAsState(targetValue = if (animateEntrance) 1f else 0f, animationSpec = tween(650, delayMillis = 100), label = "hero_a")
+    val heroSlide by animateFloatAsState(targetValue = if (animateEntrance) 0f else 70f, animationSpec = tween(650, delayMillis = 100), label = "hero_s")
+
+    val metricsAlpha by animateFloatAsState(targetValue = if (animateEntrance) 1f else 0f, animationSpec = tween(650, delayMillis = 280), label = "metrics_a")
+    val metricsSlide by animateFloatAsState(targetValue = if (animateEntrance) 0f else 70f, animationSpec = tween(650, delayMillis = 280), label = "metrics_s")
+
+    val chartAlpha by animateFloatAsState(targetValue = if (animateEntrance) 1f else 0f, animationSpec = tween(650, delayMillis = 440), label = "chart_a")
+    val chartSlide by animateFloatAsState(targetValue = if (animateEntrance) 0f else 70f, animationSpec = tween(650, delayMillis = 440), label = "chart_s")
+
+    val alertsAlpha by animateFloatAsState(targetValue = if (animateEntrance) 1f else 0f, animationSpec = tween(650, delayMillis = 600), label = "alerts_a")
+    val alertsSlide by animateFloatAsState(targetValue = if (animateEntrance) 0f else 70f, animationSpec = tween(650, delayMillis = 600), label = "alerts_s")
+
+    // Retrieve active counts
+    val isFactoryActive = appState.factoryStatus == "ACTIVE" || appState.stats.totalFabricated > 0
+    val dutyCount = appState.currentAttendance.count { it.status == "On Duty" }
+    val stockSum = appState.products.sumOf { it.currentStock }
+
+    // Parse alerts
+    val premiumAlerts = remember(appState) {
+        val list = mutableListOf<PremiumAlert>()
+        
+        // Critical stock alerts (product stock < 15)
+        appState.products.forEach { p ->
+            if (p.currentStock < 15) {
+                list.add(PremiumAlert("የምርት '${p.name}' ክምችት አልቋል! (${p.currentStock} ከረጢት)", AlertType.CRITICAL_STOCK))
+            }
+        }
+        
+        // Critical raw material alerts (rm < 350)
+        appState.rawMaterials.forEach { rm ->
+            if (rm.currentStock < 350) {
+                list.add(PremiumAlert("የጥሬ እቃ '${rm.type}' ክምችት እጅግ ዝቅተኛ ነው! (${rm.currentStock.toInt()}kg ቀርቷል)", AlertType.CRITICAL_STOCK))
+            }
+        }
+
+        // Salary countdown (usually end of Ethiopian month - day 30)
+        val parts = appState.selectedDate.split("-")
+        val currentDay = parts.getOrNull(2)?.toIntOrNull() ?: 1
+        if (currentDay <= 30) {
+            val daysToSalary = 30 - currentDay
+            if (daysToSalary == 0) {
+                list.add(PremiumAlert("የዛሬ ቀን ታላቁ የሰራተኞች ደሞዝ መክፈያ እለት ነው! ([ደሞዝ ክፈት/PAY ACTIVE])", AlertType.SALARY_COUNTDOWN))
+            } else if (daysToSalary <= 10) {
+                list.add(PremiumAlert("የደመወዝ ዝግጅት መቁጠሪያ፡ ለክፍያ ቀን $daysToSalary ቀናት ቀርተዋል!", AlertType.SALARY_COUNTDOWN))
+            }
+        }
+        
+        list
+    }
+
+    Box(
         modifier = Modifier
             .fillMaxSize()
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+            .background(Color.Black)
     ) {
-        // Full width high-end hero card
-        item {
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .shadow(8.dp, RoundedCornerShape(16.dp)),
-                colors = CardDefaults.cardColors(containerColor = DarkGlassCard),
-                border = BorderStroke(1.dp, Color(0xFF122C20))
-            ) {
+        // 1. Animated circuit particle background
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val w = size.width
+            val h = size.height
+            val pxList = particles.map { p ->
+                val cx = p.first * w + 35.dp.toPx() * cos((tick * p.third).toDouble()).toFloat()
+                val cy = p.second * h + 35.dp.toPx() * sin((tick * p.third).toDouble()).toFloat()
+                Offset(cx.coerceIn(0f, w), cy.coerceIn(0f, h))
+            }
+
+            // Draw link connections
+            val threshold = 180.dp.toPx()
+            for (i in pxList.indices) {
+                for (j in i + 1 until pxList.size) {
+                    val p1 = pxList[i]
+                    val p2 = pxList[j]
+                    val dx = p1.x - p2.x
+                    val dy = p1.y - p2.y
+                    val dist = sqrt((dx * dx + dy * dy).toDouble()).toFloat()
+                    if (dist < threshold) {
+                        val alpha = (1f - dist / threshold).coerceIn(0f, 1f) * 0.15f
+                        drawLine(
+                            color = Color(0xFF00FF88),
+                            start = p1,
+                            end = p2,
+                            strokeWidth = 1.dp.toPx(),
+                            alpha = alpha
+                        )
+                    }
+                }
+            }
+
+            // Draw circuit dot junctions
+            pxList.forEach { pt ->
+                drawCircle(
+                    color = Color(0xFF00FF88),
+                    radius = 3.dp.toPx(),
+                    center = pt,
+                    alpha = 0.38f
+                )
+            }
+        }
+
+        // 2. Main scrollable content
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(20.dp)
+        ) {
+            // Hero section
+            item {
                 Column(
-                    modifier = Modifier.padding(20.dp)
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .graphicsLayer(alpha = heroAlpha, translationY = heroSlide)
+                        .padding(vertical = 12.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    // Small green eyebrow
+                    Text(
+                        text = "የፋብሪካ አሠራር ቁጥጥር ስርዓት",
+                        color = Color(0xFF00FF88),
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 1.5.sp,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+
+                    // Big glowing title
+                    Text(
+                        text = buildAnnotatedString {
+                            append("ANWAR ")
+                            withStyle(style = SpanStyle(color = Color(0xFF00FF88), fontWeight = FontWeight.Black)) {
+                                append("PLASTIC")
+                            }
+                            append(" RECYCLE")
+                        },
+                        color = Color.White,
+                        fontSize = 24.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        letterSpacing = 0.5.sp,
+                        modifier = Modifier.shadow(
+                            elevation = 8.dp,
+                            spotColor = Color(0xFF00FF88),
+                            ambientColor = Color(0xFF00FF88)
+                        )
+                    )
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    // Typewriter Console strip
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth(0.9f)
+                            .height(34.dp)
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(Color(0xFF041008))
+                            .border(BorderStroke(0.8.dp, Color(0xFF00FF88).copy(alpha = 0.25f)), RoundedCornerShape(6.dp))
+                            .padding(horizontal = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Text(
+                            text = typewriterText,
+                            color = Color(0xFF00FF88),
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 1.sp
+                        )
+                        
+                        // Blinking terminal cursor
+                        val cursorTransition = rememberInfiniteTransition(label = "cursor")
+                        val cursorAlpha by cursorTransition.animateFloat(
+                            initialValue = 0f,
+                            targetValue = 1f,
+                            animationSpec = infiniteRepeatable(tween(400, easing = EaseInOutSine), RepeatMode.Reverse),
+                            label = "cursor_alpha"
+                        )
+                        Box(
+                            modifier = Modifier
+                                .width(7.dp)
+                                .height(13.dp)
+                                .offset(x = 3.dp)
+                                .background(Color(0xFF00FF88).copy(alpha = cursorAlpha))
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // Pill-shaped status badge
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(100.dp))
+                            .background(Color(0xFF09140C))
+                            .border(BorderStroke(1.dp, if (isFactoryActive) Color(0xFF00FF88).copy(alpha = 0.5f) else Color.Red.copy(alpha = 0.5f)), RoundedCornerShape(100.dp))
+                            .padding(horizontal = 14.dp, vertical = 6.dp)
+                    ) {
+                        // Pulsing led
+                        val ledTransition = rememberInfiniteTransition(label = "led")
+                        val ledScale by ledTransition.animateFloat(
+                            initialValue = 0.8f,
+                            targetValue = 1.35f,
+                            animationSpec = infiniteRepeatable(tween(900, easing = EaseInOutSine), RepeatMode.Reverse),
+                            label = "led_scale"
+                        )
+                        Box(
+                            modifier = Modifier
+                                .size(9.dp)
+                                .graphicsLayer(scaleX = ledScale, scaleY = ledScale)
+                                .background(if (isFactoryActive) Color(0xFF00FF88) else Color.Red, CircleShape)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = if (isFactoryActive) "FACTORY ACTIVE · በስራ ላይ" else "FACTORY IDLE · ቆሟል",
+                            color = if (isFactoryActive) Color(0xFF00FF88) else Color.Red,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = FontFamily.Monospace
+                        )
+                    }
+                }
+            }
+
+            // Metric Cards Grid
+            item {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .graphicsLayer(alpha = metricsAlpha, translationY = metricsSlide),
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                        horizontalArrangement = Arrangement.spacedBy(14.dp)
+                    ) {
+                        OverviewMetricCardGodMode(
+                            label = "የዛሬ ምርት",
+                            subLabel = "Today's Production",
+                            valueKey = "${appState.stats.totalFabricated} ከረጢት",
+                            numberColor = Color(0xFF00FF88),
+                            modifier = Modifier.weight(1f)
+                        )
+                        OverviewMetricCardGodMode(
+                            label = "የዛሬ ሽያጭ",
+                            subLabel = "Today's Sales",
+                            valueKey = "${appState.stats.totalSold} ከረጢት",
+                            numberColor = Color(0xFFFFD700),
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(14.dp)
+                    ) {
+                        OverviewMetricCardGodMode(
+                            label = "ንቁ ሰራተኞች",
+                            subLabel = "On Duty Workers",
+                            valueKey = "$dutyCount ሰራተኛ",
+                            numberColor = Color(0xFF00E5FF),
+                            modifier = Modifier.weight(1f)
+                        )
+                        OverviewMetricCardGodMode(
+                            label = "ጠቅላላ ክምችት",
+                            subLabel = "Total Stock Balance",
+                            valueKey = "$stockSum ማዳበሪያ",
+                            numberColor = Color(0xFF00FF88),
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
+            }
+
+            // Chart Section
+            item {
+                val trendPoints = remember(appState.allProductTransactions) {
+                    calculateLast7DaysTrend(appState.allProductTransactions, appState.products)
+                }
+                val maxVal = remember(trendPoints) {
+                    (trendPoints.maxOrNull() ?: 1.0).coerceAtLeast(1.0)
+                }
+
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .graphicsLayer(alpha = chartAlpha, translationY = chartSlide)
+                        .shadow(12.dp, RoundedCornerShape(20.dp), ambientColor = Color(0xFF00FF88).copy(alpha = 0.1f), spotColor = Color(0xFF00FF88).copy(alpha = 0.2f)),
+                    shape = RoundedCornerShape(20.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFF050505)),
+                    border = BorderStroke(0.8.dp, Color(0xFF333333))
+                ) {
+                    Column(
+                        modifier = Modifier.padding(18.dp)
                     ) {
                         Text(
-                            text = "እለታዊ አጠቃላይ መረጃ",
-                            fontWeight = FontWeight.Bold,
+                            text = "ታሪካዊ ምርት ልኬት (7-Days Production)",
                             color = Color.White,
-                            fontSize = 15.sp
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 0.5.sp
                         )
+                        Spacer(modifier = Modifier.height(18.dp))
+
+                        // Custom Bar Chart Row
                         Row(
-                            verticalAlignment = Alignment.CenterVertically
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(160.dp)
+                                .padding(horizontal = 4.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.Bottom
                         ) {
-                            Text(
-                                text = "ዛሬ፡ " + appState.selectedDate,
-                                color = EmeraldGlow,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 14.sp
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            // Factory Live Status Pulsing Led
-                            Box(
-                                modifier = Modifier
-                                    .size(10.dp)
-                                    .background(
-                                        if (appState.factoryStatus == "ACTIVE") EmeraldGlow else Color.Red,
-                                        CircleShape
+                            val labels = getAmharicWeekdays()
+                            trendPoints.forEachIndexed { index, value ->
+                                val barHeightFraction = if (maxVal > 0) (value / maxVal).toFloat() else 0f
+                                val animatedHeightFraction by animateFloatAsState(
+                                    targetValue = barHeightFraction,
+                                    animationSpec = tween(durationMillis = 800 + index * 80, easing = EaseOutQuad),
+                                    label = "bar_$index"
+                                )
+                                
+                                Column(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .fillMaxHeight(),
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.Bottom
+                                ) {
+                                    Text(
+                                        text = "${value.toInt()}",
+                                        color = if (index == 6) Color(0xFF00FF88) else Color.White.copy(alpha = 0.75f),
+                                        fontSize = 9.sp,
+                                        fontFamily = FontFamily.Monospace,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.padding(bottom = 4.dp)
                                     )
-                                    .shadow(4.dp, CircleShape)
+
+                                    Box(
+                                        modifier = Modifier
+                                            .weight(1f, fill = false)
+                                            .width(18.dp)
+                                            .height(95.dp * animatedHeightFraction.coerceAtLeast(0.01f))
+                                            .clip(RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp))
+                                            .background(
+                                                Brush.verticalGradient(
+                                                    colors = listOf(Color(0xFF00FF88), Color(0xFF042915))
+                                                )
+                                            )
+                                            .border(
+                                                BorderStroke(0.5.dp, if (index == 6) Color(0xFF00FF88) else Color(0xFF00FF88).copy(alpha = 0.3f)),
+                                                RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp)
+                                            )
+                                    )
+
+                                    Spacer(modifier = Modifier.height(6.dp))
+
+                                    Text(
+                                        text = labels.getOrNull(index) ?: "",
+                                        color = if (index == 6) Color(0xFF00FF88) else Color(0xFF8C9E94),
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Quick actions controller card (Optional actions helper)
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFF050505)),
+                    border = BorderStroke(0.8.dp, Color(0xFF222222))
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text(
+                            "ፈጣን የክትትል የድርጊት መቆጣጠሪያ (Quick Controls)",
+                            color = Color.White,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = FontFamily.Monospace,
+                            letterSpacing = 0.5.sp
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            OverviewQuickButton(
+                                label = "+ አዲስ ምርት",
+                                color = Color(0xFF041007),
+                                textColor = Color(0xFF00FF88),
+                                onClick = {
+                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    onAddProduct()
+                                },
+                                modifier = Modifier.weight(1f)
+                            )
+                            OverviewQuickButton(
+                                label = "+ ጥሬ እቃ LD",
+                                color = Color(0xFF030D14),
+                                textColor = Color(0xFF00E5FF),
+                                onClick = {
+                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    onRecordRawMaterial("LD")
+                                },
+                                modifier = Modifier.weight(1f)
+                            )
+                            OverviewQuickButton(
+                                label = "+ ማስተርባች",
+                                color = Color(0xFF141003),
+                                textColor = Color(0xFFFFD700),
+                                onClick = {
+                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    onAddMasterbatch()
+                                },
+                                modifier = Modifier.weight(1f)
                             )
                         }
                     }
+                }
+            }
 
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    Text(
-                        text = liveTimeStr.ifBlank { "00:00:00" },
-                        fontFamily = FontFamily.Monospace,
-                        color = Color.White,
-                        fontSize = 32.sp,
-                        fontWeight = FontWeight.Black,
-                        modifier = Modifier.align(Alignment.CenterHorizontally)
-                    )
-
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+            // Alerts Strip
+            item {
+                if (premiumAlerts.isNotEmpty()) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .graphicsLayer(alpha = alertsAlpha, translationY = alertsSlide),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         Text(
-                            text = "የፋብሪካው የስራ ሁኔታ (SCADA)፦",
-                            color = Color(0xFF8C9E94),
-                            fontSize = 13.sp
+                            text = "⚡ የስርዓት ማሳሰቢያዎች (Smart Alerts System)",
+                            color = Color.White.copy(alpha = 0.8f),
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = FontFamily.Monospace,
+                            modifier = Modifier.padding(bottom = 4.dp)
                         )
-                        Text(
-                            text = if (appState.factoryStatus == "ACTIVE") "ACTIVE (በስራ ላይ)" else "IDLE (ማሽኖች ጠፍተዋል)",
-                            color = if (appState.factoryStatus == "ACTIVE") EmeraldGlow else Color.Red,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Black
-                        )
+
+                        premiumAlerts.forEach { alert ->
+                            val isCritical = alert.type == AlertType.CRITICAL_STOCK
+                            val bgColor = if (isCritical) Color(0xFF1E0606) else Color(0xFF1E1706)
+                            val borderGlow = if (isCritical) Color(0xFFFF3B3B) else Color(0xFFFFD700)
+                            val textColor = if (isCritical) Color(0xFFFF9494) else Color(0xFFFDE047)
+
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .shadow(4.dp, RoundedCornerShape(12.dp), ambientColor = borderGlow, spotColor = borderGlow),
+                                colors = CardDefaults.cardColors(containerColor = bgColor),
+                                border = BorderStroke(1.dp, borderGlow.copy(alpha = 0.4f)),
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(14.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = if (isCritical) Icons.Default.Warning else Icons.Default.Info,
+                                        contentDescription = "Alert Indicator",
+                                        tint = borderGlow,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    Text(
+                                        text = alert.text,
+                                        color = textColor,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        fontFamily = FontFamily.Monospace,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
             }
-        }
 
-        // 4 metric cards in 2x2 grid
-        item {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+            // Scroll Hint indicator
+            item {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    val activeWorkersVal = appState.currentAttendance.count { it.status == "On Duty" }
-                    val totalStockVal = appState.products.sumOf { it.currentStock }
-
-                    OverviewMetricCard(
-                        title = "የዛሬ ምርት",
-                        subTitle = "Today Produced",
-                        value = "${appState.stats.totalFabricated} ከረጢት",
-                        gradient = Brush.linearGradient(listOf(Color(0xFF0A1A0F), Color(0xFF030E07))),
-                        modifier = Modifier.weight(1f)
-                    )
-                    OverviewMetricCard(
-                        title = "የዛሬ ሽያጭ",
-                        subTitle = "Today Sold",
-                        value = "${appState.stats.totalSold} ከረጢት",
-                        gradient = Brush.linearGradient(listOf(Color(0xFF0A1A0F), Color(0xFF030E07))),
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    val dutyCount = appState.currentAttendance.count { it.status == "On Duty" }
-                    val stockSum = appState.products.sumOf { it.currentStock }
-
-                    OverviewMetricCard(
-                        title = "ንቁ ሰራተኞች",
-                        subTitle = "On Duty Workers",
-                        value = "$dutyCount ሰራተኛ",
-                        gradient = Brush.linearGradient(listOf(Color(0xFF0A1A0F), Color(0xFF030E07))),
-                        modifier = Modifier.weight(1f)
-                    )
-                    OverviewMetricCard(
-                        title = "የቀረው ክምችት",
-                        subTitle = "Total Stock Balance",
-                        value = "$stockSum ማዳበሪያ",
-                        gradient = Brush.linearGradient(listOf(Color(0xFF0A1A0F), Color(0xFF030E07))),
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-            }
-        }
-
-        // Beautiful mini line chart detailing 7 days production trend
-        item {
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(240.dp),
-                colors = CardDefaults.cardColors(containerColor = DarkGlassCard),
-                border = BorderStroke(1.dp, Color(0xFF122C20))
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
                     Text(
-                        "ታሪካዊ ምርት ልኬት (7-Days Production Trend)",
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White,
-                        fontSize = 13.sp
+                        text = "SCROLL",
+                        color = Color(0xFF00FF88).copy(alpha = 0.7f),
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Black,
+                        fontFamily = FontFamily.Monospace,
+                        letterSpacing = 2.sp
                     )
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
 
-                    val trendPoints = remember(appState.allProductTransactions) {
-                        calculateLast7DaysTrend(appState.allProductTransactions, appState.products)
-                    }
+                    val scrollTransition = rememberInfiniteTransition(label = "scroll_glow")
+                    val lineOffset by scrollTransition.animateFloat(
+                        initialValue = -10f,
+                        targetValue = 10f,
+                        animationSpec = infiniteRepeatable(tween(1200, easing = EaseInOutSine), RepeatMode.Reverse),
+                        label = "offset"
+                    )
 
                     Box(
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .weight(1f)
+                            .width(2.dp)
+                            .height(30.dp)
+                            .background(Color(0xFF222222))
                     ) {
-                        Canvas(modifier = Modifier.fillMaxSize()) {
-                            val w = size.width
-                            val h = size.height
-                            if (trendPoints.isNotEmpty()) {
-                                val maxVal = (trendPoints.maxOrNull() ?: 1.0).coerceAtLeast(10.0)
-                                val stepX = w / (trendPoints.size - 1).coerceAtLeast(1)
-                                val path = Path()
-                                val px40 = 40.dp.toPx()
-                                val px10 = 10.dp.toPx()
-                                val points = trendPoints.mapIndexed { idx, value ->
-                                    val x = idx * stepX
-                                    val y = h - (value / maxVal * (h - px40)).toFloat() - px10
-                                    Offset(x, y)
-                                }
-
-                                path.moveTo(points.first().x, points.first().y)
-                                for (i in 1 until points.size) {
-                                    val prev = points[i - 1]
-                                    val curr = points[i]
-                                    // Smooth bezier interpolation
-                                    path.cubicTo(
-                                        (prev.x + curr.x) / 2, prev.y,
-                                        (prev.x + curr.x) / 2, curr.y,
-                                        curr.x, curr.y
-                                    )
-                                }
-
-                                // Draw line path
-                                drawPath(
-                                    path = path,
-                                    color = EmeraldGlow,
-                                    style = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round)
-                                )
-
-                                // Fill area underneath with bright neon vertical gradient
-                                val fillPath = Path().apply {
-                                    addPath(path)
-                                    lineTo(w, h)
-                                    lineTo(0f, h)
-                                    close()
-                                }
-                                drawPath(
-                                    path = fillPath,
-                                    brush = Brush.verticalGradient(
-                                        listOf(EmeraldGlow.copy(alpha = 0.35f), Color.Transparent)
-                                    )
-                                )
-
-                                // Draw glowing circles on vertex coordinates
-                                points.forEach { pt ->
-                                    drawCircle(
-                                        color = EmeraldGlow,
-                                        radius = 5.dp.toPx(),
-                                        center = pt
-                                    )
-                                    drawCircle(
-                                        color = Color.White,
-                                        radius = 2.dp.toPx(),
-                                        center = pt
-                                    )
-                                }
-                            }
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(10.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text("-7d", color = Color(0xFF8C9E94), fontSize = 11.sp, fontFamily = FontFamily.Monospace)
-                        Text("-4d", color = Color(0xFF8C9E94), fontSize = 11.sp, fontFamily = FontFamily.Monospace)
-                        Text("ትላንት", color = Color(0xFF8C9E94), fontSize = 11.sp, fontFamily = FontFamily.Monospace)
-                        Text("ዛሬ", color = EmeraldGlow, fontSize = 11.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
-                    }
-                }
-            }
-        }
-
-        // Quick action floating buttons panel
-        item {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = DarkGlassCard),
-                border = BorderStroke(1.dp, Color(0xFF122C20))
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text(
-                        "ፈጣን ድርጊቶች (Quick Actions Control)",
-                        color = Color.White,
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Spacer(modifier = Modifier.height(14.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        OverviewQuickButton(
-                            label = "+ አዲስ ምርት",
-                            color = Color(0xFF0F2618),
-                            textColor = EmeraldGlow,
-                            onClick = {
-                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                onAddProduct()
-                            },
-                            modifier = Modifier.weight(1f)
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.TopCenter)
+                                .offset(y = (10.dp + lineOffset.dp))
+                                .width(2.dp)
+                                .height(10.dp)
+                                .background(Color(0xFF00FF88))
                         )
-                        OverviewQuickButton(
-                            label = "+ ጥሬ እቃ LD",
-                            color = Color(0xFF0F1C26),
-                            textColor = Color(0xFF7DD3FC),
-                            onClick = {
-                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                onRecordRawMaterial("LD")
-                            },
-                            modifier = Modifier.weight(1f)
-                        )
-                        OverviewQuickButton(
-                            label = "+ ማስተርባች",
-                            color = Color(0xFF261D0F),
-                            textColor = BentoGold,
-                            onClick = {
-                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                onAddMasterbatch()
-                            },
-                            modifier = Modifier.weight(1f)
-                        )
-                    }
-                }
-            }
-        }
-
-        // Active Alerts Warning Strip
-        item {
-            val alerts = remember(appState) { calculateOverviewAlerts(appState) }
-            if (alerts.isNotEmpty()) {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFF330C0C)),
-                    border = BorderStroke(1.dp, Color(0xFFFF3B3B).copy(alpha = 0.5f))
-                ) {
-                    Row(
-                        modifier = Modifier.padding(14.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Warning,
-                            contentDescription = "Warning alerts",
-                            tint = Color(0xFFFF3B3B),
-                            modifier = Modifier.size(24.dp)
-                        )
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Column {
-                            alerts.take(2).forEach { alert ->
-                                Text(
-                                    text = "⚠️ $alert",
-                                    color = Color(0xFFFF9494),
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                            }
-                        }
                     }
                 }
             }
@@ -848,36 +1128,81 @@ fun OverviewScreenContent(
     }
 }
 
+// Helpers
+fun getAmharicWeekdays(): List<String> {
+    val days = listOf("እሁ", "ሰኞ", "ማክ", "ረቡ", "ሐሙ", "አርብ", "ቅዳ")
+    val todayWeekDay = Calendar.getInstance().get(Calendar.DAY_OF_WEEK)
+    val result = mutableListOf<String>()
+    for (i in 0 until 7) {
+        val calculatedIdx = (todayWeekDay - 1 - (6 - i) + 14) % 7
+        result.add(days[calculatedIdx])
+    }
+    return result
+}
+
 @Composable
-fun OverviewMetricCard(
-    title: String,
-    subTitle: String,
-    value: String,
-    gradient: Brush,
+fun OverviewMetricCardGodMode(
+    label: String,
+    subLabel: String,
+    valueKey: String,
+    numberColor: Color,
     modifier: Modifier = Modifier
 ) {
     Card(
         modifier = modifier
-            .height(108.dp)
-            .border(BorderStroke(1.dp, Color(0xFF122C20)), RoundedCornerShape(12.dp)),
-        colors = CardDefaults.cardColors(containerColor = Color.Transparent)
+            .height(115.dp)
+            .shadow(
+                elevation = 8.dp,
+                shape = RoundedCornerShape(16.dp),
+                ambientColor = numberColor.copy(alpha = 0.15f),
+                spotColor = numberColor.copy(alpha = 0.25f)
+            ),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF050505)),
+        border = BorderStroke(0.8.dp, Color(0xFF222222))
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(gradient)
-                .padding(14.dp)
-        ) {
-            Column(verticalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxSize()) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            // Modern Top Shine Line
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(2.dp)
+                    .background(
+                        Brush.horizontalGradient(
+                            listOf(
+                                Color.Transparent,
+                                numberColor.copy(alpha = 0.9f),
+                                Color.Transparent
+                            )
+                        )
+                    )
+            )
+
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(14.dp),
+                verticalArrangement = Arrangement.SpaceBetween
+            ) {
                 Column {
-                    Text(title, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                    Text(subTitle, color = Color(0xFF8C9E94), fontSize = 10.sp)
+                    Text(
+                        text = label,
+                        color = Color.White,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = subLabel,
+                        color = Color(0xFF8C9E94),
+                        fontSize = 10.sp
+                    )
                 }
-                Text(
-                    text = value,
-                    color = EmeraldGlow,
+
+                AnimateCountUpText(
+                    valueString = valueKey,
+                    color = numberColor,
                     fontSize = 18.sp,
-                    fontWeight = FontWeight.Black,
+                    fontWeight = FontWeight.ExtraBold,
                     fontFamily = FontFamily.Monospace
                 )
             }
@@ -905,7 +1230,7 @@ fun OverviewQuickButton(
         Text(
             text = label,
             color = textColor,
-            fontSize = 12.sp,
+            fontSize = 11.sp,
             fontWeight = FontWeight.Black
         )
     }
@@ -913,8 +1238,6 @@ fun OverviewQuickButton(
 
 fun calculateLast7DaysTrend(transactions: List<ProductTransaction>, products: List<Product>): List<Double> {
     val list = MutableList(7) { 0.0 }
-    val formatter = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
-    val cal = Calendar.getInstance()
     for (i in 0 until 7) {
         val targetDateStr = EthiopianCalendarHelper.shiftEthiopianDate(EthiopianCalendarHelper.getTodayEthiopianString(), i - 6)
         val fabricationToday = transactions.filter { it.date == targetDateStr }.sumOf { tr ->
@@ -1725,6 +2048,8 @@ fun BiniyamAIScreenContent(
     val haptic = LocalHapticFeedback.current
     val scope = rememberCoroutineScope()
     var isThinking by remember { mutableStateOf(false) }
+    var isListening by remember { mutableStateOf(false) }
+    var showTerminalInput by remember { mutableStateOf(false) }
 
     val chatMessages = remember {
         mutableStateListOf(
@@ -1759,50 +2084,164 @@ fun BiniyamAIScreenContent(
     val speechLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
     ) { result ->
+        isListening = false
         if (result.resultCode == Activity.RESULT_OK) {
             val spokenText = result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull() ?: ""
             if (spokenText.isNotBlank()) {
-                userInputText = spokenText
+                val userMsg = spokenText.trim()
+                chatMessages.add(ChatMessage(sender = "user", text = userMsg))
+                userInputText = ""
+                isThinking = true
+
+                scope.launch {
+                    val contextPrompt = buildContextPromptForGemini(appState)
+                    val reply = GeminiBotService.getGeminiResponse(
+                        systemPrompt = contextPrompt,
+                        userPrompt = userMsg,
+                        history = chatMessages.map { Pair(it.sender, it.text) }
+                    )
+                    chatMessages.add(ChatMessage(sender = "model", text = reply))
+                    isThinking = false
+
+                    // Auto-read response for authentic voice-first experience
+                    if (isTtsReady) {
+                        tts?.speak(reply, TextToSpeech.QUEUE_FLUSH, null, null)
+                    }
+
+                    // Log activity
+                    viewModel.recordActivityLog("Biniyam AI", "Add", "ቢኒያም AI መልስ ሰጥቷል፡ $userMsg")
+                }
             }
         }
     }
 
-    // Dynamic animation coordinates for Drift Network (Constellation Canvas)
-    val infiniteTransition = rememberInfiniteTransition(label = "drift")
+    // Dynamic animation coordinates for Drift Network (Deep Neural Network Plexus Landscape)
+    val infiniteTransition = rememberInfiniteTransition(label = "drift_neural")
     val tick by infiniteTransition.animateFloat(
-        initialValue =  0f,
+        initialValue = 0f,
         targetValue = 2 * Math.PI.toFloat(),
-        animationSpec = infiniteRepeatable(tween(25000, easing = LinearEasing), RepeatMode.Restart),
+        animationSpec = infiniteRepeatable(tween(35000, easing = LinearEasing), RepeatMode.Restart),
         label = "tick"
     )
 
-    // Pre-declare static particles positioning offsetting on tick
-    val particlesCount = 14
+    // Glowing heartbeat plexus pulse to represent active process or idle status
+    val restPulseTransition = rememberInfiniteTransition(label = "rest_pulse")
+    val plexusPulse by restPulseTransition.animateFloat(
+        initialValue = 0.35f,
+        targetValue = 1.15f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1800, easing = EaseInOutSine),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "plexus_pulse"
+    )
+
+    // Wave ripple animation parameters triggered during voice/thinking
+    val wave1Progress by infiniteTransition.animateFloat(
+        initialValue = 1.0f,
+        targetValue = 3.5f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1800, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "wave1"
+    )
+    val wave2Progress by infiniteTransition.animateFloat(
+        initialValue = 1.0f,
+        targetValue = 3.5f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1800, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart,
+            initialStartOffset = StartOffset(600)
+        ),
+        label = "wave2"
+    )
+    val wave3Progress by infiniteTransition.animateFloat(
+        initialValue = 1.0f,
+        targetValue = 3.5f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1800, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart,
+            initialStartOffset = StartOffset(1200)
+        ),
+        label = "wave3"
+    )
+
+    // Pre-declare and layout static particle coordinates (24 high-end nodes)
+    val particlesCount = 24
     val particles = remember {
         List(particlesCount) {
             Triple(
                 kotlin.random.Random.nextFloat(),
                 kotlin.random.Random.nextFloat(),
-                kotlin.random.Random.nextFloat() * 1.5f + 0.5f
+                kotlin.random.Random.nextFloat() * 1.6f + 0.4f
             )
         }
     }
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        // Drifting background particles Canvas
+    // Terminal typing visual state
+    var activeTypewrittenText by remember { mutableStateOf("") }
+    val lastMessage = chatMessages.lastOrNull()
+
+    LaunchedEffect(lastMessage) {
+        if (lastMessage != null && lastMessage.sender == "model") {
+            activeTypewrittenText = ""
+            val fullText = lastMessage.text
+            // Fast intelligent chunk typewriting
+            for (i in 1..fullText.length) {
+                activeTypewrittenText = fullText.substring(0, i)
+                kotlinx.coroutines.delay(10)
+            }
+            activeTypewrittenText = fullText
+        }
+    }
+
+    val listState = rememberLazyListState()
+    LaunchedEffect(chatMessages.size, activeTypewrittenText) {
+        if (chatMessages.isNotEmpty()) {
+            listState.animateScrollToItem(chatMessages.size - 1)
+        }
+    }
+
+    val onMicClick = {
+        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+        if (tts?.isSpeaking == true) {
+            tts?.stop()
+        }
+        isListening = true
+        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE, "am-ET")
+            putExtra(RecognizerIntent.EXTRA_PROMPT, "ስለ አንዋር ሪሳይክል ይጠይቁ (Ask Biniyam)...")
+        }
+        try {
+            speechLauncher.launch(intent)
+        } catch (e: Exception) {
+            isListening = false
+            Toast.makeText(context, "የድምፅ ግብዓት አልተዘጋጀም (Voice input not ready)", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black)
+    ) {
+        // 1. Drifting neural background particles & pulsing connecting link Canvas
         Canvas(modifier = Modifier.fillMaxSize()) {
             val w = size.width
             val h = size.height
+            val activeMultiplier = if (isListening || isThinking) plexusPulse * 1.4f else plexusPulse
 
-            // Calculate active positions based on trigonometric offsets
+            // Map particle drifts
             val pxList = particles.map { p ->
-                val cx = p.first * w + 50.dp.toPx() * cos((tick * p.third).toDouble()).toFloat()
-                val cy = p.second * h + 50.dp.toPx() * sin((tick * p.third).toDouble()).toFloat()
+                val cx = p.first * w + 45.dp.toPx() * cos((tick * p.third).toDouble()).toFloat()
+                val cy = p.second * h + 45.dp.toPx() * sin((tick * p.third).toDouble()).toFloat()
                 Offset(cx.coerceIn(0f, w), cy.coerceIn(0f, h))
             }
 
-            // Draw connecting links if distances < 200dp
-            val threshold = 180.dp.toPx()
+            // Draw neural connections
+            val threshold = 210.dp.toPx()
             for (i in pxList.indices) {
                 for (j in i + 1 until pxList.size) {
                     val p1 = pxList[i]
@@ -1811,114 +2250,208 @@ fun BiniyamAIScreenContent(
                     val dy = p1.y - p2.y
                     val dist = sqrt((dx * dx + dy * dy).toDouble()).toFloat()
                     if (dist < threshold) {
-                        val alpha = (1f - dist / threshold).coerceIn(0f, 1f) * 0.25f
+                        val baseAlpha = (1f - dist / threshold).coerceIn(0f, 1f)
+                        val pulseAlpha = baseAlpha * 0.18f * activeMultiplier
                         drawLine(
-                            color = EmeraldGlow,
+                            color = Color(0xFF00FF88),
                             start = p1,
                             end = p2,
-                            strokeWidth = 1.dp.toPx(),
-                            alpha = alpha
+                            strokeWidth = (1.1.dp.toPx() * activeMultiplier),
+                            alpha = pulseAlpha
                         )
                     }
                 }
             }
 
-            // Draw glowing circles
+            // Draw glowing synapse nodes with pulsating core radii
             pxList.forEach { pt ->
                 drawCircle(
-                    color = EmeraldGlow,
-                    radius = 4.dp.toPx(),
+                    color = Color(0xFF00FF88),
+                    radius = (4.dp.toPx() * activeMultiplier),
                     center = pt,
-                    alpha = 0.4f
+                    alpha = 0.35f * activeMultiplier
+                )
+                drawCircle(
+                    color = Color(0xFF00FF88),
+                    radius = (2.dp.toPx() * activeMultiplier),
+                    center = pt,
+                    alpha = 0.6f
                 )
             }
         }
 
-        // Biniyam Chat UI container
+        // 2. Cosmic Darkness vignette overlay to keep text fully legible
+        Spacer(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.radialGradient(
+                        colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.94f)),
+                        center = Offset.Unspecified
+                    )
+                )
+        )
+
+        // 3. Central Glassmorphism terminal dialogue box
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(16.dp)
+                .padding(horizontal = 16.dp, vertical = 24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Daily Auto-Briefing strip
+            Spacer(modifier = Modifier.height(12.dp))
+
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable {
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                        val reportMsg = buildEthiopianReportOverview(appState)
-                        chatMessages.add(ChatMessage(sender = "model", text = reportMsg))
-                        if (isTtsReady) {
-                            tts?.speak(
-                                "የእለት መረጃ ተዘጋጅቷል፡ " + reportMsg.take(150),
-                                TextToSpeech.QUEUE_FLUSH,
-                                null,
-                                null
+                    .fillMaxHeight(0.52f)
+                    .shadow(
+                        elevation = 24.dp,
+                        shape = RoundedCornerShape(24.dp),
+                        ambientColor = Color(0xFF00FF88).copy(alpha = 0.2f),
+                        spotColor = Color(0xFF00FF88).copy(alpha = 0.4f)
+                    ),
+                shape = RoundedCornerShape(24.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = Color(0xFF0A1A0F).copy(alpha = 0.82f)
+                ),
+                border = BorderStroke(1.2.dp, Color(0xFF00FF88).copy(alpha = 0.38f))
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(18.dp)
+                ) {
+                    // Futuristic Glass Card Console Status Header
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(
+                                modifier = Modifier
+                                    .size(7.dp)
+                                    .background(
+                                        if (isThinking) Color(0xFFFFD700) else if (isListening) Color(0xFF00FF88) else Color(0xFF00FF88).copy(alpha = 0.4f),
+                                        CircleShape
+                                    )
+                                    .shadow(4.dp, CircleShape)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = if (isThinking) "BINIYAM_SYS @ CORES_PROCESSING" else if (isListening) "BINIYAM_SYS @ CAPTURING_AUDIO" else "BINIYAM_SYS @ IDLE_STBY",
+                                color = if (isThinking) Color(0xFFFFD700) else Color(0xFF00FF88).copy(alpha = 0.85f),
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Black,
+                                letterSpacing = 0.5.sp
                             )
                         }
-                    }
-                    .border(BorderStroke(1.dp, BentoGold.copy(alpha = 0.5f)), RoundedCornerShape(12.dp)),
-                colors = CardDefaults.cardColors(containerColor = DarkGlassCard)
-            ) {
-                Row(
-                    modifier = Modifier.padding(14.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(Icons.Default.AutoAwesome, null, tint = BentoGold, modifier = Modifier.size(24.dp))
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text("እለታዊ አውቶማቲክ ሪፖርት (Click for briefing)", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                        Text("ቢኒያም AI - የዛሬ የፋብሪካ የስራ ማጠቃለያ", color = BentoGold, fontSize = 11.sp)
-                    }
-                    Icon(Icons.Default.VolumeUp, null, tint = EmeraldGlow, modifier = Modifier.size(20.dp))
-                }
-            }
 
-            Spacer(modifier = Modifier.height(12.dp))
+                        Text(
+                            text = "PORT_4031_SYS",
+                            color = Color.White.copy(alpha = 0.25f),
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
 
-            // Chat Messages pane
-            LazyColumn(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                items(chatMessages) { msg ->
-                    val isModel = msg.sender == "model"
                     Box(
                         modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 10.dp)
+                            .height(1.dp)
+                            .background(Color(0xFF00FF88).copy(alpha = 0.15f))
+                    )
+
+                    // Typewriter/Console Scrollable Chat Dialogue
+                    LazyColumn(
+                        state = listState,
+                        modifier = Modifier
+                            .weight(1f)
                             .fillMaxWidth(),
-                        contentAlignment = if (isModel) Alignment.CenterStart else Alignment.CenterEnd
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
-                        Surface(
-                            shape = RoundedCornerShape(12.dp),
-                            color = if (isModel) DarkGlassCard else Color(0xFF0F2B18),
-                            border = BorderStroke(
-                                1.dp,
-                                if (isModel) Color(0xFF122C20) else EmeraldGlow.copy(alpha = 0.5f)
-                            ),
-                            modifier = Modifier.fillMaxWidth(0.85f)
-                        ) {
-                            Column(modifier = Modifier.padding(12.dp)) {
+                        itemsIndexed(chatMessages) { idx, msg ->
+                            val isLast = idx == chatMessages.lastIndex
+                            val isModel = msg.sender == "model"
+
+                            Column(modifier = Modifier.fillMaxWidth()) {
                                 Text(
-                                    text = msg.text,
-                                    color = Color.White,
-                                    fontSize = 13.sp,
-                                    lineHeight = 18.sp
+                                    text = if (isModel) "BINIYAM_AI_SYS_ORACLE >" else "LOCAL_USER_SPK >",
+                                    color = if (isModel) Color(0xFF00FF88).copy(alpha = 0.8f) else Color(0xFFFFD700).copy(alpha = 0.8f),
+                                    fontFamily = FontFamily.Monospace,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Black,
+                                    letterSpacing = 0.5.sp,
+                                    modifier = Modifier.padding(bottom = 4.dp)
                                 )
+
+                                val displayText = if (isModel && isLast) activeTypewrittenText else msg.text
+
+                                Row(verticalAlignment = Alignment.Bottom) {
+                                    Text(
+                                        text = displayText,
+                                        color = if (isModel) Color.White else Color(0xFFE2EBE5),
+                                        fontFamily = FontFamily.Monospace,
+                                        fontSize = 12.5.sp,
+                                        lineHeight = 18.sp,
+                                        modifier = Modifier.weight(1f, fill = false)
+                                    )
+
+                                    if (isModel && isLast && activeTypewrittenText.length < msg.text.length) {
+                                        val cursorTransition = rememberInfiniteTransition(label = "cursor")
+                                        val cursorAlpha by cursorTransition.animateFloat(
+                                            initialValue = 0f,
+                                            targetValue = 1f,
+                                            animationSpec = infiniteRepeatable(
+                                                animation = tween(450, easing = EaseInOutSine),
+                                                repeatMode = RepeatMode.Reverse
+                                            ),
+                                            label = "alpha"
+                                        )
+                                        Box(
+                                            modifier = Modifier
+                                                .width(7.dp)
+                                                .height(14.dp)
+                                                .offset(x = 3.dp)
+                                                .background(Color(0xFF00FF88).copy(alpha = cursorAlpha))
+                                        )
+                                    }
+                                }
+
                                 if (isModel) {
                                     Spacer(modifier = Modifier.height(6.dp))
-                                    IconButton(
-                                        onClick = {
-                                            if (isTtsReady) {
-                                                tts?.speak(msg.text, TextToSpeech.QUEUE_FLUSH, null, null)
-                                            }
-                                        },
-                                        modifier = Modifier
-                                            .size(24.dp)
-                                            .align(Alignment.End)
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.End
                                     ) {
-                                        Icon(Icons.Default.VolumeUp, null, tint = EmeraldGlow, modifier = Modifier.size(16.dp))
+                                        TextButton(
+                                            onClick = {
+                                                if (isTtsReady) {
+                                                    tts?.speak(msg.text, TextToSpeech.QUEUE_FLUSH, null, null)
+                                                }
+                                            },
+                                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                                            modifier = Modifier.height(26.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.VolumeUp,
+                                                contentDescription = "Speak response voice",
+                                                tint = Color(0xFF00FF88).copy(alpha = 0.6f),
+                                                modifier = Modifier.size(15.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text(
+                                                "REPLAY VOICE",
+                                                color = Color(0xFF00FF88).copy(alpha = 0.6f),
+                                                fontFamily = FontFamily.Monospace,
+                                                fontSize = 9.sp,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                        }
                                     }
                                 }
                             }
@@ -1927,91 +2460,225 @@ fun BiniyamAIScreenContent(
                 }
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
-
-            if (isThinking) {
-                Card(
-                    modifier = Modifier.align(Alignment.Start),
-                    colors = CardDefaults.cardColors(containerColor = DarkGlassCard)
-                ) {
-                    Text("ቢኒያም AI እያሰበ ነው... (Thinking...)", color = EmeraldGlow, fontSize = 11.sp, modifier = Modifier.padding(8.dp))
-                }
-                Spacer(modifier = Modifier.height(8.dp))
-            }
-
-            // Input Row & Voice Mic Controls
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            // 4. Manual Text Input (Optional / Expandable Console field)
+            AnimatedVisibility(
+                visible = showTerminalInput,
+                enter = expandVertically() + fadeIn(),
+                exit = shrinkVertically() + fadeOut()
             ) {
-                OutlinedTextField(
+                TextField(
                     value = userInputText,
                     onValueChange = { userInputText = it },
-                    placeholder = { Text("ቢኒያምን ጥያቄ ጠይቁት...", color = Color(0xFF8C9E94)) },
-                    modifier = Modifier
-                        .weight(1f)
-                        .testTag("ai_input_text"),
-                    colors = OutlinedTextFieldDefaults.colors(
+                    placeholder = {
+                        Text(
+                            "ቢኒያምን እዚህ ይጻፉለት (Type a custom query to Biniyam)...",
+                            color = Color(0xFF7A9483),
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 11.sp
+                        )
+                    },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
+                    textStyle = TextStyle(color = Color.White, fontFamily = FontFamily.Monospace, fontSize = 12.sp),
+                    colors = TextFieldDefaults.colors(
+                        focusedContainerColor = Color(0xFF041008),
+                        unfocusedContainerColor = Color(0xFF020904),
+                        focusedIndicatorColor = Color(0xFF00FF88),
+                        unfocusedIndicatorColor = Color(0xFF03160A),
                         focusedTextColor = Color.White,
-                        unfocusedTextColor = Color.White,
-                        focusedBorderColor = EmeraldGlow,
-                        unfocusedBorderColor = Color(0xFF14241B)
-                    )
+                        unfocusedTextColor = Color.White
+                    ),
+                    trailingIcon = {
+                        IconButton(
+                            onClick = {
+                                if (userInputText.isNotBlank()) {
+                                    val userMsg = userInputText.trim()
+                                    chatMessages.add(ChatMessage(sender = "user", text = userMsg))
+                                    userInputText = ""
+                                    isThinking = true
+                                    showTerminalInput = false
+
+                                    scope.launch {
+                                        val contextPrompt = buildContextPromptForGemini(appState)
+                                        val reply = GeminiBotService.getGeminiResponse(
+                                            systemPrompt = contextPrompt,
+                                            userPrompt = userMsg,
+                                            history = chatMessages.map { Pair(it.sender, it.text) }
+                                        )
+                                        chatMessages.add(ChatMessage(sender = "model", text = reply))
+                                        isThinking = false
+
+                                        if (isTtsReady) {
+                                            tts?.speak(reply, TextToSpeech.QUEUE_FLUSH, null, null)
+                                        }
+
+                                        viewModel.recordActivityLog("Biniyam AI", "Add", "ቢኒያም AI መልስ ሰጥቷል፡ $userMsg")
+                                    }
+                                }
+                            }
+                        ) {
+                            Icon(Icons.Default.Send, "Send terminal message", tint = Color(0xFF00FF88))
+                        }
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 12.dp)
+                        .border(BorderStroke(1.dp, Color(0xFF00FF88).copy(alpha = 0.35f)), RoundedCornerShape(10.dp))
+                        .clip(RoundedCornerShape(10.dp))
+                )
+            }
+
+            Spacer(modifier = Modifier.weight(1f))
+
+            // 5. Voice Pulse Studio Terminal Controller at Bottom
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 76.dp), // Height class offset
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                // Status Label
+                Text(
+                    text = if (isThinking) "BINIYAM AI ORACLE ENGAGED" else if (isListening) "🎙️ LISTENING / RECORDING VOICE..." else "TAP MIC KEY TO COMMUNICATE",
+                    color = if (isThinking) Color(0xFFFFD700) else if (isListening) Color(0xFF00FF88) else Color(0xFF6B8074),
+                    fontFamily = FontFamily.Monospace,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Black,
+                    letterSpacing = 1.8.sp,
+                    modifier = Modifier.padding(bottom = 14.dp)
                 )
 
-                // Sleek pulsing microphone ripple
-                IconButton(
-                    onClick = {
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-                            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-                            putExtra(RecognizerIntent.EXTRA_LANGUAGE, "am-ET")
-                            putExtra(RecognizerIntent.EXTRA_PROMPT, "ስለ አንዋር ሪሳይክል ይጠይቁ...")
-                        }
-                        try {
-                            speechLauncher.launch(intent)
-                        } catch (e: Exception) {
-                            Toast.makeText(context, "Voice input not ready", Toast.LENGTH_SHORT).show()
-                        }
-                    },
-                    modifier = Modifier
-                        .size(46.dp)
-                        .background(Color(0xFF0F2B18), CircleShape)
-                        .border(BorderStroke(1.5.dp, EmeraldGlow), CircleShape)
+                // Large interactive glowing microphone button built with concentric feedback waves
+                Box(
+                    modifier = Modifier.size(135.dp),
+                    contentAlignment = Alignment.Center
                 ) {
-                    Icon(Icons.Default.Mic, "Voice Input", tint = EmeraldGlow)
+                    if (isListening || isThinking) {
+                        Canvas(modifier = Modifier.fillMaxSize()) {
+                            val centerOffset = Offset(size.width / 2, size.height / 2)
+                            val baseWaveColor = if (isThinking) Color(0xFFFFD700) else Color(0xFF00FF88)
+
+                            // Wave Ripple Ring 1 (Inner expanding)
+                            drawCircle(
+                                color = baseWaveColor.copy(alpha = (1f - (wave1Progress - 1f) / 2.5f).coerceIn(0f, 1f) * 0.42f),
+                                radius = (35.dp.toPx() * wave1Progress),
+                                center = centerOffset,
+                                style = Stroke(width = 2.dp.toPx())
+                            )
+
+                            // Wave Ripple Ring 2 (Middle expanding)
+                            drawCircle(
+                                color = baseWaveColor.copy(alpha = (1f - (wave2Progress - 1f) / 2.5f).coerceIn(0f, 1f) * 0.42f),
+                                radius = (35.dp.toPx() * wave2Progress),
+                                center = centerOffset,
+                                style = Stroke(width = 1.5.dp.toPx())
+                            )
+
+                            // Wave Ripple Ring 3 (Outer expanding)
+                            drawCircle(
+                                color = baseWaveColor.copy(alpha = (1f - (wave3Progress - 1f) / 2.5f).coerceIn(0f, 1f) * 0.42f),
+                                radius = (35.dp.toPx() * wave3Progress),
+                                center = centerOffset,
+                                style = Stroke(width = 1.dp.toPx())
+                            )
+                        }
+                    } else {
+                        // Resting smooth organic pulse halo
+                        val restWaveTransition = rememberInfiniteTransition(label = "pulse_mic_idle")
+                        val restProgress by restWaveTransition.animateFloat(
+                            initialValue = 1.0f,
+                            targetValue = 1.28f,
+                            animationSpec = infiniteRepeatable(
+                                animation = tween(1500, easing = EaseInOutSine),
+                                repeatMode = RepeatMode.Reverse
+                            ),
+                            label = "progress"
+                        )
+                        Canvas(modifier = Modifier.fillMaxSize()) {
+                            val centerOffset = Offset(size.width / 2, size.height / 2)
+                            drawCircle(
+                                color = Color(0xFF00FF88).copy(alpha = (1.28f - restProgress) * 0.28f),
+                                radius = (35.dp.toPx() * restProgress),
+                                center = centerOffset,
+                                style = Stroke(width = 1.5.dp.toPx())
+                            )
+                        }
+                    }
+
+                    // Floating microphone central sphere trigger icon button
+                    IconButton(
+                        onClick = onMicClick,
+                        modifier = Modifier
+                            .size(72.dp)
+                            .shadow(
+                                elevation = if (isListening) 24.dp else 10.dp,
+                                shape = CircleShape,
+                                ambientColor = if (isThinking) Color(0xFFFFD700) else Color(0xFF00FF88),
+                                spotColor = if (isThinking) Color(0xFFFFD700) else Color(0xFF00FF88)
+                            )
+                            .background(
+                                if (isListening) Color(0xFF00FF88) else Color(0xFF0A1A0F),
+                                CircleShape
+                            )
+                            .border(
+                                BorderStroke(
+                                    2.dp,
+                                    if (isThinking) Color(0xFFFFD700) else Color(0xFF00FF88)
+                                ),
+                                CircleShape
+                            )
+                    ) {
+                        Icon(
+                            imageVector = if (isThinking) Icons.Default.AutoAwesome else Icons.Default.Mic,
+                            contentDescription = "Biniyam Voice Terminal Trigger",
+                            tint = if (isListening) Color.Black else if (isThinking) Color(0xFFFFD700) else Color(0xFF00FF88),
+                            modifier = Modifier.size(30.dp)
+                        )
+                    }
                 }
 
-                IconButton(
-                    onClick = {
-                        if (userInputText.isNotBlank()) {
-                            val userMsg = userInputText.trim()
-                            chatMessages.add(ChatMessage(sender = "user", text = userMsg))
-                            userInputText = ""
-                            isThinking = true
+                Spacer(modifier = Modifier.height(18.dp))
 
-                            // Launch asynchronous Gemini response retrieval
-                            scope.launch {
-                                val contextPrompt = buildContextPromptForGemini(appState)
-                                val reply = GeminiBotService.getGeminiResponse(
-                                    systemPrompt = contextPrompt,
-                                    userPrompt = userMsg,
-                                    history = chatMessages.map { Pair(it.sender, it.text) }
-                                )
-                                chatMessages.add(ChatMessage(sender = "model", text = reply))
-                                isThinking = false
-
-                                // Log AI query completed
-                                viewModel.recordActivityLog("Biniyam AI", "Add", "ቢኒያም AI መልስ ሰጥቷል፡ $userMsg")
-                            }
-                        }
-                    },
-                    modifier = Modifier
-                        .size(46.dp)
-                        .background(EmeraldGlow, CircleShape)
+                // Console Options Actions row
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(24.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(Icons.Default.Send, "Send", tint = Color.Black)
+                    Text(
+                        text = if (showTerminalInput) "[ DEACTIVATE KEYBOARD ]" else "[ INITIATE KEYBOARD TYPE ]",
+                        color = Color(0xFF00FF88).copy(alpha = 0.55f),
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier
+                            .clickable {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                showTerminalInput = !showTerminalInput
+                            }
+                            .padding(8.dp)
+                    )
+
+                    Text(
+                        text = "[ SYSTEM LIVE STATUS REPORT ]",
+                        color = Color(0xFFFFD700).copy(alpha = 0.65f),
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier
+                            .clickable {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                val reportMsg = buildEthiopianReportOverview(appState)
+                                chatMessages.add(ChatMessage(sender = "model", text = reportMsg))
+                                if (isTtsReady) {
+                                    tts?.speak(
+                                        "የእለት መረጃ ተዘጋጅቷል፡ " + reportMsg.take(150),
+                                        TextToSpeech.QUEUE_FLUSH,
+                                        null,
+                                        null
+                                    )
+                                }
+                            }
+                            .padding(8.dp)
+                    )
                 }
             }
         }
@@ -2076,7 +2743,8 @@ fun AddProductDialog(
     Dialog(onDismissRequest = onDismiss) {
         Card(
             colors = CardDefaults.cardColors(containerColor = DarkGlassCard),
-            border = BorderStroke(1.dp, Color(0xFF122C20))
+            modifier = Modifier.shadow(8.dp, RoundedCornerShape(16.dp), ambientColor = Color(0xFF00FF88), spotColor = Color(0xFF00FF88)),
+            border = BorderStroke(1.dp, Color(0xFF00FF88))
         ) {
             Column(
                 modifier = Modifier
@@ -2086,37 +2754,32 @@ fun AddProductDialog(
             ) {
                 Text("ማስመዝገቢያ ፦ አዲስ ምርት ምዝገባ", color = Color.White, fontWeight = FontWeight.Black, fontSize = 16.sp)
 
-                OutlinedTextField(
+                AnwarTextField(
                     value = name,
                     onValueChange = { name = it },
-                    label = { Text("የምርቱ ስም (Product Name)", color = Color.White) },
-                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = EmeraldGlow, unfocusedBorderColor = Color(0xFF122C20))
+                    label = "የምርቱ ስም (Product Name)"
                 )
-                OutlinedTextField(
+                AnwarTextField(
                     value = size,
                     onValueChange = { size = it },
-                    label = { Text("መጠን (Size/Dimensions)", color = Color.White) },
-                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = EmeraldGlow, unfocusedBorderColor = Color(0xFF122C20))
+                    label = "መጠን (Size/Dimensions)"
                 )
-                OutlinedTextField(
+                AnwarTextField(
                     value = color,
                     onValueChange = { color = it },
-                    label = { Text("ቀለም (Color)", color = Color.White) },
-                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = EmeraldGlow, unfocusedBorderColor = Color(0xFF122C20))
+                    label = "ቀለም (Color)"
                 )
-                OutlinedTextField(
+                AnwarTextField(
                     value = weight,
                     onValueChange = { weight = it },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    label = { Text("ክብደት (Bag Weight in Kg)", color = Color.White) },
-                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = EmeraldGlow, unfocusedBorderColor = Color(0xFF122C20))
+                    label = "ክብደት (Bag Weight in Kg)"
                 )
-                OutlinedTextField(
+                AnwarTextField(
                     value = stock,
                     onValueChange = { stock = it },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    label = { Text("የመነሻ ክምችት (Initial Stock Bags)", color = Color.White) },
-                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = EmeraldGlow, unfocusedBorderColor = Color(0xFF122C20))
+                    label = "የመነሻ ክምችት (Initial Stock Bags)"
                 )
 
                 Row(
@@ -2328,6 +2991,30 @@ fun AnwarSplashScreen(onFinished: () -> Unit) {
     val scaleAnim = remember { Animatable(0.2f) }
     val opacityAnim = remember { Animatable(0f) }
 
+    // Gravitational ring pulse animation
+    val pulseTransition = rememberInfiniteTransition(label = "pulse")
+    val pulseRadius by pulseTransition.animateFloat(
+        initialValue = 40.dp.value,
+        targetValue = 200.dp.value,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1800, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "radius"
+    )
+    val pulseAlpha by pulseTransition.animateFloat(
+        initialValue = 1f,
+        targetValue = 0f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1800, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "alpha"
+    )
+
+    var typedText by remember { mutableStateOf("") }
+    val fullText = "INITIALIZING ANWAR SYSTEMS..."
+
     LaunchedEffect(Unit) {
         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
         // Spring bounce up the scaling
@@ -2343,16 +3030,43 @@ fun AnwarSplashScreen(onFinished: () -> Unit) {
         launch {
             opacityAnim.animateTo(1f, animationSpec = tween(1200))
         }
-        kotlinx.coroutines.delay(2600)
+
+        // Typewriter effect
+        for (i in 1..fullText.length) {
+            typedText = fullText.substring(0, i)
+            kotlinx.coroutines.delay(65)
+        }
+
+        kotlinx.coroutines.delay(1200)
+
+        // Implode screen transition (shrink fast to 0f, then trigger layout transition)
+        scaleAnim.animateTo(0.0f, animationSpec = tween(550, easing = EaseInBack))
         onFinished()
     }
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(DarkToxicBg),
+            .background(Color.Black), // Pure void black #000000 screen
         contentAlignment = Alignment.Center
     ) {
+        // Green event horizon pulsing rings
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val centerOffset = Offset(size.width / 2, size.height / 2)
+            drawCircle(
+                color = Color(0xFF00FF88).copy(alpha = pulseAlpha * 0.45f),
+                radius = pulseRadius.dp.toPx(),
+                center = centerOffset,
+                style = Stroke(width = 2.dp.toPx())
+            )
+            drawCircle(
+                color = Color(0xFF00FF88).copy(alpha = (pulseAlpha + 0.3f).coerceAtMost(1f) * 0.25f),
+                radius = (pulseRadius * 0.62f).dp.toPx(),
+                center = centerOffset,
+                style = Stroke(width = 1.dp.toPx())
+            )
+        }
+
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier.graphicsLayer(
@@ -2361,33 +3075,53 @@ fun AnwarSplashScreen(onFinished: () -> Unit) {
                 alpha = opacityAnim.value
             )
         ) {
+            // ANWAR Logo Glowing particle circle
             Box(
                 modifier = Modifier
-                    .size(100.dp)
-                    .background(Brush.radialGradient(listOf(EmeraldGlow.copy(alpha = 0.35f), Color.Transparent)), CircleShape)
-                    .border(BorderStroke(2.dp, EmeraldGlow), CircleShape),
+                    .size(124.dp)
+                    .shadow(16.dp, CircleShape, ambientColor = Color(0xFF00FF88), spotColor = Color(0xFF00FF88))
+                    .background(Color(0xFF050505), CircleShape)
+                    .border(BorderStroke(2.dp, Color(0xFF00FF88)), CircleShape),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
                     text = "A",
-                    fontSize = 44.sp,
+                    fontSize = 56.sp,
                     fontWeight = FontWeight.Black,
-                    color = Color.White
+                    color = Color.White,
+                    fontFamily = FontFamily.Monospace,
+                    modifier = Modifier.offset(y = (-2).dp)
                 )
             }
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(28.dp))
             Text(
-                text = "ANWAR RECYCLE",
+                text = "ANWAR CONTROL",
                 fontWeight = FontWeight.Black,
                 color = Color.White,
-                fontSize = 24.sp,
-                letterSpacing = 2.5.sp
+                fontSize = 28.sp,
+                letterSpacing = 4.sp,
+                fontFamily = FontFamily.Monospace
             )
+            Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = "Official Factory Controller v1.0.0",
-                color = EmeraldGlow,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.SemiBold
+                text = "UNIVERSE GOD MODE V1.0.0",
+                color = Color(0xFFFFD700), // Cosmic Gold #FFD700
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Black,
+                letterSpacing = 2.sp,
+                fontFamily = FontFamily.Monospace
+            )
+
+            Spacer(modifier = Modifier.height(36.dp))
+
+            // Monospace character typewriting
+            Text(
+                text = typedText,
+                color = Color(0xFF00FF88),
+                fontSize = 13.sp,
+                fontFamily = FontFamily.Monospace,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 1.5.sp
             )
         }
     }
@@ -2512,4 +3246,98 @@ object GeminiBotService {
             "ለመገናኘት አልተቻለም (Connection Failed): ${e.localizedMessage ?: "አልታወቀም "}"
         }
     }
+}
+
+@Composable
+fun AnimateCountUpText(
+    valueString: String,
+    color: Color,
+    fontSize: TextUnit = 18.sp,
+    fontFamily: FontFamily = FontFamily.Monospace,
+    fontWeight: FontWeight = FontWeight.Bold,
+    modifier: Modifier = Modifier
+) {
+    // Parse the first group of digits in valueString
+    val numericPart = remember(valueString) {
+        valueString.takeWhile { it.isDigit() }.toIntOrNull() ?: valueString.filter { it.isDigit() }.toIntOrNull()
+    }
+    val nonNumericSuffix = remember(valueString) {
+        if (numericPart != null) {
+            val numStr = numericPart.toString()
+            val startIdx = valueString.indexOf(numStr)
+            if (startIdx != -1) {
+                valueString.substring(startIdx + numStr.length)
+            } else {
+                valueString.replace(numStr, "")
+            }
+        } else {
+            valueString
+        }
+    }
+    val nonNumericPrefix = remember(valueString) {
+        if (numericPart != null) {
+            val numStr = numericPart.toString()
+            val startIdx = valueString.indexOf(numStr)
+            if (startIdx > 0) {
+                valueString.substring(0, startIdx)
+            } else ""
+        } else ""
+    }
+
+    if (numericPart == null) {
+        Text(
+            text = valueString,
+            color = color,
+            fontSize = fontSize,
+            fontFamily = fontFamily,
+            fontWeight = fontWeight,
+            modifier = modifier
+        )
+    } else {
+        var animatedValue by remember { mutableStateOf(0) }
+        LaunchedEffect(numericPart) {
+            // Smoothly animate from 0 to numericPart
+            val steps = 30
+            val delayDuration = (600 / steps).toLong()
+            for (step in 1..steps) {
+                animatedValue = (numericPart * step) / steps
+                kotlinx.coroutines.delay(delayDuration)
+            }
+            animatedValue = numericPart
+        }
+        Text(
+            text = "$nonNumericPrefix$animatedValue$nonNumericSuffix",
+            color = color,
+            fontSize = fontSize,
+            fontFamily = fontFamily,
+            fontWeight = fontWeight,
+            modifier = modifier
+        )
+    }
+}
+
+@Composable
+fun AnwarTextField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    label: String,
+    keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
+    modifier: Modifier = Modifier
+) {
+    TextField(
+        value = value,
+        onValueChange = onValueChange,
+        label = { Text(label, color = Color(0xFF8C9E94)) },
+        keyboardOptions = keyboardOptions,
+        colors = TextFieldDefaults.colors(
+            focusedContainerColor = Color.Transparent,
+            unfocusedContainerColor = Color.Transparent,
+            disabledContainerColor = Color.Transparent,
+            focusedIndicatorColor = EmeraldGlow,
+            unfocusedIndicatorColor = EmeraldGlow.copy(alpha = 0.4f),
+            focusedTextColor = Color.White,
+            unfocusedTextColor = Color.White
+        ),
+        modifier = modifier.fillMaxWidth()
+    )
 }
