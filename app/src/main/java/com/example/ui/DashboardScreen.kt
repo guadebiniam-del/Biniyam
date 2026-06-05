@@ -1649,52 +1649,325 @@ fun MasterbatchStockView(appState: AppState, viewModel: StockViewModel) {
 
 @Composable
 fun ProductStockGaugeView(appState: AppState) {
-    if (appState.products.isEmpty()) {
-        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Text("ምርት አልተመዘገበም...", color = Color(0xFF8C9E94), fontSize = 13.sp)
+    var listAnimated by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        listAnimated = true
+    }
+
+    val totalBags = appState.products.sumOf { it.currentStock }
+    val criticalCount = appState.products.count { it.currentStock < 10 }
+    val productCount = appState.products.size
+
+    val infiniteTransition = rememberInfiniteTransition(label = "pulse_critical_stock")
+    val pulseAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.4f,
+        targetValue = 1.0f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(800, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "pulseAlpha"
+    )
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black)
+            .padding(top = 8.dp)
+    ) {
+        // Summary Card at top with count-up animation
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 16.dp)
+                .shadow(
+                    elevation = 8.dp,
+                    shape = RoundedCornerShape(16.dp),
+                    ambientColor = Color(0xFF00FF88).copy(alpha = 0.1f),
+                    spotColor = Color(0xFF00FF88).copy(alpha = 0.15f)
+                ),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF050505)),
+            border = BorderStroke(0.8.dp, Color(0xFF222222))
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(14.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                // Column 1: Total Bags
+                SummaryStockMetricItem(
+                    title = "ጠቅላላ ከረጢት",
+                    subTitle = "Total Bags",
+                    value = "$totalBags",
+                    color = Color(0xFF00FF88),
+                    modifier = Modifier.weight(1f)
+                )
+                // Column 2: Critical Stocks
+                SummaryStockMetricItem(
+                    title = "ወሳኝ ክምችት",
+                    subTitle = "Critical Stock",
+                    value = "$criticalCount",
+                    color = if (criticalCount > 0) Color(0xFFFF3B3B) else Color(0xFF8C9E94),
+                    modifier = Modifier.weight(1f)
+                )
+                // Column 3: Product Types count
+                SummaryStockMetricItem(
+                    title = "የምርት አይነት",
+                    subTitle = "Products",
+                    value = "$productCount",
+                    color = Color(0xFFFFD700),
+                    modifier = Modifier.weight(1f)
+                )
+            }
         }
-    } else {
-        LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            items(appState.products) { p ->
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .border(BorderStroke(1.dp, Color(0xFF122C20)), RoundedCornerShape(12.dp)),
-                    colors = CardDefaults.cardColors(containerColor = DarkGlassCard)
-                ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
+
+        // Product stock list
+        if (appState.products.isEmpty()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "ምንም ምርት አልተመዘገበም...",
+                    color = Color(0xFF8C9E94),
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Medium
+                )
+            }
+        } else {
+            LazyColumn(
+                verticalArrangement = Arrangement.spacedBy(14.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                itemsIndexed(appState.products) { index, p ->
+                    val cleanName = p.name
+                        .replace("avocado", "", ignoreCase = true)
+                        .replace("Avocado", "", ignoreCase = true)
+                        .replace("አቮካዶ", "", ignoreCase = true)
+                        .trim()
+                        .let { if (it.isEmpty()) "ሸርጅን" else it }
+
+                    val percent = (p.currentStock / 200.0).coerceIn(0.0, 1.0)
+                    val isCritical = p.currentStock < 10
+
+                    val levelColor = when {
+                        percent > 0.40 -> Color(0xFF00FF88) // High
+                        percent >= 0.15 -> Color(0xFFFFD700) // Medium/Gold
+                        percent >= 0.05 -> Color(0xFFFF8C00) // Low/Orange
+                        else -> Color(0xFFFF3B3B) // Critical/Red
+                    }
+
+                    val badgeText = when {
+                        percent > 0.40 -> "✓ ምቹ ክምችት"
+                        percent >= 0.15 -> "⚠ መካከለኛ"
+                        else -> "🔴 ወሳኝ!"
+                    }
+
+                    // Staggered slide up animation calculation
+                    val cardAlpha by animateFloatAsState(
+                        targetValue = if (listAnimated) 1f else 0f,
+                        animationSpec = tween(400, delayMillis = index * 60),
+                        label = "cardAlpha"
+                    )
+                    val cardSlide by animateFloatAsState(
+                        targetValue = if (listAnimated) 0f else 40f,
+                        animationSpec = tween(400, delayMillis = index * 60),
+                        label = "cardSlide"
+                    )
+
+                    // Line filling from left animation on load
+                    var isLineAnimated by remember { mutableStateOf(false) }
+                    LaunchedEffect(p.currentStock) {
+                        isLineAnimated = true
+                    }
+                    val animatedFillPercent by animateFloatAsState(
+                        targetValue = if (isLineAnimated) percent.toFloat() else 0f,
+                        animationSpec = tween(1200, easing = LinearOutSlowInEasing),
+                        label = "fillPercent"
+                    )
+
+                    // Glassmorphism Card
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .graphicsLayer {
+                                alpha = cardAlpha
+                                translationY = cardSlide
+                            }
+                            .shadow(
+                                elevation = 6.dp,
+                                shape = RoundedCornerShape(16.dp),
+                                ambientColor = Color(0xFF00FF88).copy(alpha = 0.12f),
+                                spotColor = Color(0xFF00FF88).copy(alpha = 0.2f)
+                            ),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFF0A0D0B).copy(alpha = 0.75f)),
+                        border = BorderStroke(0.8.dp, Color(0xFF1F2E24).copy(alpha = 0.5f))
+                    ) {
                         Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(p.name, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                            Text("${p.currentStock}/1000 ከረጢት", color = Color(0xFF8C9E94), fontSize = 11.sp, fontFamily = FontFamily.Monospace)
-                        }
-                        Spacer(modifier = Modifier.height(10.dp))
-                        // Linear glowing Gauge bar representing 0->1000 capacity
-                        val capWidth = (p.currentStock / 1000.0).coerceIn(0.0, 1.0).toFloat()
-                        Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(12.dp)
-                                .background(Color(0xFF0F1E14), RoundedCornerShape(6.dp))
+                                .height(IntrinsicSize.Min)
                         ) {
+                            // Left border green glow
                             Box(
                                 modifier = Modifier
-                                    .fillMaxWidth(capWidth)
+                                    .width(4.dp)
                                     .fillMaxHeight()
                                     .background(
-                                        Brush.horizontalGradient(listOf(Color(0xFF00C6FF), EmeraldGlow)),
-                                        RoundedCornerShape(6.dp)
+                                        Brush.verticalGradient(
+                                            colors = listOf(Color(0xFF00FF88), Color(0xFF00FF88).copy(alpha = 0.4f))
+                                        )
                                     )
-                                    .shadow(4.dp)
                             )
+
+                            // Main card layout content
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(14.dp),
+                                verticalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = cleanName,
+                                            color = Color.White,
+                                            fontSize = 15.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                        Spacer(modifier = Modifier.height(2.dp))
+                                        Text(
+                                            text = "መጠን፡ ${p.size} · ክብደት፡ ${p.bagWeightKg} ኪ.ግ",
+                                            color = Color(0xFF8C9E94),
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Medium,
+                                            fontFamily = FontFamily.Monospace
+                                        )
+                                    }
+
+                                    // Bags Count (Stylized Monospace mimicking Orbitron)
+                                    Column(horizontalAlignment = Alignment.End) {
+                                        Row(verticalAlignment = Alignment.Bottom) {
+                                            Text(
+                                                text = "${p.currentStock}",
+                                                color = levelColor,
+                                                fontSize = 24.sp,
+                                                fontWeight = FontWeight.Black,
+                                                fontFamily = FontFamily.Monospace,
+                                                modifier = Modifier.graphicsLayer {
+                                                    if (isCritical) {
+                                                        alpha = pulseAlpha
+                                                    }
+                                                }
+                                            )
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text(
+                                                text = "ከረጢት",
+                                                color = Color.White.copy(alpha = 0.8f),
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                modifier = Modifier.padding(bottom = 3.dp)
+                                            )
+                                        }
+                                    }
+                                }
+
+                                // Progress Bar
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(8.dp)
+                                        .background(Color(0xFF151816), RoundedCornerShape(100.dp))
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth(animatedFillPercent)
+                                            .fillMaxHeight()
+                                            .background(
+                                                brush = Brush.horizontalGradient(
+                                                    colors = listOf(levelColor.copy(alpha = 0.6f), levelColor)
+                                                ),
+                                                shape = RoundedCornerShape(100.dp)
+                                            )
+                                            .graphicsLayer {
+                                                if (isCritical) {
+                                                    alpha = pulseAlpha
+                                                }
+                                            }
+                                    )
+                                }
+
+                                // Status Badge
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(4.dp))
+                                            .background(levelColor.copy(alpha = 0.15f))
+                                            .border(BorderStroke(0.5.dp, levelColor.copy(alpha = 0.4f)), RoundedCornerShape(4.dp))
+                                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                                    ) {
+                                        Text(
+                                            text = badgeText,
+                                            color = levelColor,
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            fontFamily = FontFamily.Monospace,
+                                            modifier = Modifier.graphicsLayer {
+                                                if (isCritical) {
+                                                    alpha = pulseAlpha
+                                                }
+                                            }
+                                        )
+                                    }
+                                }
+                            }
                         }
                     }
                 }
             }
         }
+    }
+}
+
+@Composable
+fun SummaryStockMetricItem(
+    title: String,
+    subTitle: String,
+    value: String,
+    color: Color,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .background(Color(0xFF020202).copy(alpha = 0.5f), RoundedCornerShape(12.dp))
+            .border(BorderStroke(0.5.dp, Color(0xFF1F1F1F)), RoundedCornerShape(12.dp))
+            .padding(10.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Text(title, color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+        Text(subTitle, color = Color(0xFF8C9E94), fontSize = 8.sp, maxLines = 1)
+        Spacer(modifier = Modifier.height(6.dp))
+        AnimateCountUpText(
+            valueString = value,
+            color = color,
+            fontSize = 18.sp,
+            fontFamily = FontFamily.Monospace,
+            fontWeight = FontWeight.Black
+        )
     }
 }
 
