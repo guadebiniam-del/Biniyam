@@ -1745,269 +1745,246 @@ fun WorkersScreenContent(
     viewModel: WorkersViewModel
 ) {
     val haptic = LocalHapticFeedback.current
-    var selectedWorkerTab by remember { mutableStateOf("Attendance") } // "Attendance", "Payroll"
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp)
-    ) {
-        // Attendance/Payroll Tabswitcher
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(Color(0xFF030D06), RoundedCornerShape(8.dp))
-                .border(BorderStroke(1.dp, Color(0xFF122C20)), RoundedCornerShape(8.dp))
-                .padding(4.dp)
-        ) {
-            val tabs = listOf(Pair("Attendance", "መገኘት (Attendance)"), Pair("Payroll", "ደመወዝ (Payroll)"))
-            tabs.forEach { tab ->
-                val isActive = selectedWorkerTab == tab.first
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .clip(RoundedCornerShape(6.dp))
-                        .background(if (isActive) Color(0xFF0A1D11) else Color.Transparent)
-                        .clickable {
-                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                            selectedWorkerTab = tab.first
-                        }
-                        .padding(vertical = 10.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = tab.second,
-                        color = if (isActive) EmeraldGlow else Color(0xFF8C9E94),
-                        fontSize = 13.sp,
-                        fontWeight = if (isActive) FontWeight.Bold else FontWeight.Medium
-                    )
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        if (selectedWorkerTab == "Attendance") {
-            WorkerAttendanceList(appState, viewModel)
-        } else {
-            WorkerPayrollDashboard(appState, viewModel)
-        }
-    }
-}
-
-@Composable
-fun WorkerAttendanceList(appState: AppState, viewModel: WorkersViewModel) {
-    val haptic = LocalHapticFeedback.current
-
-    if (appState.workers.isEmpty()) {
-        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Text("ምንም ሰራተኛ አልተመዘገበም... (No workers)", color = Color(0xFF8C9E94), fontSize = 13.sp)
-        }
-    } else {
-        LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            items(appState.workers) { worker ->
-                val density = androidx.compose.ui.platform.LocalDensity.current
-                val maxSwipePx = with(density) { 120.dp.toPx() }
-                val triggerSwipePx = with(density) { 80.dp.toPx() }
-                var dragOffset by remember { mutableStateOf(0f) }
-                val currentStatusVal = appState.currentAttendance.find { it.workerId == worker.id }?.status ?: "የለም"
-
-                // Swipe background card calculation
-                val swipeBgColor = if (dragOffset > 0f) Color(0xFF0F381D) else if (dragOffset < 0f) Color(0xFF380F0F) else Color.Transparent
-
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(swipeBgColor)
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(14.dp),
-                        horizontalArrangement = if (dragOffset > 0) Arrangement.Start else Arrangement.End,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        if (dragOffset > 0) {
-                            Text("👉 ON DUTY (ስራ ላይ)", color = EmeraldGlow, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                        } else if (dragOffset < 0) {
-                            Text("ABSENT (ቀሪ) 👈", color = Color.Red, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                        }
-                    }
-
-                    Card(
-                        modifier = Modifier
-                            .offset { IntOffset(dragOffset.roundToInt(), 0) }
-                            .pointerInput(worker.id) {
-                                detectHorizontalDragGestures(
-                                    onHorizontalDrag = { _, dragAmount ->
-                                        dragOffset = (dragOffset + dragAmount).coerceIn(-maxSwipePx, maxSwipePx)
-                                    },
-                                    onDragEnd = {
-                                        if (dragOffset > triggerSwipePx) {
-                                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                            viewModel.recordAttendance(worker.id, "On Duty")
-                                        } else if (dragOffset < -triggerSwipePx) {
-                                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                            viewModel.recordAttendance(worker.id, "Absent")
-                                        }
-                                        dragOffset = 0f
-                                    }
-                                )
-                            }
-                            .fillMaxWidth()
-                            .border(BorderStroke(1.dp, Color(0xFF122C20)), RoundedCornerShape(12.dp)),
-                        colors = CardDefaults.cardColors(containerColor = DarkGlassCard)
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(14.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            // Avatar drawing with initials
-                            Box(
-                                modifier = Modifier
-                                    .size(44.dp)
-                                    .background(Color(0xFF0F2618), CircleShape)
-                                    .border(BorderStroke(1.5.dp, EmeraldGlow), CircleShape),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                val initials = worker.name.split(" ").take(2).map { it.firstOrNull() ?: "" }.joinToString("")
-                                Text(
-                                    text = initials.uppercase(),
-                                    color = Color.White,
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-
-                            Spacer(modifier = Modifier.width(14.dp))
-
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(worker.name, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                                Text(
-                                    text = "<< እዚህ ጋር ወደ ቀኝ ስላይድ (Duty) | ወደ ግራ (Absent) >>",
-                                    color = Color(0xFF8C9E94),
-                                    fontSize = 11.sp
-                                )
-                            }
-
-                            Box(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(6.dp))
-                                    .background(
-                                        when (currentStatusVal) {
-                                            "On Duty" -> Color(0xFF0F331D)
-                                            "Absent" -> Color(0xFF330F0F)
-                                            else -> Color(0xFF262626)
-                                        }
-                                    )
-                                    .padding(horizontal = 10.dp, vertical = 6.dp)
-                            ) {
-                                Text(
-                                    text = if (currentStatusVal == "On Duty") "በስራ ላይ" else if (currentStatusVal == "Absent") "Absent (ቀሪ)" else "ያልተሞላ",
-                                    color = if (currentStatusVal == "On Duty") EmeraldGlow else if (currentStatusVal == "Absent") Color.Red else Color.White,
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun WorkerPayrollDashboard(appState: AppState, viewModel: WorkersViewModel) {
-    val haptic = LocalHapticFeedback.current
+    var selectedWorkerTab by remember { mutableStateOf("Attendance") } // "Attendance", "Salary"
+    var showAddWorkerDialog by remember { mutableStateOf(false) }
     var editingSalaryWorker by remember { mutableStateOf<Worker?>(null) }
 
-    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        // Historical Total pay estimation
-        val totalPay = appState.workers.sumOf { it.monthlySalary }
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = DarkGlassCard),
-            border = BorderStroke(1.dp, Color(0xFF122C20))
-        ) {
-            Row(
-                modifier = Modifier.padding(16.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column {
-                    Text("ጠቅላላ ወርሃዊ የደመወዝ ክፍያ (Payroll)", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                    Text("Total Month Salary Budget Estimation", color = Color(0xFF8C9E94), fontSize = 11.sp)
+    // Animated green particle network background
+    val infiniteTransition = rememberInfiniteTransition(label = "workers_drift")
+    val tick by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = (2 * Math.PI).toFloat(),
+        animationSpec = infiniteRepeatable(tween(42000, easing = LinearEasing), RepeatMode.Restart),
+        label = "tick"
+    )
+
+    val particlesCount = 15
+    val particles = remember {
+        List(particlesCount) {
+            Triple(
+                kotlin.random.Random.nextFloat(),
+                kotlin.random.Random.nextFloat(),
+                kotlin.random.Random.nextFloat() * 1.5f + 0.3f
+            )
+        }
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black)
+    ) {
+        // Drifting Network Canvas
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val w = size.width
+            val h = size.height
+            val pxList = particles.map { p ->
+                val cx = p.first * w + 30.dp.toPx() * cos((tick * p.third).toDouble()).toFloat()
+                val cy = p.second * h + 30.dp.toPx() * sin((tick * p.third).toDouble()).toFloat()
+                Offset(cx.coerceIn(0f, w), cy.coerceIn(0f, h))
+            }
+
+            // Draw links
+            val threshold = 160.dp.toPx()
+            for (i in pxList.indices) {
+                for (j in i + 1 until pxList.size) {
+                    val p1 = pxList[i]
+                    val p2 = pxList[j]
+                    val dist = sqrt(((p1.x - p2.x) * (p1.x - p2.x) + (p1.y - p2.y) * (p1.y - p2.y)).toDouble()).toFloat()
+                    if (dist < threshold) {
+                        val alpha = (1f - dist / threshold).coerceIn(0f, 1f) * 0.12f
+                        drawLine(
+                            color = Color(0xFF00FF88),
+                            start = p1,
+                            end = p2,
+                            strokeWidth = 1.dp.toPx(),
+                            alpha = alpha
+                        )
+                    }
                 }
-                Text(
-                    text = "${totalPay.toInt()} BIRR",
-                    color = BentoGold,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Black,
-                    fontFamily = FontFamily.Monospace
+            }
+
+            // Draw points
+            pxList.forEach { pt ->
+                drawCircle(
+                    color = Color(0xFF00FF88),
+                    radius = 2.5.dp.toPx(),
+                    center = pt,
+                    alpha = 0.3f
                 )
             }
         }
 
-        Text("የሰራተኞች የደመወዝ መግለጫ (Salary Setup):", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-        LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            items(appState.workers) { worker ->
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable {
-                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                            editingSalaryWorker = worker
-                        }
-                        .border(BorderStroke(1.dp, Color(0xFF122C20)), RoundedCornerShape(12.dp)),
-                    colors = CardDefaults.cardColors(containerColor = DarkGlassCard)
-                ) {
-                    Row(
+        // Content
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp)
+        ) {
+            // Tab switcher
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color(0xFF050505), RoundedCornerShape(100.dp))
+                    .border(BorderStroke(1.dp, Color(0xFF222222)), RoundedCornerShape(100.dp))
+                    .padding(4.dp)
+            ) {
+                val tabs = listOf(Pair("Attendance", "መገኘት (Attendance)"), Pair("Salary", "ደመወዝ (Salary)"))
+                tabs.forEach { tab ->
+                    val isActive = selectedWorkerTab == tab.first
+                    Box(
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(14.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
+                            .weight(1f)
+                            .clip(RoundedCornerShape(100.dp))
+                            .background(if (isActive) Color(0xFF041c0d) else Color.Transparent)
+                            .border(
+                                BorderStroke(0.8.dp, if (isActive) Color(0xFF00FF88).copy(alpha = 0.6f) else Color.Transparent),
+                                RoundedCornerShape(100.dp)
+                            )
+                            .clickable {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                selectedWorkerTab = tab.first
+                            }
+                            .padding(vertical = 11.dp),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Column {
-                            Text(worker.name, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                            Text("Click to customize rate", color = Color(0xFF8C9E94), fontSize = 11.sp)
-                        }
                         Text(
-                            text = "${worker.monthlySalary.toInt()} ETB/Month",
-                            color = EmeraldGlow,
+                            text = tab.second,
+                            color = if (isActive) Color(0xFF00FF88) else Color(0xFF8C9E94),
                             fontSize = 13.sp,
-                            fontWeight = FontWeight.Bold,
+                            fontWeight = if (isActive) FontWeight.Bold else FontWeight.Medium,
                             fontFamily = FontFamily.Monospace
                         )
                     }
                 }
             }
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            if (selectedWorkerTab == "Attendance") {
+                WorkersAttendanceTab(
+                    appState = appState,
+                    viewModel = viewModel,
+                    onAddClicked = { showAddWorkerDialog = true }
+                )
+            } else {
+                WorkersSalaryTab(
+                    appState = appState,
+                    viewModel = viewModel,
+                    onEditSalaryClicked = { editingSalaryWorker = it }
+                )
+            }
         }
     }
 
+    // Add Worker Dialog
+    if (showAddWorkerDialog) {
+        var workerName by remember { mutableStateOf("") }
+        var salaryInput by remember { mutableStateOf("10000") }
+
+        Dialog(onDismissRequest = { showAddWorkerDialog = false }) {
+            Card(
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF050505)),
+                border = BorderStroke(1.dp, Color(0xFF00FF88).copy(alpha = 0.5f)),
+                shape = RoundedCornerShape(20.dp)
+            ) {
+                Column(modifier = Modifier.padding(22.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                    Text(
+                        "አዲስ ሰራተኛ መመዝገቢያ (New Worker)",
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 16.sp
+                    )
+                    OutlinedTextField(
+                        value = workerName,
+                        onValueChange = { workerName = it },
+                        label = { Text("ሙሉ ስም (Full Name)", color = Color.White.copy(alpha = 0.6f)) },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = Color(0xFF00FF88),
+                            unfocusedBorderColor = Color(0xFF222222),
+                            focusedLabelColor = Color(0xFF00FF88),
+                            unfocusedLabelColor = Color.White.copy(alpha = 0.6f),
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    OutlinedTextField(
+                        value = salaryInput,
+                        onValueChange = { salaryInput = it },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        label = { Text("ወርሃዊ ደመወዝ (Birr)", color = Color.White.copy(alpha = 0.6f)) },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = Color(0xFF00FF88),
+                            unfocusedBorderColor = Color(0xFF222222),
+                            focusedLabelColor = Color(0xFF00FF88),
+                            unfocusedLabelColor = Color.White.copy(alpha = 0.6f),
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        TextButton(onClick = { showAddWorkerDialog = false }) {
+                            Text("ሰርዝ", color = Color(0xFFFF3B3B), fontWeight = FontWeight.Bold)
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Button(
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00FF88), contentColor = Color.Black),
+                            onClick = {
+                                if (workerName.isNotBlank()) {
+                                    viewModel.addNewWorker(workerName.trim(), salaryInput.toDoubleOrNull() ?: 10000.0)
+                                }
+                                showAddWorkerDialog = false
+                            }
+                        ) {
+                            Text("መዝግብ", fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Salary Rate Dialog
     if (editingSalaryWorker != null) {
-        var rateInput by remember { mutableStateOf(editingSalaryWorker!!.monthlySalary.toInt().toString()) }
+        var rateInput by remember(editingSalaryWorker) { mutableStateOf(editingSalaryWorker!!.monthlySalary.toInt().toString()) }
         Dialog(onDismissRequest = { editingSalaryWorker = null }) {
             Card(
-                colors = CardDefaults.cardColors(containerColor = DarkGlassCard),
-                border = BorderStroke(1.dp, Color(0xFF122C20))
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF050505)),
+                border = BorderStroke(1.dp, Color(0xFF00FF88).copy(alpha = 0.5f)),
+                shape = RoundedCornerShape(20.dp)
             ) {
-                Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                    Text("ደመወዝ ማስተካከያ (${editingSalaryWorker!!.name})", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                Column(modifier = Modifier.padding(22.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                    Text(
+                        "ወርሃዊ ደመወዝ ማስተካከያ",
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 16.sp
+                    )
+                    Text(
+                        "የ '${editingSalaryWorker!!.name}' ወርሃዊ ክፍያ እዚህ ያሻሽሉ።",
+                        color = Color(0xFF8C9E94),
+                        fontSize = 12.sp
+                    )
                     OutlinedTextField(
                         value = rateInput,
                         onValueChange = { rateInput = it },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        label = { Text("ወርሃዊ ደመወዝ (Birr)", color = Color.White) },
+                        label = { Text("ወርሃዊ ክፍያ (Birr)", color = Color.White.copy(alpha = 0.6f)) },
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = EmeraldGlow,
-                            unfocusedBorderColor = Color(0xFF122C20),
-                            unfocusedLabelColor = Color(0xFF8C9E94)
-                        )
+                            focusedBorderColor = Color(0xFF00FF88),
+                            unfocusedBorderColor = Color(0xFF222222),
+                            focusedLabelColor = Color(0xFF00FF88),
+                            unfocusedLabelColor = Color.White.copy(alpha = 0.6f),
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White
+                        ),
+                        modifier = Modifier.fillMaxWidth()
                     )
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -2015,10 +1992,11 @@ fun WorkerPayrollDashboard(appState: AppState, viewModel: WorkersViewModel) {
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         TextButton(onClick = { editingSalaryWorker = null }) {
-                            Text("ሰርዝ", color = Color.Red)
+                            Text("ሰርዝ", color = Color(0xFFFF3B3B), fontWeight = FontWeight.Bold)
                         }
+                        Spacer(modifier = Modifier.width(8.dp))
                         Button(
-                            colors = ButtonDefaults.buttonColors(containerColor = EmeraldGlow, contentColor = Color.Black),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00FF88), contentColor = Color.Black),
                             onClick = {
                                 rateInput.toDoubleOrNull()?.let { doubleVal ->
                                     viewModel.updateWorkerSalary(editingSalaryWorker!!.id, doubleVal)
@@ -2030,6 +2008,698 @@ fun WorkerPayrollDashboard(appState: AppState, viewModel: WorkersViewModel) {
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+fun WorkersAttendanceTab(
+    appState: AppState,
+    viewModel: WorkersViewModel,
+    onAddClicked: () -> Unit
+) {
+    val haptic = LocalHapticFeedback.current
+    var listAnimated by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        listAnimated = true
+    }
+
+    val attendanceOnDuty = appState.currentAttendance.count { it.status == "On Duty" }
+    val attendanceAbsent = appState.currentAttendance.count { it.status == "Absent" }
+    val totalWorkersCount = appState.workers.size
+
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        // Page header & Add worker
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column {
+                Text(
+                    text = "የሰራተኞች አስተዳደር",
+                    color = Color.White,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Box(
+                    modifier = Modifier
+                        .width(60.dp)
+                        .height(3.dp)
+                        .background(Color(0xFF00FF88))
+                )
+            }
+
+            Button(
+                onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    onAddClicked()
+                },
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color(0xFF041c0d),
+                    contentColor = Color(0xFF00FF88)
+                ),
+                shape = RoundedCornerShape(100.dp),
+                border = BorderStroke(1.dp, Color(0xFF00FF88).copy(alpha = 0.6f)),
+                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
+                modifier = Modifier.height(38.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Add,
+                    contentDescription = "Add worker",
+                    modifier = Modifier.size(16.dp),
+                    tint = Color(0xFF00FF88)
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(
+                    text = "ሰራተኛ ጨምር",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+
+        // Summary Cards
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            AttendanceSummaryCard(
+                title = "በስራ ላይ",
+                enTitle = "On Duty",
+                value = "$attendanceOnDuty",
+                color = Color(0xFF00FF88),
+                modifier = Modifier.weight(1f)
+            )
+            AttendanceSummaryCard(
+                title = "ቀርቷል",
+                enTitle = "Absent",
+                value = "$attendanceAbsent",
+                color = Color(0xFFFF3B3B),
+                modifier = Modifier.weight(1f)
+            )
+            AttendanceSummaryCard(
+                title = "ጠቅላላ",
+                enTitle = "Total",
+                value = "$totalWorkersCount",
+                color = Color(0xFFFFD700),
+                modifier = Modifier.weight(1f)
+            )
+        }
+
+        // Workers List
+        if (appState.workers.isEmpty()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(200.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "ምንም ሰራተኛ አልተመዘገበም... (No workers available)",
+                    color = Color(0xFF8C9E94),
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Medium
+                )
+            }
+        } else {
+            LazyColumn(
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                itemsIndexed(appState.workers) { index, worker ->
+                    val workerStatus = appState.currentAttendance.find { it.workerId == worker.id }?.status ?: "የለም"
+
+                    // Smooth 300ms transitions on properties
+                    val animatedBgColor by animateColorAsState(
+                        targetValue = when (workerStatus) {
+                            "On Duty" -> Color(0xFF031408)
+                            "Absent" -> Color(0xFF140303)
+                            else -> Color(0xFF050505)
+                        },
+                        animationSpec = tween(300),
+                        label = "cardBg"
+                    )
+                    val animatedBorderColor by animateColorAsState(
+                        targetValue = when (workerStatus) {
+                            "On Duty" -> Color(0xFF00FF88).copy(alpha = 0.5f)
+                            "Absent" -> Color(0xFFFF3B3B).copy(alpha = 0.5f)
+                            else -> Color(0xFF222222)
+                        },
+                        animationSpec = tween(300),
+                        label = "cardBorder"
+                    )
+
+                    // Card entrance scaling & offset logic
+                    val cardAlpha by animateFloatAsState(
+                        targetValue = if (listAnimated) 1f else 0f,
+                        animationSpec = tween(400, delayMillis = index * 50),
+                        label = "cardAlpha"
+                    )
+                    val cardSlide by animateFloatAsState(
+                        targetValue = if (listAnimated) 0f else 40f,
+                        animationSpec = tween(400, delayMillis = index * 50),
+                        label = "cardSlide"
+                    )
+
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .graphicsLayer {
+                                alpha = cardAlpha
+                                translationY = cardSlide
+                            }
+                            .shadow(
+                                elevation = if (workerStatus != "የለም") 6.dp else 0.dp,
+                                shape = RoundedCornerShape(16.dp),
+                                ambientColor = when (workerStatus) {
+                                    "On Duty" -> Color(0xFF00FF88)
+                                    "Absent" -> Color(0xFFFF3B3B)
+                                    else -> Color.Transparent
+                                },
+                                spotColor = when (workerStatus) {
+                                    "On Duty" -> Color(0xFF00FF88)
+                                    "Absent" -> Color(0xFFFF3B3B)
+                                    else -> Color.Transparent
+                                }
+                            ),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = animatedBgColor),
+                        border = BorderStroke(0.8.dp, animatedBorderColor)
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(IntrinsicSize.Min)
+                        ) {
+                            // Left border glow
+                            Box(
+                                modifier = Modifier
+                                    .width(4.dp)
+                                    .fillMaxHeight()
+                                    .background(
+                                        when (workerStatus) {
+                                            "On Duty" -> Color(0xFF00FF88)
+                                            "Absent" -> Color(0xFFFF3B3B)
+                                            else -> Color(0xFF333333)
+                                        }
+                                    )
+                            )
+
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(14.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    // Circular avatar
+                                    val initials = worker.name.split(" ").take(2).map { it.firstOrNull() ?: "" }.joinToString("")
+                                    Box(
+                                        modifier = Modifier
+                                            .size(42.dp)
+                                            .background(Color(0xFF0A0A0A), CircleShape)
+                                            .border(
+                                                BorderStroke(1.2.dp, if (workerStatus == "On Duty") Color(0xFF00FF88) else if (workerStatus == "Absent") Color(0xFFFF3B3B) else Color(0xFF444444)),
+                                                CircleShape
+                                            ),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = initials.uppercase(),
+                                            color = Color.White,
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            fontFamily = FontFamily.Monospace
+                                        )
+                                    }
+
+                                    Spacer(modifier = Modifier.width(12.dp))
+
+                                    Column {
+                                        Text(
+                                            text = worker.name,
+                                            color = Color.White,
+                                            fontSize = 14.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                        Spacer(modifier = Modifier.height(2.dp))
+                                        Text(
+                                            text = "${appState.selectedDate} · ${if (workerStatus == "On Duty") "በስራ ላይ" else if (workerStatus == "Absent") "ቀሪ (Absent)" else "ያልተመዘገበ"}",
+                                            color = Color(0xFF8C9E94),
+                                            fontSize = 11.sp
+                                        )
+                                    }
+                                }
+
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    // "በስራ" Pill
+                                    Box(
+                                        modifier = Modifier
+                                            .height(34.dp)
+                                            .clip(RoundedCornerShape(100.dp))
+                                            .background(if (workerStatus == "On Duty") Color(0xFF00FF88) else Color.Transparent)
+                                            .border(
+                                                BorderStroke(1.dp, Color(0xFF00FF88).copy(alpha = 0.6f)),
+                                                RoundedCornerShape(100.dp)
+                                            )
+                                            .clickable {
+                                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                                viewModel.recordAttendance(worker.id, "On Duty")
+                                            }
+                                            .padding(horizontal = 14.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = "በስራ",
+                                            color = if (workerStatus == "On Duty") Color.Black else Color(0xFF00FF88),
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+
+                                    // "ቀረ" Pill
+                                    Box(
+                                        modifier = Modifier
+                                            .height(34.dp)
+                                            .clip(RoundedCornerShape(100.dp))
+                                            .background(if (workerStatus == "Absent") Color(0xFFFF3B3B) else Color.Transparent)
+                                            .border(
+                                                BorderStroke(1.dp, Color(0xFFFF3B3B).copy(alpha = 0.6f)),
+                                                RoundedCornerShape(100.dp)
+                                            )
+                                            .clickable {
+                                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                                viewModel.recordAttendance(worker.id, "Absent")
+                                            }
+                                            .padding(horizontal = 14.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = "ቀረ",
+                                            color = if (workerStatus == "Absent") Color.Black else Color(0xFFFF3B3B),
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun WorkersSalaryTab(
+    appState: AppState,
+    viewModel: WorkersViewModel,
+    onEditSalaryClicked: (Worker) -> Unit
+) {
+    val haptic = LocalHapticFeedback.current
+    var listAnimated by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        listAnimated = true
+    }
+
+    // Days counter computations
+    val parts = appState.selectedDate.split("-")
+    val ethiopianDaysPassed = parts.getOrNull(2)?.toIntOrNull() ?: 1
+    val daysRemaining = (30 - ethiopianDaysPassed).coerceIn(0, 30)
+    val yearMonthStr = "${parts.getOrNull(0)}-${parts.getOrNull(1)}"
+
+    // Calculate total Payroll sum
+    val totalEarnedCalculated = appState.workers.sumOf { worker ->
+        val daily = worker.monthlySalary / 30.0
+        val absents = appState.allWorkerAttendance.count {
+            it.workerId == worker.id && it.date.startsWith(yearMonthStr) && it.status == "Absent"
+        }
+        val earned = (daily * ethiopianDaysPassed) - (absents * 2 * daily)
+        earned.coerceAtLeast(0.0)
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        // Countdown Ring Header Card
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(20.dp))
+                .background(Color(0xFF050505))
+                .border(BorderStroke(0.8.dp, Color(0xFF222222)), RoundedCornerShape(20.dp))
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Column(modifier = Modifier.weight(1.3f)) {
+                Text(
+                    text = "የክፍያ መቁጠሪያ (Days Until Payday)",
+                    color = Color.White,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = "በወሩ 30ኛው ቀን ላይ ለሁሉም ሰራተኞች የደመወዝ ክፍያ ይከናወናል። ዛሬ የወሩ $ethiopianDaysPassed ቀን ነው።",
+                    color = Color(0xFF8C9E94),
+                    fontSize = 11.sp,
+                    lineHeight = 15.sp
+                )
+            }
+
+            Spacer(modifier = Modifier.width(16.dp))
+
+            Box(
+                modifier = Modifier
+                    .size(105.dp)
+                    .weight(0.9f),
+                contentAlignment = Alignment.Center
+            ) {
+                Canvas(modifier = Modifier.size(85.dp)) {
+                    drawCircle(
+                        color = Color(0xFF151816),
+                        style = Stroke(width = 8.dp.toPx())
+                    )
+                    val sweep = 360f * (daysRemaining / 30f)
+                    drawArc(
+                        color = Color(0xFFFFD700),
+                        startAngle = -90f,
+                        sweepAngle = sweep,
+                        useCenter = false,
+                        style = Stroke(width = 8.dp.toPx(), cap = StrokeCap.Round)
+                    )
+                }
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = "$daysRemaining",
+                        color = Color(0xFFFFD700),
+                        fontSize = 24.sp,
+                        fontWeight = FontWeight.Black,
+                        fontFamily = FontFamily.Monospace
+                    )
+                    Text(
+                        text = "ቀሪ ቀናት",
+                        color = Color(0xFF8C9E94),
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+        }
+
+        // Salary Cards List Header
+        Text(
+            text = "የደመወዝ ዝርዝር መግለጫ (Current Salaries)",
+            color = Color.White,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Bold,
+            fontFamily = FontFamily.Monospace
+        )
+
+        if (appState.workers.isEmpty()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(150.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "ምንም ሰራተኛ አልተመዘገበም... (No workers loaded)",
+                    color = Color(0xFF8C9E94),
+                    fontSize = 12.sp
+                )
+            }
+        } else {
+            LazyColumn(
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f, fill = false)
+            ) {
+                itemsIndexed(appState.workers) { index, worker ->
+                    val dailySalary = worker.monthlySalary / 30.0
+                    val absentDays = appState.allWorkerAttendance.count {
+                        it.workerId == worker.id && it.date.startsWith(yearMonthStr) && it.status == "Absent"
+                    }
+
+                    // Formula: earnedSalary = (monthlySalary ÷ 30) × ethiopianDaysPassed - (absentDays × 2 × dailySalary)
+                    val earnedSalary = (dailySalary * ethiopianDaysPassed) - (absentDays * 2 * dailySalary)
+                    val earnedSalaryVal = earnedSalary.coerceAtLeast(0.0)
+                    val deductionAmount = absentDays * 2 * dailySalary
+
+                    // Smooth transition alpha/slide
+                    val cardAlpha by animateFloatAsState(
+                        targetValue = if (listAnimated) 1f else 0f,
+                        animationSpec = tween(400, delayMillis = index * 50),
+                        label = "salCardAlpha"
+                    )
+                    val cardSlide by animateFloatAsState(
+                        targetValue = if (listAnimated) 0f else 40f,
+                        animationSpec = tween(400, delayMillis = index * 50),
+                        label = "salCardSlide"
+                    )
+
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .graphicsLayer {
+                                alpha = cardAlpha
+                                translationY = cardSlide
+                            },
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFF050505)),
+                        border = BorderStroke(0.8.dp, Color(0xFF222222))
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(IntrinsicSize.Min)
+                        ) {
+                            // Left border indicator (green if absentCount == 0, red if > 0)
+                            Box(
+                                modifier = Modifier
+                                    .width(4.dp)
+                                    .fillMaxHeight()
+                                    .background(if (absentDays > 0) Color(0xFFFF3B3B) else Color(0xFF00FF88))
+                            )
+
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(14.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    // Amharic Name
+                                    Text(
+                                        text = worker.name,
+                                        color = Color.White,
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+
+                                    Spacer(modifier = Modifier.height(4.dp))
+
+                                    // Absent badge (red if absent, green if 0)
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(4.dp))
+                                            .background(if (absentDays > 0) Color(0xFF260D0D) else Color(0xFF0D2611))
+                                            .padding(horizontal = 8.dp, vertical = 3.dp)
+                                    ) {
+                                        Text(
+                                            text = if (absentDays > 0) "⚠️ $absentDays ቀን ቀርቷል" else "✓ ምንም የቀረ የለም (0)",
+                                            color = if (absentDays > 0) Color(0xFFFF3B3B) else Color(0xFF00FF88),
+                                            fontSize = 9.5.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+
+                                    Spacer(modifier = Modifier.height(6.dp))
+
+                                    // Monthly salary edit icon trigger
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier.clickable {
+                                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                            onEditSalaryClicked(worker)
+                                        }
+                                    ) {
+                                        Text(
+                                            text = "ወርሃዊ ደሞዝ፡ ${worker.monthlySalary.toInt()} ETB",
+                                            color = Color(0xFF8C9E94),
+                                            fontSize = 11.sp,
+                                            fontFamily = FontFamily.Monospace
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Icon(
+                                            imageVector = Icons.Default.Edit,
+                                            contentDescription = "Edit rate",
+                                            tint = Color(0xFF00FF88),
+                                            modifier = Modifier.size(13.dp)
+                                        )
+                                    }
+
+                                    if (deductionAmount > 0.0) {
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        Text(
+                                            text = "ማቅነሻ (Deduction): -${deductionAmount.toInt()} ETB",
+                                            color = Color(0xFFFF3B3B),
+                                            fontSize = 10.5.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            fontFamily = FontFamily.Monospace
+                                        )
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.width(8.dp))
+
+                                // Earned Salary Amount Large
+                                Column(horizontalAlignment = Alignment.End) {
+                                    Text(
+                                        text = "የተገኘ ደሞዝ",
+                                        color = Color(0xFF8C9E94),
+                                        fontSize = 10.sp
+                                    )
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Text(
+                                        text = "${earnedSalaryVal.toInt()} ETB",
+                                        color = if (absentDays > 0) Color(0xFFFF3B3B) else Color(0xFF00FF88),
+                                        fontSize = 16.sp,
+                                        fontWeight = FontWeight.ExtraBold,
+                                        fontFamily = FontFamily.Monospace
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // Large Total Payroll card at bottom with dark green background
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .shadow(
+                    elevation = 12.dp,
+                    shape = RoundedCornerShape(20.dp),
+                    ambientColor = Color(0xFF00FF88).copy(alpha = 0.15f),
+                    spotColor = Color(0xFF00FF88).copy(alpha = 0.25f)
+                ),
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF041c0d)),
+            border = BorderStroke(1.dp, Color(0xFF00FF88).copy(alpha = 0.4f))
+        ) {
+            Row(
+                modifier = Modifier.padding(20.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column {
+                    Text(
+                        text = "ጠቅላላ የተገኘ ደሞዝ",
+                        color = Color.White.copy(alpha = 0.7f),
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 1.sp
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "ጠቅላላ ወርሃዊ የደመወዝ ክፍያ",
+                        color = Color.White,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
+                AnimateCountUpText(
+                    valueString = "${totalEarnedCalculated.toInt()} ETB",
+                    color = Color(0xFFFFD700),
+                    fontSize = 22.sp,
+                    fontFamily = FontFamily.Monospace,
+                    fontWeight = FontWeight.Black
+                )
+            }
+        }
+    }
+}
+
+
+@Composable
+fun AttendanceSummaryCard(
+    title: String,
+    enTitle: String,
+    value: String,
+    color: Color,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier
+            .height(105.dp)
+            .shadow(
+                elevation = 8.dp,
+                shape = RoundedCornerShape(16.dp),
+                ambientColor = color.copy(alpha = 0.15f),
+                spotColor = color.copy(alpha = 0.25f)
+            ),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF050505)),
+        border = BorderStroke(0.8.dp, Color(0xFF222222))
+    ) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            // Modern Top Shine Line for Gold/Green/Red summary card
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(2.5.dp)
+                    .background(
+                        Brush.horizontalGradient(
+                            colors = listOf(color, color.copy(alpha = 0.05f))
+                        )
+                    )
+            )
+
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(14.dp),
+                verticalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column {
+                    Text(
+                        text = title,
+                        color = Color.White,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = enTitle,
+                        color = Color(0xFF8C9E94),
+                        fontSize = 9.sp
+                    )
+                }
+
+                AnimateCountUpText(
+                    valueString = value,
+                    color = color,
+                    fontSize = 20.sp,
+                    fontFamily = FontFamily.Monospace,
+                    fontWeight = FontWeight.Black
+                )
             }
         }
     }
