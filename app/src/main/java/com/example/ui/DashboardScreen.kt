@@ -1,1125 +1,542 @@
 package com.example.ui
 
+import kotlinx.coroutines.launch
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.*
-import androidx.compose.foundation.shape.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
+import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.graphics.*
-import androidx.compose.ui.graphics.drawscope.*
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.*
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.style.*
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.unit.TextUnit
-import androidx.compose.ui.window.Dialog
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.data.*
-import com.example.ui.theme.*
-import com.example.R
-import com.example.BuildConfig
-import kotlinx.coroutines.launch
-import android.content.Intent
-import android.speech.RecognizerIntent
-import android.speech.tts.TextToSpeech
-import android.widget.Toast
-import android.app.Activity
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.ui.platform.LocalContext
-import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.RequestBody.Companion.toRequestBody
-import java.text.SimpleDateFormat
-import java.util.*
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.unit.IntOffset
-import kotlin.math.roundToInt
-import kotlin.math.cos
-import kotlin.math.sin
-import kotlin.math.sqrt
+import java.util.UUID
 
-const val CURRENT_APP_VERSION = "1.0.0"
+// Premium Color Constants
+val PureBlack = Color(0xFF000000)
+val DarkGray = Color(0xFF070B08)
+val EmeraldGlow = Color(0xFF00FF88)
+val DarkGlassCard = Color(0xFF0C100D)
+val DarkGlassInner = Color(0xFF131714)
+val GrayBorder = Color(0xFF1B241F)
+val LightText = Color(0xFFE8ECE9)
+val MutedText = Color(0xFF8C9E94)
 
-// God Mode Color & Gradient palette extensions
-val DarkToxicBg = Color(0xFF000000) // Pure void black #000000
-val EmeraldGlow = Color(0xFF00FF88) // Glowing mint emerald neon
-val DarkGlassCard = Color(0xFF050505) // Pure black card background #050505
+// Ethiopian Months list
+val ET_MONTHS = listOf(
+    "መስከረም", "ጥቅምት", "ህዳር", "ታህሳስ", "ጥር", "የካቲት", "መጋቢት", "ሚያዝያ", "ግንቦት", "ሰኔ", "ሐምሌ", "ነሐሴ", "ጳጉሜን"
+)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DashboardScreen(
-    viewModel: MainViewModel,
-    modifier: Modifier = Modifier
-) {
-    // Collect central real-time AppState (Single Source of Truth)
-    val appState by viewModel.appState.collectAsStateWithLifecycle()
+fun DashboardScreen(viewModel: MainViewModel) {
+    var selectedTab by remember { mutableStateOf("Overview") } // "Overview", "Production", "Stock", "Workers", "AI"
 
-    // Instantiate screen ViewModels representing clean MVVM structure
-    val overviewViewModel = remember { OverviewViewModel(viewModel) }
-    val productionViewModel = remember { ProductionViewModel(viewModel) }
-    val stockViewModel = remember { StockViewModel(viewModel) }
-    val workersViewModel = remember { WorkersViewModel(viewModel) }
-    val biniyamAIViewModel = remember { BiniyamAIViewModel(viewModel) }
+    val products by viewModel.products.collectAsState()
+    val workers by viewModel.workers.collectAsState()
+    val attendanceList by viewModel.attendanceList.collectAsState()
+    val chatMessages by viewModel.chatMessages.collectAsState()
 
-    val appContext = LocalContext.current
-    val haptic = LocalHapticFeedback.current
-    val scope = rememberCoroutineScope()
+    val currentMonth by viewModel.currentMonth.collectAsState()
+    val currentYear by viewModel.currentYear.collectAsState()
 
-    var showSplash by remember { mutableStateOf(true) }
-    // Navigation selection: "Overview", "Production", "Stock", "Workers", "AI"
-    var currentScreen by remember { mutableStateOf("Overview") }
-    // Slide-out Drawer state
-    var drawerOpen by remember { mutableStateOf(false) }
+    val rawMaterialsStock by viewModel.rawMaterialsStock.collectAsState()
+    val masterbatchStock by viewModel.masterbatchStock.collectAsState()
 
-    // Dialog state hooks
-    var showAddProductDialog by remember { mutableStateOf(false) }
-    var showAddMasterbatchDialog by remember { mutableStateOf(false) }
-    var showAddWorkerDialog by remember { mutableStateOf(false) }
-    var rawMaterialRecordDialogType by remember { mutableStateOf<String?>(null) } // "LD", "HD", "WASTE"
-
-    if (showSplash) {
-        AnwarSplashScreen(onFinished = { showSplash = false })
-    } else {
-        Box(modifier = Modifier
-            .fillMaxSize()
-            .background(DarkToxicBg)
-        ) {
-            // Main Sliding Gesture detection for Side Drawer
-            Scaffold(
-                containerColor = Color.Transparent,
-                topBar = {
-                    CenterAlignedTopAppBar(
-                        colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                            containerColor = DarkGlassCard.copy(alpha = 0.9f),
-                            titleContentColor = Color.White
+    Scaffold(
+        modifier = Modifier.fillMaxSize(),
+        bottomBar = {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
+                    .background(Color(0xFF040605))
+                    .border(BorderStroke(0.5.dp, GrayBorder), RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
+                    .padding(vertical = 10.dp),
+                horizontalArrangement = Arrangement.SpaceAround,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                listOf(
+                    Triple("Overview", "ዳሽቦርድ", Icons.Default.Dashboard),
+                    Triple("Production", "ምርት", Icons.Default.TrendingUp),
+                    Triple("Stock", "ክምችት", Icons.Default.Layers),
+                    Triple("Workers", "ሰራተኞች", Icons.Default.People),
+                    Triple("AI", "ቢኒያም AI", Icons.Default.Chat)
+                ).forEach { (tab, label, icon) ->
+                    val isSelected = selectedTab == tab
+                    
+                    // Bouncing active icon scale animation
+                    val iconScale by animateFloatAsState(
+                        targetValue = if (isSelected) 1.25f else 1.0f,
+                        animationSpec = spring(
+                            dampingRatio = Spring.DampingRatioHighBouncy,
+                            stiffness = Spring.StiffnessLow
                         ),
-                        title = {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(8.dp)
-                                        .background(EmeraldGlow, CircleShape)
-                                        .shadow(4.dp, CircleShape)
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = "ANWAR RECYCLE",
-                                    fontFamily = FontFamily.SansSerif,
-                                    fontWeight = FontWeight.Black,
-                                    fontSize = 18.sp,
-                                    letterSpacing = 1.5.sp,
-                                    color = Color.White
-                                )
-                            }
-                        },
-                        navigationIcon = {
-                            IconButton(onClick = {
-                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                drawerOpen = true
-                            }) {
-                                Icon(
-                                    imageVector = Icons.Default.Menu,
-                                    contentDescription = "Side Drawer",
-                                    tint = EmeraldGlow
-                                )
-                            }
-                        },
-                        actions = {
-                            IconButton(onClick = {
-                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                Toast.makeText(appContext, "ዳታ ቤዙ ከደመና ጋር ተመሳስሏል! (Database fully synchronized)", Toast.LENGTH_SHORT).show()
-                            }) {
-                                Icon(
-                                    imageVector = Icons.Default.CloudQueue,
-                                    contentDescription = "Cloud Connected Status",
-                                    tint = EmeraldGlow
-                                )
-                            }
-                        }
-                    )
-                },
-                bottomBar = {
-                    CustomBottomNavigationBar(
-                        currentTab = currentScreen,
-                        onTabSelected = { tab ->
-                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                            currentScreen = tab
-                        }
-                    )
-                }
-            ) { paddingValues ->
-                Box(modifier = Modifier
-                    .fillMaxSize()
-                    .padding(paddingValues)
-                    .pointerInput(Unit) {
-                        detectHorizontalDragGestures { _, dragAmount ->
-                            // Swipe-right opens side drawer
-                            if (dragAmount > 35f && !drawerOpen) {
-                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                drawerOpen = true
-                            }
-                        }
-                    }
-                ) {
-                    ScreenContentTransition(
-                        screen = currentScreen,
-                        appState = appState,
-                        overviewViewModel = overviewViewModel,
-                        productionViewModel = productionViewModel,
-                        stockViewModel = stockViewModel,
-                        workersViewModel = workersViewModel,
-                        biniyamAIViewModel = biniyamAIViewModel,
-                        onAddProductTrigger = { showAddProductDialog = true },
-                        onAddMasterbatchTrigger = { showAddMasterbatchDialog = true },
-                        onAddRawMaterialTrigger = { type -> rawMaterialRecordDialogType = type }
-                    )
-                }
-            }
-
-            // Custom sliding drawer
-            PremiumSideDrawer(
-                isOpen = drawerOpen,
-                appState = appState,
-                onClose = { drawerOpen = false },
-                onNavigate = { tab ->
-                    currentScreen = tab
-                    drawerOpen = false
-                }
-            )
-        }
-    }
-
-    // Modal dialog insertions
-    if (showAddProductDialog) {
-        AddProductDialog(
-            onDismiss = { showAddProductDialog = false },
-            onSave = { name, size, color, pieces, weight, stock ->
-                overviewViewModel.addNewProduct(name, size, color, 500, pieces, weight, stock)
-                showAddProductDialog = false
-            }
-        )
-    }
-
-    if (showAddMasterbatchDialog) {
-        AddMasterbatchDialog(
-            onDismiss = { showAddMasterbatchDialog = false },
-            onSave = { color, stock ->
-                overviewViewModel.addNewMasterbatch(color, stock)
-                showAddMasterbatchDialog = false
-            }
-        )
-    }
-
-    if (rawMaterialRecordDialogType != null) {
-        RecordRawMaterialDialog(
-            materialType = rawMaterialRecordDialogType!!,
-            onDismiss = { rawMaterialRecordDialogType = null },
-            onSave = { added, used ->
-                overviewViewModel.recordRawMaterialActivity(rawMaterialRecordDialogType!!, used, added)
-                rawMaterialRecordDialogType = null
-            }
-        )
-    }
-}
-
-// Custom animated 5 tab Bottom navigation containing Ethiopian strings & animated icons
-@Composable
-fun CustomBottomNavigationBar(
-    currentTab: String,
-    onTabSelected: (String) -> Unit
-) {
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .windowInsetsPadding(WindowInsets.navigationBars)
-            .shadow(
-                elevation = 16.dp,
-                shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp),
-                ambientColor = EmeraldGlow,
-                spotColor = EmeraldGlow
-            ),
-        color = DarkGlassCard,
-        border = BorderStroke(1.dp, EmeraldGlow)
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 8.dp, horizontal = 4.dp),
-            horizontalArrangement = Arrangement.SpaceEvenly,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            val tabs = listOf(
-                TabItem("Overview", "ማጠቃለያ", Icons.Default.Dashboard),
-                TabItem("Production", "ምርት", Icons.Default.Factory),
-                TabItem("Stock", "ክምችት", Icons.Default.Storage),
-                TabItem("Workers", "ሰራተኞች", Icons.Default.People),
-                TabItem("AI", "ቢኒያም AI", Icons.Default.Psychology)
-            )
-
-            tabs.forEach { tab ->
-                val isActive = currentTab == tab.route
-                val scale by animateFloatAsState(
-                    targetValue = if (isActive) 1.2f else 1.0f,
-                    animationSpec = tween(300, easing = EaseInOutCirc),
-                    label = "icon_scale"
-                )
-                val color by animateColorAsState(
-                    targetValue = if (isActive) EmeraldGlow else Color(0xFF8C9E94),
-                    animationSpec = tween(300),
-                    label = "icon_color"
-                )
-
-                Column(
-                    modifier = Modifier
-                        .clickable(
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = null
-                        ) { onTabSelected(tab.route) }
-                        .weight(1f)
-                        .testTag("nav_tab_${tab.route.lowercase()}"),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center
-                ) {
-                    Icon(
-                        imageVector = tab.icon,
-                        contentDescription = tab.label,
-                        tint = color,
-                        modifier = Modifier
-                            .size(24.dp)
-                            .graphicsLayer(scaleX = scale, scaleY = scale)
-                    )
-                    Spacer(modifier = Modifier.height(3.dp))
-                    Text(
-                        text = tab.label,
-                        fontSize = 11.sp,
-                        fontWeight = if (isActive) FontWeight.Bold else FontWeight.Medium,
-                        color = color,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
+                        label = "navIconScale"
                     )
                     
-                    Box(
+                    // Smooth glow dot width/scale animation
+                    val glowOffset by animateFloatAsState(
+                        targetValue = if (isSelected) 1.0f else 0f,
+                        animationSpec = tween(250),
+                        label = "glowOffset"
+                    )
+                    
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
                         modifier = Modifier
-                            .height(8.dp)
-                            .fillMaxWidth(),
-                        contentAlignment = Alignment.Center
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = androidx.compose.material.ripple.rememberRipple(bounded = false, radius = 24.dp)
+                            ) {
+                                selectedTab = tab
+                            }
+                            .padding(horizontal = 8.dp, vertical = 2.dp)
                     ) {
-                        if (isActive) {
-                            Box(
-                                modifier = Modifier
-                                    .size(5.dp)
-                                    .background(EmeraldGlow, CircleShape)
-                                    .shadow(4.dp, CircleShape)
-                            )
-                        }
+                        Icon(
+                            imageVector = icon,
+                            contentDescription = label,
+                            tint = if (isSelected) EmeraldGlow else MutedText,
+                            modifier = Modifier
+                                .size(24.dp)
+                                .graphicsLayer {
+                                    scaleX = iconScale
+                                    scaleY = iconScale
+                                }
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = label,
+                            color = if (isSelected) EmeraldGlow else MutedText,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        
+                        // Premium emerald glow line/dot under active navigation tab
+                        Box(
+                            modifier = Modifier
+                                .padding(top = 4.dp)
+                                .height(4.dp)
+                                .width(12.dp)
+                                .graphicsLayer {
+                                    alpha = glowOffset
+                                    scaleX = glowOffset
+                                }
+                                .background(
+                                    Brush.horizontalGradient(
+                                        listOf(
+                                            Color.Transparent,
+                                            EmeraldGlow,
+                                            Color.Transparent
+                                        )
+                                    ),
+                                    shape = RoundedCornerShape(100.dp)
+                                )
+                        )
                     }
                 }
             }
         }
-    }
-}
-
-data class TabItem(val route: String, val label: String, val icon: ImageVector)
-
-@Composable
-fun ScreenContentTransition(
-    screen: String,
-    appState: AppState,
-    overviewViewModel: OverviewViewModel,
-    productionViewModel: ProductionViewModel,
-    stockViewModel: StockViewModel,
-    workersViewModel: WorkersViewModel,
-    biniyamAIViewModel: BiniyamAIViewModel,
-    onAddProductTrigger: () -> Unit,
-    onAddMasterbatchTrigger: () -> Unit,
-    onAddRawMaterialTrigger: (String) -> Unit
-) {
-    AnimatedContent(
-        targetState = screen,
-        transitionSpec = {
-            fadeIn(animationSpec = tween(300)) togetherWith fadeOut(animationSpec = tween(300))
-        },
-        label = "screen_transition"
-    ) { targetScreen ->
-        when (targetScreen) {
-            "Overview" -> OverviewScreenContent(appState, overviewViewModel, onAddProductTrigger, onAddMasterbatchTrigger, onAddRawMaterialTrigger)
-            "Production" -> ProductionScreenContent(appState, productionViewModel)
-            "Stock" -> StockScreenContent(appState, stockViewModel)
-            "Workers" -> WorkersScreenContent(appState, workersViewModel)
-            "AI" -> BiniyamAIScreenContent(appState, biniyamAIViewModel)
-        }
-    }
-}
-
-// CUSTOM SLIDING PREMIUM DRAWER
-@OptIn(ExperimentalAnimationApi::class)
-@Composable
-fun PremiumSideDrawer(
-    isOpen: Boolean,
-    appState: AppState,
-    onClose: () -> Unit,
-    onNavigate: (String) -> Unit
-) {
-    val drawerContext = androidx.compose.ui.platform.LocalContext.current
-    if (isOpen) {
-        // Scrim layer
+    ) { paddingValues ->
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.6f))
-                .clickable { onClose() }
+                .background(PureBlack)
+                .padding(paddingValues)
         ) {
-            // Main sliding pane animation
-            Box(
-                modifier = Modifier
-                    .fillMaxHeight()
-                    .fillMaxWidth(0.78f)
-                    .background(DarkGlassCard)
-                    .border(BorderStroke(1.dp, Color(0xFF122C20)), RoundedCornerShape(topEnd = 16.dp, bottomEnd = 16.dp))
-                    .clickable(enabled = false) {},
-                contentAlignment = Alignment.TopStart
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(24.dp)
-                        .verticalScroll(rememberScrollState())
-                ) {
-                    Spacer(modifier = Modifier.height(24.dp))
-                    // ANWAR Large Logo
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(
-                            modifier = Modifier
-                                .size(48.dp)
-                                .background(Brush.radialGradient(listOf(EmeraldGlow.copy(alpha = 0.4f), Color.Transparent)), CircleShape)
-                                .border(BorderStroke(2.dp, EmeraldGlow), CircleShape),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text("A", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 24.sp)
-                        }
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Column {
-                            Text(
-                                "ANWAR PLUS",
-                                fontWeight = FontWeight.Black,
-                                fontSize = 20.sp,
-                                color = Color.White,
-                                letterSpacing = 1.sp
-                            )
-                            Text(
-                                "Recycling Industry",
-                                color = EmeraldGlow,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                        }
-                    }
-                    Spacer(modifier = Modifier.height(28.dp))
-                    Divider(color = Color(0xFF122C20))
-                    Spacer(modifier = Modifier.height(20.dp))
-
-                    // Company Stats Summary Block
-                    Text("ድርጅታዊ ስታትስቲክስ (Stats Summary)", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                    Spacer(modifier = Modifier.height(12.dp))
-                    StatsSummaryTile("ጠቅላላ ሰራተኛ (Workers)", "${appState.workers.size} ንቁ")
-                    StatsSummaryTile("የምርቶች አይነት (Products)", "${appState.products.size} አይነቶች")
-                    StatsSummaryTile("የእቃ ክምችት (Stock bags)", "${appState.products.sumOf { it.currentStock }} ከረጢት")
-                    StatsSummaryTile("ዛሬ የተመረተ (Today Produced)", "${appState.stats.totalFabricated} ከረጢት")
-
-                    Spacer(modifier = Modifier.height(24.dp))
-                    Divider(color = Color(0xFF122C20))
-                    Spacer(modifier = Modifier.height(20.dp))
-
-                    // Shortcuts/Quick Links
-                    Text("ፈጣን መንገዶች (Quick Links)", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                    Spacer(modifier = Modifier.height(12.dp))
-                    DrawerItem(Icons.Default.Dashboard, "ማጠቃለያ", "Overview", onNavigate)
-                    DrawerItem(Icons.Default.Factory, "ምርት መዝግብ", "Production", onNavigate)
-                    DrawerItem(Icons.Default.Storage, "የክምችት ማሳያ", "Stock", onNavigate)
-                    DrawerItem(Icons.Default.People, "ሰራተኞች አስተዳድር", "Workers", onNavigate)
-                    DrawerItem(Icons.Default.Psychology, "ቢኒያም AI ረዳት", "AI", onNavigate)
-
-                    Spacer(modifier = Modifier.weight(1f))
-                    Spacer(modifier = Modifier.height(40.dp))
-
-                    // App Version Footer
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column {
-                            Text("ANWAR APP", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                            Text("Version $CURRENT_APP_VERSION (stable)", color = Color(0xFF8C9E94), fontSize = 10.sp)
-                        }
-                        IconButton(onClick = {
-                            Toast.makeText(drawerContext, "ከአካውንትዎ በትክክል ወጥተዋል! (Logged Out)", Toast.LENGTH_SHORT).show()
-                        }) {
-                            Icon(Icons.Default.Logout, "Logout", tint = Color.Red)
-                        }
-                    }
+            // Main views routing
+            AnimatedContent(
+                targetState = selectedTab,
+                transitionSpec = {
+                    fadeIn(animationSpec = tween(220)) togetherWith fadeOut(animationSpec = tween(220))
+                },
+                label = "MainScreenTabs"
+            ) { targetTab ->
+                when (targetTab) {
+                    "Overview" -> OverviewTab(
+                        products = products,
+                        workers = workers,
+                        rawMaterial = rawMaterialsStock,
+                        masterbatch = masterbatchStock,
+                        attendanceList = attendanceList
+                    )
+                    "Production" -> ProductionTab(
+                        viewModel = viewModel,
+                        products = products
+                    )
+                    "Stock" -> StockTab(
+                        viewModel = viewModel,
+                        products = products,
+                        rawMaterial = rawMaterialsStock,
+                        masterbatch = masterbatchStock
+                    )
+                    "Workers" -> WorkersTab(
+                        viewModel = viewModel,
+                        workers = workers,
+                        attendanceList = attendanceList,
+                        currentMonth = currentMonth,
+                        currentYear = currentYear
+                    )
+                    "AI" -> AiTab(
+                        viewModel = viewModel,
+                        messages = chatMessages
+                    )
                 }
             }
         }
     }
 }
 
+// ==========================================
+// MOTION GRAPHICS & GOD MODE ANIMATIONS HELPERS
+// ==========================================
+
+class RecycleParticle(var x: Float, var y: Float, var vx: Float, var vy: Float, var size: Float)
+
 @Composable
-fun DrawerItem(icon: ImageVector, label: String, route: String, onNavigate: (String) -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onNavigate(route) }
-            .padding(vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Icon(icon, null, tint = EmeraldGlow, modifier = Modifier.size(20.dp))
-        Spacer(modifier = Modifier.width(12.dp))
-        Text(label, color = Color(0xFFE2E8F0), fontSize = 14.sp, fontWeight = FontWeight.Medium)
+fun ParticleBackground() {
+    val particles = remember {
+        List(18) {
+            RecycleParticle(
+                x = (0..100).random().toFloat() / 100f,
+                y = (0..100).random().toFloat() / 100f,
+                vx = ((1..4).random().toFloat() * if (Math.random() > 0.5) 1f else -1f) / 15000f,
+                vy = ((1..4).random().toFloat() * if (Math.random() > 0.5) 1f else -1f) / 15000f,
+                size = (3..7).random().toFloat()
+            )
+        }
+    }
+    
+    var tick by remember { mutableStateOf(0L) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            withFrameNanos { frameTime ->
+                particles.forEach { p ->
+                    p.x = (p.x + p.vx).let { if (it < 0f) 1f else if (it > 1f) 0f else it }
+                    p.y = (p.y + p.vy).let { if (it < 0f) 1f else if (it > 1f) 0f else it }
+                }
+                tick = frameTime
+            }
+        }
+    }
+    
+    Canvas(modifier = Modifier.fillMaxSize()) {
+        val w = size.width
+        val h = size.height
+        
+        // Connection lines between nearby moving particles
+        for (i in particles.indices) {
+            val p1 = particles[i]
+            val px1 = p1.x * w
+            val py1 = p1.y * h
+            
+            for (j in i + 1 until particles.size) {
+                val p2 = particles[j]
+                val px2 = p2.x * w
+                val py2 = p2.y * h
+                
+                val dist = Math.hypot((px1 - px2).toDouble(), (py1 - py2).toDouble()).toFloat()
+                val maxDist = 180.dp.toPx()
+                if (dist < maxDist) {
+                    val alpha = (1f - (dist / maxDist)).coerceIn(0f, 1f) * 0.12f
+                    drawLine(
+                        color = Color(0xFF00FF88),
+                        start = Offset(px1, py1),
+                        end = Offset(px2, py2),
+                        strokeWidth = 0.8.dp.toPx(),
+                        alpha = alpha
+                    )
+                }
+            }
+            
+            // Draw floating green particle points
+            drawCircle(
+                color = Color(0xFF00FF88),
+                radius = p1.size.dp.toPx() / 2,
+                center = Offset(px1, py1),
+                alpha = 0.2f
+            )
+        }
     }
 }
 
 @Composable
-fun StatsSummaryTile(title: String, valStr: String) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 6.dp),
-        horizontalArrangement = Arrangement.SpaceBetween
-    ) {
-        Text(title, color = Color(0xFF8C9E94), fontSize = 12.sp)
-        AnimateCountUpText(
-            valueString = valStr,
-            color = Color(0xFFFFD700), // Premium cosmic gold
-            fontSize = 12.sp,
-            fontWeight = FontWeight.Bold,
-            fontFamily = FontFamily.Monospace
+fun RadarScanLine() {
+    val infiniteTransition = rememberInfiniteTransition(label = "scan_line")
+    val progress by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(4000, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "scan_progress"
+    )
+    
+    Canvas(modifier = Modifier.fillMaxSize()) {
+        val h = size.height
+        val w = size.width
+        val y = progress * h
+        
+        // 40% Opacity Sweeping thin green radar scanner scan line
+        drawLine(
+            color = Color(0xFF00FF88),
+            start = Offset(0f, y),
+            end = Offset(w, y),
+            strokeWidth = 1.2.dp.toPx(),
+            alpha = 0.40f
+        )
+        
+        // Subtle glow trailer above the scanner
+        drawRect(
+            brush = Brush.verticalGradient(
+                colors = listOf(Color(0xFF00FF88).copy(alpha = 0.08f), Color.Transparent),
+                startY = y,
+                endY = (y - 45.dp.toPx()).coerceAtLeast(0f)
+            ),
+            size = Size(w, 45.dp.toPx())
         )
     }
 }
 
-// ==================== (PRIMARY SCREEN 1) OVERVIEW/HOME SCREEN ====================
-data class PremiumAlert(val text: String, val type: AlertType)
-enum class AlertType { CRITICAL_STOCK, SALARY_COUNTDOWN }
+@Composable
+fun AnimateCountUpText(
+    valueString: String,
+    color: Color,
+    fontSize: TextUnit,
+    fontFamily: FontFamily = FontFamily.Monospace,
+    fontWeight: FontWeight = FontWeight.Black
+) {
+    // Graceful check and extraction of digits for count up
+    val numericValue = valueString.filter { it.isDigit() }.toIntOrNull() ?: 0
+    val nonNumericValue = valueString.filter { !it.isDigit() }
+    
+    var animateCount by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        animateCount = true
+    }
+    
+    val animatedCountVal by animateIntAsState(
+        targetValue = if (animateCount) numericValue else 0,
+        animationSpec = tween(1500, easing = LinearOutSlowInEasing),
+        label = "metricCount"
+    )
+    
+    Text(
+        text = if (nonNumericValue.isNotEmpty()) "$animatedCountVal$nonNumericValue" else "$animatedCountVal",
+        color = color,
+        fontSize = fontSize,
+        fontWeight = fontWeight,
+        fontFamily = fontFamily
+    )
+}
 
 @Composable
-fun OverviewScreenContent(
-    appState: AppState,
-    viewModel: OverviewViewModel,
-    onAddProduct: () -> Unit,
-    onAddMasterbatch: () -> Unit,
-    onRecordRawMaterial: (String) -> Unit
-) {
-    val context = LocalContext.current
-    val haptic = LocalHapticFeedback.current
-    var liveTimeStr by remember { mutableStateOf("") }
-
-    // Live clock ticker
-    LaunchedEffect(Unit) {
-        while (true) {
-            val format = SimpleDateFormat("hh:mm:ss a", Locale.US)
-            liveTimeStr = format.format(Date())
-            kotlinx.coroutines.delay(1000)
+fun TypewriterText(phrases: List<String>) {
+    var phraseIdx by remember { mutableStateOf(0) }
+    var textToDisplay by remember { mutableStateOf("") }
+    var isDeleting by remember { mutableStateOf(false) }
+    
+    LaunchedEffect(phraseIdx, isDeleting) {
+        val currentPhrase = phrases[phraseIdx]
+        if (!isDeleting) {
+            // Typing speed: 80ms
+            for (i in 1..currentPhrase.length) {
+                textToDisplay = currentPhrase.take(i)
+                kotlinx.coroutines.delay(80)
+            }
+            // Delay at fully typed before starting delete
+            kotlinx.coroutines.delay(2000)
+            isDeleting = true
+        } else {
+            // Deleting speed: 40ms
+            for (i in currentPhrase.length downTo 0) {
+                textToDisplay = currentPhrase.take(i)
+                kotlinx.coroutines.delay(40)
+            }
+            isDeleting = false
+            phraseIdx = (phraseIdx + 1) % phrases.size
         }
     }
-
-    // Dynamic animation coordinates for Drift Network Background
-    val infiniteTransition = rememberInfiniteTransition(label = "overview_drift")
-    val tick by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = (2 * Math.PI).toFloat(),
-        animationSpec = infiniteRepeatable(tween(42000, easing = LinearEasing), RepeatMode.Restart),
-        label = "tick"
-    )
-
-    // Pre-declare static drift coordinates (18 premium nodes)
-    val particlesCount = 18
-    val particles = remember {
-        List(particlesCount) {
-            Triple(
-                kotlin.random.Random.nextFloat(),
-                kotlin.random.Random.nextFloat(),
-                kotlin.random.Random.nextFloat() * 1.4f + 0.4f
-            )
-        }
-    }
-
-    // Typewriter state management
-    var typewriterText by remember { mutableStateOf("") }
-    val typewriterPhrases = listOf(
-        "OPERATING EFFICIENTLY",
-        "LEADING WITH INNOVATION",
-        "የፕላስቲክ ምርት ቁጥጥር",
-        "ANWAR FACTORY SYSTEM"
-    )
-
-    LaunchedEffect(Unit) {
-        var phraseIndex = 0
-        while (true) {
-            val word = typewriterPhrases[phraseIndex]
-            // Type characters forward
-            for (i in 0..word.length) {
-                typewriterText = word.substring(0, i)
-                kotlinx.coroutines.delay(75)
-            }
-            kotlinx.coroutines.delay(1500) // Pause on complete word
-            // Backspace delete
-            for (i in word.length downTo 0) {
-                typewriterText = word.substring(0, i)
-                kotlinx.coroutines.delay(35)
-            }
-            kotlinx.coroutines.delay(400)
-            phraseIndex = (phraseIndex + 1) % typewriterPhrases.size
-        }
-    }
-
-    // Entrance Animation coordination scales via graphicsLayer
-    var animateEntrance by remember { mutableStateOf(false) }
-    LaunchedEffect(Unit) {
-        animateEntrance = true
-    }
-
-    val heroAlpha by animateFloatAsState(targetValue = if (animateEntrance) 1f else 0f, animationSpec = tween(650, delayMillis = 100), label = "hero_a")
-    val heroSlide by animateFloatAsState(targetValue = if (animateEntrance) 0f else 70f, animationSpec = tween(650, delayMillis = 100), label = "hero_s")
-
-    val metricsAlpha by animateFloatAsState(targetValue = if (animateEntrance) 1f else 0f, animationSpec = tween(650, delayMillis = 280), label = "metrics_a")
-    val metricsSlide by animateFloatAsState(targetValue = if (animateEntrance) 0f else 70f, animationSpec = tween(650, delayMillis = 280), label = "metrics_s")
-
-    val chartAlpha by animateFloatAsState(targetValue = if (animateEntrance) 1f else 0f, animationSpec = tween(650, delayMillis = 440), label = "chart_a")
-    val chartSlide by animateFloatAsState(targetValue = if (animateEntrance) 0f else 70f, animationSpec = tween(650, delayMillis = 440), label = "chart_s")
-
-    val alertsAlpha by animateFloatAsState(targetValue = if (animateEntrance) 1f else 0f, animationSpec = tween(650, delayMillis = 600), label = "alerts_a")
-    val alertsSlide by animateFloatAsState(targetValue = if (animateEntrance) 0f else 70f, animationSpec = tween(650, delayMillis = 600), label = "alerts_s")
-
-    // Retrieve active counts
-    val isFactoryActive = appState.factoryStatus == "ACTIVE" || appState.stats.totalFabricated > 0
-    val dutyCount = appState.currentAttendance.count { it.status == "On Duty" }
-    val stockSum = appState.products.sumOf { it.currentStock }
-
-    // Parse alerts
-    val premiumAlerts = remember(appState) {
-        val list = mutableListOf<PremiumAlert>()
-        
-        // Critical stock alerts (product stock < 15)
-        appState.products.forEach { p ->
-            if (p.currentStock < 15) {
-                list.add(PremiumAlert("የምርት '${p.name}' ክምችት አልቋል! (${p.currentStock} ከረጢት)", AlertType.CRITICAL_STOCK))
-            }
-        }
-        
-        // Critical raw material alerts (rm < 350)
-        appState.rawMaterials.forEach { rm ->
-            if (rm.currentStock < 350) {
-                list.add(PremiumAlert("የጥሬ እቃ '${rm.type}' ክምችት እጅግ ዝቅተኛ ነው! (${rm.currentStock.toInt()}kg ቀርቷል)", AlertType.CRITICAL_STOCK))
-            }
-        }
-
-        // Salary countdown (usually end of Ethiopian month - day 30)
-        val parts = appState.selectedDate.split("-")
-        val currentDay = parts.getOrNull(2)?.toIntOrNull() ?: 1
-        if (currentDay <= 30) {
-            val daysToSalary = 30 - currentDay
-            if (daysToSalary == 0) {
-                list.add(PremiumAlert("የዛሬ ቀን ታላቁ የሰራተኞች ደሞዝ መክፈያ እለት ነው! ([ደሞዝ ክፈት/PAY ACTIVE])", AlertType.SALARY_COUNTDOWN))
-            } else if (daysToSalary <= 10) {
-                list.add(PremiumAlert("የደመወዝ ዝግጅት መቁጠሪያ፡ ለክፍያ ቀን $daysToSalary ቀናት ቀርተዋል!", AlertType.SALARY_COUNTDOWN))
-            }
-        }
-        
-        list
-    }
-
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.Black)
-    ) {
-        // 1. Animated circuit particle background
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            val w = size.width
-            val h = size.height
-            val pxList = particles.map { p ->
-                val cx = p.first * w + 35.dp.toPx() * cos((tick * p.third).toDouble()).toFloat()
-                val cy = p.second * h + 35.dp.toPx() * sin((tick * p.third).toDouble()).toFloat()
-                Offset(cx.coerceIn(0f, w), cy.coerceIn(0f, h))
-            }
-
-            // Draw link connections
-            val threshold = 180.dp.toPx()
-            for (i in pxList.indices) {
-                for (j in i + 1 until pxList.size) {
-                    val p1 = pxList[i]
-                    val p2 = pxList[j]
-                    val dx = p1.x - p2.x
-                    val dy = p1.y - p2.y
-                    val dist = sqrt((dx * dx + dy * dy).toDouble()).toFloat()
-                    if (dist < threshold) {
-                        val alpha = (1f - dist / threshold).coerceIn(0f, 1f) * 0.15f
-                        drawLine(
-                            color = Color(0xFF00FF88),
-                            start = p1,
-                            end = p2,
-                            strokeWidth = 1.dp.toPx(),
-                            alpha = alpha
-                        )
-                    }
-                }
-            }
-
-            // Draw circuit dot junctions
-            pxList.forEach { pt ->
-                drawCircle(
-                    color = Color(0xFF00FF88),
-                    radius = 3.dp.toPx(),
-                    center = pt,
-                    alpha = 0.38f
-                )
-            }
-        }
-
-        // 2. Main scrollable content
-        LazyColumn(
+    
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text(
+            text = textToDisplay,
+            color = MutedText,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Medium
+        )
+        // Blinking green terminal cursor block
+        val cursorTransition = rememberInfiniteTransition(label = "terminal_cursor")
+        val cursorAlpha by cursorTransition.animateFloat(
+            initialValue = 0f,
+            targetValue = 1f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(500, easing = LinearEasing),
+                repeatMode = RepeatMode.Reverse
+            ),
+            label = "cursorAlpha"
+        )
+        Box(
             modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(20.dp)
-        ) {
-            // Hero section
-            item {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .graphicsLayer(alpha = heroAlpha, translationY = heroSlide)
-                        .padding(vertical = 12.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    // Small green eyebrow
-                    Text(
-                        text = "የፋብሪካ አሠራር ቁጥጥር ስርዓት",
-                        color = Color(0xFF00FF88),
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 1.5.sp,
-                        modifier = Modifier.padding(bottom = 8.dp)
+                .padding(start = 2.dp)
+                .width(2.dp)
+                .height(13.dp)
+                .background(EmeraldGlow)
+                .graphicsLayer { alpha = cursorAlpha }
+        )
+    }
+}
+
+@Composable
+fun ProductStockBarChart(products: List<Product>) {
+    if (products.isEmpty()) return
+    val maxStock = (products.maxOfOrNull { it.currentStock } ?: 1).coerceAtLeast(1)
+    
+    var chartAnimateTriggered by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        chartAnimateTriggered = true
+    }
+    
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .shadow(
+                elevation = 6.dp,
+                shape = RoundedCornerShape(16.dp),
+                ambientColor = EmeraldGlow.copy(alpha = 0.08f),
+                spotColor = EmeraldGlow.copy(alpha = 0.12f)
+            ),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = DarkGlassCard.copy(alpha = 0.9f)),
+        border = BorderStroke(0.6.dp, Color(0xFF1E2E24))
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                text = "የእቃዎች ክምችት ንፅፅር ቻርት (Recycle Stocks Chart)",
+                color = Color.White,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(modifier = Modifier.height(18.dp))
+            
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(140.dp),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                verticalAlignment = Alignment.Bottom
+            ) {
+                products.forEachIndexed { index, product ->
+                    val cleanLabelName = product.name
+                        .replace("avocado", "", ignoreCase = true)
+                        .replace("Avocado", "", ignoreCase = true)
+                        .replace("አቮካዶ", "", ignoreCase = true)
+                        .trim()
+                        .let { if (it.isEmpty()) "ሸርጅን" else it }
+
+                    val stockRatio = product.currentStock.toFloat() / maxStock.toFloat()
+                    
+                    // Height animating from 0% to real height with a 1.5-second cubic ease animation
+                    val animatedHeightProgress by animateFloatAsState(
+                        targetValue = if (chartAnimateTriggered) stockRatio else 0f,
+                        animationSpec = tween(
+                            durationMillis = 1500,
+                            easing = CubicBezierEasing(0.25f, 0.1f, 0.25f, 1f)
+                        ),
+                        label = "chartBarProgress"
                     )
-
-                    // Big glowing title
-                    Text(
-                        text = buildAnnotatedString {
-                            append("ANWAR ")
-                            withStyle(style = SpanStyle(color = Color(0xFF00FF88), fontWeight = FontWeight.Black)) {
-                                append("PLASTIC")
-                            }
-                            append(" RECYCLE")
-                        },
-                        color = Color.White,
-                        fontSize = 24.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        letterSpacing = 0.5.sp,
-                        modifier = Modifier.shadow(
-                            elevation = 8.dp,
-                            spotColor = Color(0xFF00FF88),
-                            ambientColor = Color(0xFF00FF88)
-                        )
+                    
+                    val infiniteShimmer = rememberInfiniteTransition(label = "shimmer_bar_$index")
+                    val shimmerProgress by infiniteShimmer.animateFloat(
+                        initialValue = -1f,
+                        targetValue = 2f,
+                        animationSpec = infiniteRepeatable(
+                            animation = tween(2200, easing = LinearEasing),
+                            repeatMode = RepeatMode.Restart
+                        ),
+                        label = "shimmerProgress"
                     )
-
-                    Spacer(modifier = Modifier.height(14.dp))
-
-                    // Typewriter Console strip
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth(0.9f)
-                            .height(34.dp)
-                            .clip(RoundedCornerShape(6.dp))
-                            .background(Color(0xFF041008))
-                            .border(BorderStroke(0.8.dp, Color(0xFF00FF88).copy(alpha = 0.25f)), RoundedCornerShape(6.dp))
-                            .padding(horizontal = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center
-                    ) {
-                        Text(
-                            text = typewriterText,
-                            color = Color(0xFF00FF88),
-                            fontFamily = FontFamily.Monospace,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Bold,
-                            letterSpacing = 1.sp
-                        )
-                        
-                        // Blinking terminal cursor
-                        val cursorTransition = rememberInfiniteTransition(label = "cursor")
-                        val cursorAlpha by cursorTransition.animateFloat(
-                            initialValue = 0f,
-                            targetValue = 1f,
-                            animationSpec = infiniteRepeatable(tween(400, easing = EaseInOutSine), RepeatMode.Reverse),
-                            label = "cursor_alpha"
-                        )
-                        Box(
-                            modifier = Modifier
-                                .width(7.dp)
-                                .height(13.dp)
-                                .offset(x = 3.dp)
-                                .background(Color(0xFF00FF88).copy(alpha = cursorAlpha))
-                        )
+                    
+                    val levelColor = when {
+                        stockRatio > 0.40 -> EmeraldGlow
+                        stockRatio >= 0.15 -> Color(0xFFFFD700)
+                        else -> Color(0xFFFF3B3B)
                     }
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    // Pill-shaped status badge
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(100.dp))
-                            .background(Color(0xFF09140C))
-                            .border(BorderStroke(1.dp, if (isFactoryActive) Color(0xFF00FF88).copy(alpha = 0.5f) else Color.Red.copy(alpha = 0.5f)), RoundedCornerShape(100.dp))
-                            .padding(horizontal = 14.dp, vertical = 6.dp)
+                    
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.weight(1f)
                     ) {
-                        // Pulsing led
-                        val ledTransition = rememberInfiniteTransition(label = "led")
-                        val ledScale by ledTransition.animateFloat(
-                            initialValue = 0.8f,
-                            targetValue = 1.35f,
-                            animationSpec = infiniteRepeatable(tween(900, easing = EaseInOutSine), RepeatMode.Reverse),
-                            label = "led_scale"
-                        )
-                        Box(
-                            modifier = Modifier
-                                .size(9.dp)
-                                .graphicsLayer(scaleX = ledScale, scaleY = ledScale)
-                                .background(if (isFactoryActive) Color(0xFF00FF88) else Color.Red, CircleShape)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = if (isFactoryActive) "FACTORY ACTIVE · በስራ ላይ" else "FACTORY IDLE · ቆሟል",
-                            color = if (isFactoryActive) Color(0xFF00FF88) else Color.Red,
+                            text = "${product.currentStock}",
+                            color = levelColor,
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
                             fontFamily = FontFamily.Monospace
                         )
-                    }
-                }
-            }
-
-            // Metric Cards Grid
-            item {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .graphicsLayer(alpha = metricsAlpha, translationY = metricsSlide),
-                    verticalArrangement = Arrangement.spacedBy(14.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(14.dp)
-                    ) {
-                        OverviewMetricCardGodMode(
-                            label = "የዛሬ ምርት",
-                            subLabel = "Today's Production",
-                            valueKey = "${appState.stats.totalFabricated} ከረጢት",
-                            numberColor = Color(0xFF00FF88),
-                            modifier = Modifier.weight(1f)
-                        )
-                        OverviewMetricCardGodMode(
-                            label = "የዛሬ ሽያጭ",
-                            subLabel = "Today's Sales",
-                            valueKey = "${appState.stats.totalSold} ከረጢት",
-                            numberColor = Color(0xFFFFD700),
-                            modifier = Modifier.weight(1f)
-                        )
-                    }
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(14.dp)
-                    ) {
-                        OverviewMetricCardGodMode(
-                            label = "ንቁ ሰራተኞች",
-                            subLabel = "On Duty Workers",
-                            valueKey = "$dutyCount ሰራተኛ",
-                            numberColor = Color(0xFF00E5FF),
-                            modifier = Modifier.weight(1f)
-                        )
-                        OverviewMetricCardGodMode(
-                            label = "ጠቅላላ ክምችት",
-                            subLabel = "Total Stock Balance",
-                            valueKey = "$stockSum ማዳበሪያ",
-                            numberColor = Color(0xFF00FF88),
-                            modifier = Modifier.weight(1f)
-                        )
-                    }
-                }
-            }
-
-            // Chart Section
-            item {
-                val trendPoints = remember(appState.allProductTransactions) {
-                    calculateLast7DaysTrend(appState.allProductTransactions, appState.products)
-                }
-                val maxVal = remember(trendPoints) {
-                    (trendPoints.maxOrNull() ?: 1.0).coerceAtLeast(1.0)
-                }
-
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .graphicsLayer(alpha = chartAlpha, translationY = chartSlide)
-                        .shadow(12.dp, RoundedCornerShape(20.dp), ambientColor = Color(0xFF00FF88).copy(alpha = 0.1f), spotColor = Color(0xFF00FF88).copy(alpha = 0.2f)),
-                    shape = RoundedCornerShape(20.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFF050505)),
-                    border = BorderStroke(0.8.dp, Color(0xFF333333))
-                ) {
-                    Column(
-                        modifier = Modifier.padding(18.dp)
-                    ) {
-                        Text(
-                            text = "ታሪካዊ ምርት ልኬት (7-Days Production)",
-                            color = Color.White,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Bold,
-                            letterSpacing = 0.5.sp
-                        )
-                        Spacer(modifier = Modifier.height(18.dp))
-
-                        // Custom Bar Chart Row
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(160.dp)
-                                .padding(horizontal = 4.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.Bottom
-                        ) {
-                            val labels = getAmharicWeekdays()
-                            trendPoints.forEachIndexed { index, value ->
-                                val barHeightFraction = if (maxVal > 0) (value / maxVal).toFloat() else 0f
-                                val animatedHeightFraction by animateFloatAsState(
-                                    targetValue = barHeightFraction,
-                                    animationSpec = tween(durationMillis = 800 + index * 80, easing = EaseOutQuad),
-                                    label = "bar_$index"
-                                )
-                                
-                                Column(
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .fillMaxHeight(),
-                                    horizontalAlignment = Alignment.CenterHorizontally,
-                                    verticalArrangement = Arrangement.Bottom
-                                ) {
-                                    Text(
-                                        text = "${value.toInt()}",
-                                        color = if (index == 6) Color(0xFF00FF88) else Color.White.copy(alpha = 0.75f),
-                                        fontSize = 9.sp,
-                                        fontFamily = FontFamily.Monospace,
-                                        fontWeight = FontWeight.Bold,
-                                        modifier = Modifier.padding(bottom = 4.dp)
-                                    )
-
-                                    Box(
-                                        modifier = Modifier
-                                            .weight(1f, fill = false)
-                                            .width(18.dp)
-                                            .height(95.dp * animatedHeightFraction.coerceAtLeast(0.01f))
-                                            .clip(RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp))
-                                            .background(
-                                                Brush.verticalGradient(
-                                                    colors = listOf(Color(0xFF00FF88), Color(0xFF042915))
-                                                )
-                                            )
-                                            .border(
-                                                BorderStroke(0.5.dp, if (index == 6) Color(0xFF00FF88) else Color(0xFF00FF88).copy(alpha = 0.3f)),
-                                                RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp)
-                                            )
-                                    )
-
-                                    Spacer(modifier = Modifier.height(6.dp))
-
-                                    Text(
-                                        text = labels.getOrNull(index) ?: "",
-                                        color = if (index == 6) Color(0xFF00FF88) else Color(0xFF8C9E94),
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            // Quick actions controller card (Optional actions helper)
-            item {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFF050505)),
-                    border = BorderStroke(0.8.dp, Color(0xFF222222))
-                ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Text(
-                            "ፈጣን የክትትል የድርጊት መቆጣጠሪያ (Quick Controls)",
-                            color = Color.White,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold,
-                            fontFamily = FontFamily.Monospace,
-                            letterSpacing = 0.5.sp
-                        )
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            OverviewQuickButton(
-                                label = "+ አዲስ ምርት",
-                                color = Color(0xFF041007),
-                                textColor = Color(0xFF00FF88),
-                                onClick = {
-                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                    onAddProduct()
-                                },
-                                modifier = Modifier.weight(1f)
-                            )
-                            OverviewQuickButton(
-                                label = "+ ጥሬ እቃ LD",
-                                color = Color(0xFF030D14),
-                                textColor = Color(0xFF00E5FF),
-                                onClick = {
-                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                    onRecordRawMaterial("LD")
-                                },
-                                modifier = Modifier.weight(1f)
-                            )
-                            OverviewQuickButton(
-                                label = "+ ማስተርባች",
-                                color = Color(0xFF141003),
-                                textColor = Color(0xFFFFD700),
-                                onClick = {
-                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                    onAddMasterbatch()
-                                },
-                                modifier = Modifier.weight(1f)
-                            )
-                        }
-                    }
-                }
-            }
-
-            // Alerts Strip
-            item {
-                if (premiumAlerts.isNotEmpty()) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .graphicsLayer(alpha = alertsAlpha, translationY = alertsSlide),
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        Text(
-                            text = "⚡ የስርዓት ማሳሰቢያዎች (Smart Alerts System)",
-                            color = Color.White.copy(alpha = 0.8f),
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold,
-                            fontFamily = FontFamily.Monospace,
-                            modifier = Modifier.padding(bottom = 4.dp)
-                        )
-
-                        premiumAlerts.forEach { alert ->
-                            val isCritical = alert.type == AlertType.CRITICAL_STOCK
-                            val bgColor = if (isCritical) Color(0xFF1E0606) else Color(0xFF1E1706)
-                            val borderGlow = if (isCritical) Color(0xFFFF3B3B) else Color(0xFFFFD700)
-                            val textColor = if (isCritical) Color(0xFFFF9494) else Color(0xFFFDE047)
-
-                            Card(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .shadow(4.dp, RoundedCornerShape(12.dp), ambientColor = borderGlow, spotColor = borderGlow),
-                                colors = CardDefaults.cardColors(containerColor = bgColor),
-                                border = BorderStroke(1.dp, borderGlow.copy(alpha = 0.4f)),
-                                shape = RoundedCornerShape(12.dp)
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(14.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Icon(
-                                        imageVector = if (isCritical) Icons.Default.Warning else Icons.Default.Info,
-                                        contentDescription = "Alert Indicator",
-                                        tint = borderGlow,
-                                        modifier = Modifier.size(20.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(12.dp))
-                                    Text(
-                                        text = alert.text,
-                                        color = textColor,
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        fontFamily = FontFamily.Monospace,
-                                        modifier = Modifier.weight(1f)
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            // Scroll Hint indicator
-            item {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 24.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Text(
-                        text = "SCROLL",
-                        color = Color(0xFF00FF88).copy(alpha = 0.7f),
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Black,
-                        fontFamily = FontFamily.Monospace,
-                        letterSpacing = 2.sp
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    val scrollTransition = rememberInfiniteTransition(label = "scroll_glow")
-                    val lineOffset by scrollTransition.animateFloat(
-                        initialValue = -10f,
-                        targetValue = 10f,
-                        animationSpec = infiniteRepeatable(tween(1200, easing = EaseInOutSine), RepeatMode.Reverse),
-                        label = "offset"
-                    )
-
-                    Box(
-                        modifier = Modifier
-                            .width(2.dp)
-                            .height(30.dp)
-                            .background(Color(0xFF222222))
-                    ) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        
+                        // Animated bar representation with Shimmer light sweep
                         Box(
                             modifier = Modifier
-                                .align(Alignment.TopCenter)
-                                .offset(y = (10.dp + lineOffset.dp))
-                                .width(2.dp)
-                                .height(10.dp)
-                                .background(Color(0xFF00FF88))
+                                .width(28.dp)
+                                .fillMaxHeight(animatedHeightProgress.coerceAtLeast(0.01f))
+                                .clip(RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp))
+                                .drawWithContent {
+                                    drawContent()
+                                    
+                                    // continuous sweep shimmer sweep light effect
+                                    val h = size.height
+                                    val yOffset = shimmerProgress * h
+                                    drawRect(
+                                        brush = Brush.verticalGradient(
+                                            colors = listOf(
+                                                Color.Transparent,
+                                                Color.White.copy(alpha = 0.35f),
+                                                Color.Transparent
+                                            ),
+                                            startY = yOffset,
+                                            endY = yOffset + 24.dp.toPx()
+                                        ),
+                                        size = Size(size.width, 24.dp.toPx())
+                                    )
+                                }
+                                .background(
+                                    Brush.verticalGradient(
+                                        listOf(levelColor, levelColor.copy(alpha = 0.15f))
+                                    )
+                                )
                         )
                     }
                 }
@@ -1128,82 +545,356 @@ fun OverviewScreenContent(
     }
 }
 
-// Helpers
-fun getAmharicWeekdays(): List<String> {
-    val days = listOf("እሁ", "ሰኞ", "ማክ", "ረቡ", "ሐሙ", "አርብ", "ቅዳ")
-    val todayWeekDay = Calendar.getInstance().get(Calendar.DAY_OF_WEEK)
-    val result = mutableListOf<String>()
-    for (i in 0 until 7) {
-        val calculatedIdx = (todayWeekDay - 1 - (6 - i) + 14) % 7
-        result.add(days[calculatedIdx])
-    }
-    return result
+@Composable
+fun Modifier.hoverLightReveal(): Modifier {
+    var touchPos by remember { mutableStateOf<Offset?>(null) }
+    val glowAlpha = remember { androidx.compose.animation.core.Animatable(0f) }
+    val coroutineScope = rememberCoroutineScope()
+    
+    return this
+        .pointerInput(Unit) {
+            awaitPointerEventScope {
+                while (true) {
+                    val event = awaitPointerEvent()
+                    val type = event.type
+                    val change = event.changes.firstOrNull()
+                    if (change != null) {
+                        touchPos = change.position
+                    }
+                    when (type) {
+                        androidx.compose.ui.input.pointer.PointerEventType.Enter,
+                        androidx.compose.ui.input.pointer.PointerEventType.Press,
+                        androidx.compose.ui.input.pointer.PointerEventType.Move -> {
+                            coroutineScope.launch {
+                                glowAlpha.animateTo(0.24f, androidx.compose.animation.core.tween(150))
+                            }
+                        }
+                        androidx.compose.ui.input.pointer.PointerEventType.Exit,
+                        androidx.compose.ui.input.pointer.PointerEventType.Release -> {
+                            coroutineScope.launch {
+                                glowAlpha.animateTo(0f, androidx.compose.animation.core.tween(250))
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        .drawWithContent {
+            drawContent()
+            val pos = touchPos
+            if (pos != null && glowAlpha.value > 0f) {
+                drawCircle(
+                    brush = androidx.compose.ui.graphics.Brush.radialGradient(
+                        colors = listOf(Color(0xFF00FF88).copy(alpha = glowAlpha.value), Color.Transparent),
+                        center = pos,
+                        radius = size.maxDimension * 0.7f
+                    ),
+                    radius = size.maxDimension * 0.7f,
+                    center = pos,
+                    blendMode = androidx.compose.ui.graphics.BlendMode.Screen
+                )
+            }
+        }
 }
 
 @Composable
-fun OverviewMetricCardGodMode(
-    label: String,
-    subLabel: String,
-    valueKey: String,
-    numberColor: Color,
-    modifier: Modifier = Modifier
+fun FlowingArrow(modifier: Modifier = Modifier, progress: Float) {
+    Canvas(modifier = modifier) {
+        val width = size.width
+        val height = size.height
+        val startY = height / 2f
+        
+        // Draw base dim green arrow line
+        drawLine(
+            color = Color(0xFF122C20),
+            start = Offset(0f, startY),
+            end = Offset(width, startY),
+            strokeWidth = 3f
+        )
+        
+        // Draw arrowhead pointing to the right
+        val arrowSize = 10f
+        val path = androidx.compose.ui.graphics.Path().apply {
+            moveTo(width, startY)
+            lineTo(width - arrowSize, startY - arrowSize * 0.7f)
+            lineTo(width - arrowSize, startY + arrowSize * 0.7f)
+            close()
+        }
+        drawPath(path, color = Color(0xFF00FF88).copy(alpha = 0.5f))
+        
+        // Draw flowing light dot (shimmer)
+        val shimmerX = width * progress
+        drawCircle(
+            color = Color.White,
+            radius = 3.5f,
+            center = Offset(shimmerX, startY)
+        )
+        // Soft outer radial green pulse halo
+        drawCircle(
+            color = Color(0xFF00FF88).copy(alpha = 0.5f),
+            radius = 7.5f,
+            center = Offset(shimmerX, startY)
+        )
+    }
+}
+
+@Composable
+fun FlowStepCard(
+    title: String,
+    sub: String,
+    iconString: String,
+    isActive: Boolean,
+    pulseColor: Color,
+    modifier: Modifier = Modifier,
+    pulseScale: Float = 1f,
+    rotationSpec: Float = 0f
 ) {
-    Card(
+    val activeBorderColor by animateColorAsState(
+        targetValue = if (isActive) Color(0xFF00FF88) else Color(0xFF122C20),
+        animationSpec = tween(400),
+        label = "stepBorder"
+    )
+    val activeGlowFactor by animateFloatAsState(
+        targetValue = if (isActive) 1.0f else 0f,
+        animationSpec = tween(400),
+        label = "stepGlow"
+    )
+    val cardBackground by animateColorAsState(
+        targetValue = if (isActive) Color(0xFF0A1811) else Color(0xFF040605),
+        animationSpec = tween(400),
+        label = "stepBackground"
+    )
+
+    Box(
         modifier = modifier
-            .height(115.dp)
-            .shadow(
-                elevation = 8.dp,
-                shape = RoundedCornerShape(16.dp),
-                ambientColor = numberColor.copy(alpha = 0.15f),
-                spotColor = numberColor.copy(alpha = 0.25f)
-            ),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF050505)),
-        border = BorderStroke(0.8.dp, Color(0xFF222222))
+            .padding(1.dp)
+            .graphicsLayer {
+                scaleX = if (iconString != "⚙️") pulseScale else 1f
+                scaleY = if (iconString != "⚙️") pulseScale else 1f
+            }
+            .clip(RoundedCornerShape(12.dp))
+            .background(cardBackground)
+            .border(
+                BorderStroke(if (isActive) 1.5.dp else 1.dp, activeBorderColor),
+                RoundedCornerShape(12.dp)
+            )
+            .padding(vertical = 10.dp, horizontal = 2.dp),
+        contentAlignment = Alignment.Center
     ) {
-        Box(modifier = Modifier.fillMaxSize()) {
-            // Modern Top Shine Line
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
             Box(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .height(2.dp)
-                    .background(
-                        Brush.horizontalGradient(
-                            listOf(
-                                Color.Transparent,
-                                numberColor.copy(alpha = 0.9f),
-                                Color.Transparent
-                            )
-                        )
-                    )
-            )
-
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(14.dp),
-                verticalArrangement = Arrangement.SpaceBetween
+                    .size(34.dp)
+                    .graphicsLayer {
+                        if (iconString == "⚙️") {
+                            rotationZ = rotationSpec
+                        }
+                    },
+                contentAlignment = Alignment.Center
             ) {
-                Column {
-                    Text(
-                        text = label,
-                        color = Color.White,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        text = subLabel,
-                        color = Color(0xFF8C9E94),
-                        fontSize = 10.sp
+                Text(
+                    text = iconString,
+                    fontSize = 20.sp
+                )
+                if (isActive) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .clip(CircleShape)
+                            .background(pulseColor.copy(alpha = 0.16f * activeGlowFactor))
                     )
                 }
+            }
+            
+            Spacer(modifier = Modifier.height(4.dp))
+            
+            Text(
+                text = title,
+                color = if (isActive) Color(0xFF00FF88) else Color.White,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1
+            )
+            
+            Text(
+                text = sub,
+                color = if (isActive) Color.White else MutedText,
+                fontSize = 9.sp,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1
+            )
+        }
+    }
+}
 
-                AnimateCountUpText(
-                    valueString = valueKey,
-                    color = numberColor,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    fontFamily = FontFamily.Monospace
+@Composable
+fun TransformFlowSection(
+    rawMaterial: Int,
+    masterbatch: Int,
+    totalBags: Int
+) {
+    var activeStep by remember { mutableStateOf(0) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            kotlinx.coroutines.delay(1500)
+            activeStep = (activeStep + 1) % 4
+        }
+    }
+    
+    val infiniteTransition = rememberInfiniteTransition(label = "flowPulse")
+    val bluePulse by infiniteTransition.animateFloat(
+        initialValue = 0.96f,
+        targetValue = 1.04f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1200, easing = EaseInOutSine),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "blue"
+    )
+    val pinkPulse by infiniteTransition.animateFloat(
+        initialValue = 0.96f,
+        targetValue = 1.04f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1300, easing = EaseInOutSine),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "pink"
+    )
+    val greenPulse by infiniteTransition.animateFloat(
+        initialValue = 0.96f,
+        targetValue = 1.04f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1420, easing = EaseInOutSine),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "green"
+    )
+    val gearRotation by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(3500, easing = androidx.compose.animation.core.LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "gear"
+    )
+    val arrowProgress by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1500, easing = androidx.compose.animation.core.LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "arrow"
+    )
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .hoverLightReveal()
+            .border(BorderStroke(1.dp, Color(0xFF122C20)), RoundedCornerShape(16.dp)),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF040605)),
+        shape = RoundedCornerShape(16.dp)
+    ) {
+        Column(modifier = Modifier.padding(14.dp)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.Autorenew,
+                        contentDescription = "Flow Process",
+                        tint = EmeraldGlow,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "የእቃዎች አመራረት ሂደት ፍሰት (Factory Transformation Flow)",
+                        color = Color.White,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(Color(0xFF122C20))
+                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                ) {
+                    Text(
+                        text = "ባለ 4-ባህሪ ሪሳይክል ፍሰት",
+                        color = Color(0xFF00FF88),
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+            
+            Spacer(modifier = Modifier.height(14.dp))
+            
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                FlowStepCard(
+                    title = "ጥሬ እቃ (LD)",
+                    sub = "$rawMaterial kg",
+                    iconString = "🧊",
+                    isActive = activeStep == 0,
+                    pulseScale = bluePulse,
+                    pulseColor = Color(0xFF2196F3),
+                    modifier = Modifier.weight(1f)
+                )
+                
+                FlowingArrow(
+                    modifier = Modifier.width(16.dp).height(24.dp),
+                    progress = arrowProgress
+                )
+                
+                FlowStepCard(
+                    title = "ቀለም",
+                    sub = "$masterbatch kg",
+                    iconString = "🎨",
+                    isActive = activeStep == 1,
+                    pulseScale = pinkPulse,
+                    pulseColor = Color(0xFFE91E63),
+                    modifier = Modifier.weight(1f)
+                )
+                
+                FlowingArrow(
+                    modifier = Modifier.width(16.dp).height(24.dp),
+                    progress = arrowProgress
+                )
+                
+                FlowStepCard(
+                    title = "ማሽን (⚙️)",
+                    sub = "በስራ ላይ",
+                    iconString = "⚙️",
+                    isActive = activeStep == 2,
+                    rotationSpec = gearRotation,
+                    pulseColor = Color(0xFFFF9800),
+                    modifier = Modifier.weight(1f)
+                )
+                
+                FlowingArrow(
+                    modifier = Modifier.width(16.dp).height(24.dp),
+                    progress = arrowProgress
+                )
+                
+                FlowStepCard(
+                    title = "ከረጢት (Bag)",
+                    sub = "$totalBags pcs",
+                    iconString = "🛍️",
+                    isActive = activeStep == 3,
+                    pulseScale = greenPulse,
+                    pulseColor = Color(0xFF00FF88),
+                    modifier = Modifier.weight(1f)
                 )
             }
         }
@@ -1211,432 +902,416 @@ fun OverviewMetricCardGodMode(
 }
 
 @Composable
-fun OverviewQuickButton(
-    label: String,
-    color: Color,
-    textColor: Color,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Box(
-        modifier = modifier
-            .clip(RoundedCornerShape(8.dp))
-            .background(color)
-            .border(BorderStroke(1.dp, textColor.copy(alpha = 0.4f)), RoundedCornerShape(8.dp))
-            .clickable { onClick() }
-            .padding(vertical = 12.dp, horizontal = 4.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            text = label,
-            color = textColor,
-            fontSize = 11.sp,
-            fontWeight = FontWeight.Black
-        )
-    }
-}
-
-fun calculateLast7DaysTrend(transactions: List<ProductTransaction>, products: List<Product>): List<Double> {
-    val list = MutableList(7) { 0.0 }
-    for (i in 0 until 7) {
-        val targetDateStr = EthiopianCalendarHelper.shiftEthiopianDate(EthiopianCalendarHelper.getTodayEthiopianString(), i - 6)
-        val fabricationToday = transactions.filter { it.date == targetDateStr }.sumOf { tr ->
-            val p = products.find { it.id == tr.productId }
-            val w = p?.bagWeightKg ?: 0.5
-            tr.fabricated * w
-        }
-        list[i] = fabricationToday
-    }
-    return list
-}
-
-fun calculateOverviewAlerts(state: AppState): List<String> {
-    val alerts = mutableListOf<String>()
-    state.products.forEach { p ->
-        if (p.currentStock < 15) {
-            alerts.add("ምርት '${p.name}' ክምችት አልቋል! (${p.currentStock} ከረጢት ብቻ መረቱን ያሳያል)")
-        }
-    }
-    state.rawMaterials.forEach { rm ->
-        if (rm.currentStock < 350) {
-            alerts.add("ጥሬ እቃ '${rm.type}' ክምችት ከ 350kg በታች ነው! (${rm.currentStock.toInt()}kg)")
-        }
-    }
-    return alerts
-}
-
-
-// ==================== (PRIMARY SCREEN 2) PRODUCTION SCREEN ====================
-@Composable
-fun ProductionScreenContent(
-    appState: AppState,
-    viewModel: ProductionViewModel
-) {
-    val context = LocalContext.current
-    val haptic = LocalHapticFeedback.current
-    var editingProductForDailySheet by remember { mutableStateOf<Product?>(null) }
-
-    Column(
+fun AlertCardSection(criticalProductsCount: Int) {
+    if (criticalProductsCount == 0) return
+    
+    val pulseTransition = rememberInfiniteTransition(label = "alert_pulse")
+    val pulseValue by pulseTransition.animateFloat(
+        initialValue = 0.3f,
+        targetValue = 1.0f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1500, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "alertAlpha"
+    )
+    
+    // Pulse color border sweeping between deep gold and warning red every 3 seconds
+    val alertBorderColor by pulseTransition.animateColor(
+        initialValue = Color(0xFFFF3B3B),
+        targetValue = Color(0xFFFFD700),
+        animationSpec = infiniteRepeatable(
+            animation = tween(1500, easing = EaseInOutSine),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "alertBorderColor"
+    )
+    
+    Card(
         modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp)
-    ) {
-        // Daily production static bar at top
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = DarkGlassCard),
-            border = BorderStroke(1.dp, Color(0xFF122C20))
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column {
-                    Text("እለታዊ አጠቃላይ የስራ ሉህ", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                    Text("Today Production Metrics Summary", color = Color(0xFF8C9E94), fontSize = 11.sp)
-                }
-                Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                    Column(horizontalAlignment = Alignment.End) {
-                        Text("ጠቅላላ የተመረተ", color = EmeraldGlow, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                        Text("${appState.stats.totalFabricated} ከረጢት", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Black, fontFamily = FontFamily.Monospace)
-                    }
-                    Column(horizontalAlignment = Alignment.End) {
-                        Text("ጠቅላላ የተሸጠ", color = BentoGold, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                        Text("${appState.stats.totalSold} ከረጢት", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Black, fontFamily = FontFamily.Monospace)
-                    }
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        Text("የተመዘገቡ የምርት አይነቶች (Product List)፦", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-        Spacer(modifier = Modifier.height(10.dp))
-
-        if (appState.products.isEmpty()) {
-            Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                Text("ምንም አልተመዘገበም... (No registered products)", color = Color(0xFF8C9E94), fontSize = 13.sp)
-            }
-        } else {
-            LazyColumn(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                items(appState.products) { product ->
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable {
-                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                editingProductForDailySheet = product
-                            }
-                            .border(BorderStroke(1.dp, Color(0xFF122C20)), RoundedCornerShape(12.dp)),
-                        colors = CardDefaults.cardColors(containerColor = DarkGlassCard)
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(14.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            // Large product image placeholder / canvas vector
-                            Box(
-                                modifier = Modifier
-                                    .size(56.dp)
-                                    .background(Color(0xFF0C1D13), RoundedCornerShape(10.dp))
-                                    .border(BorderStroke(1.dp, EmeraldGlow.copy(alpha = 0.4f)), RoundedCornerShape(10.dp)),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Canvas(modifier = Modifier.size(36.dp)) {
-                                    val w = size.width
-                                    val h = size.height
-                                    // Custom bag icon vector
-                                    val path = Path().apply {
-                                        moveTo(w * 0.3f, h * 0.2f)
-                                        lineTo(w * 0.7f, h * 0.2f)
-                                        lineTo(w * 0.85f, h * 0.8f)
-                                        lineTo(w * 0.15f, h * 0.8f)
-                                        close()
-                                    }
-                                    drawPath(path, color = EmeraldGlow, style = Stroke(width = 1.5.dp.toPx()))
-                                    drawCircle(color = BentoGold, radius = 3.dp.toPx(), center = Offset(w / 2, h / 2))
-                                }
-                            }
-
-                            Spacer(modifier = Modifier.width(14.dp))
-
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = product.name,
-                                    color = Color.White,
-                                    fontSize = 15.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
-                                Text(
-                                    text = "መጠን፡ ${product.size} | ቀለም፡ ${product.color} | ክብደት፡ ${product.bagWeightKg}kg",
-                                    color = Color(0xFF8C9E94),
-                                    fontSize = 12.sp
-                                )
-                            }
-
-                            Column(horizontalAlignment = Alignment.End) {
-                                Text("አሁን ያለ ክምችት", color = Color(0xFF8C9E94), fontSize = 11.sp)
-                                Text(
-                                    text = "${product.currentStock} ማዳበሪያ",
-                                    color = if (product.currentStock < 15) Color.Red else EmeraldGlow,
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.Black,
-                                    fontFamily = FontFamily.Monospace
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    if (editingProductForDailySheet != null) {
-        RecordProductActivityDialog(
-            product = editingProductForDailySheet!!,
-            onDismiss = { editingProductForDailySheet = null },
-            onSave = { prodId, fab, sold, adj, note ->
-                viewModel.recordProductDailyActivity(prodId, fab, sold, adj, note)
-                editingProductForDailySheet = null
-            },
-            onDelete = { prod ->
-                viewModel.deleteProduct(prod)
-                editingProductForDailySheet = null
-            }
+            .fillMaxWidth()
+            .hoverLightReveal()
+            .shadow(
+                elevation = (4 * pulseValue).dp,
+                shape = RoundedCornerShape(12.dp)
+            ),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF140707).copy(alpha = 0.85f)),
+        border = BorderStroke(
+            width = (1 + pulseValue).dp,
+            color = alertBorderColor.copy(alpha = pulseValue)
         )
-    }
-}
-
-
-// ==================== (PRIMARY SCREEN 3) STOCK SCREEN ====================
-@Composable
-fun StockScreenContent(
-    appState: AppState,
-    viewModel: StockViewModel
-) {
-    val haptic = LocalHapticFeedback.current
-    var selectedSubTab by remember { mutableStateOf("RawMaterial") } // "RawMaterial", "Masterbatch", "ProductStock"
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp)
     ) {
-        // Swanky tab switcher
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(Color(0xFF030D06), RoundedCornerShape(8.dp))
-                .border(BorderStroke(1.dp, Color(0xFF122C20)), RoundedCornerShape(8.dp))
-                .padding(4.dp),
-            horizontalArrangement = Arrangement.SpaceEvenly
+                .padding(14.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            val subTabs = listOf(
-                Pair("RawMaterial", "ጥሬ እቃ"),
-                Pair("Masterbatch", "ማስተርባች"),
-                Pair("ProductStock", "ምርት ክምችት")
-            )
-            subTabs.forEach { tab ->
-                val isActive = selectedSubTab == tab.first
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .clip(RoundedCornerShape(6.dp))
-                        .background(if (isActive) Color(0xFF0A1D11) else Color.Transparent)
-                        .clickable {
-                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                            selectedSubTab = tab.first
-                        }
-                        .padding(vertical = 8.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = tab.second,
-                        color = if (isActive) EmeraldGlow else Color(0xFF8C9E94),
-                        fontSize = 13.sp,
-                        fontWeight = if (isActive) FontWeight.Bold else FontWeight.Medium
-                    )
-                }
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(CircleShape)
+                    .background(Color(0xFF381010)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Warning,
+                    contentDescription = "Warning",
+                    tint = Color(0xFFFF3B3B),
+                    modifier = Modifier.size(18.dp)
+                )
             }
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        when (selectedSubTab) {
-            "RawMaterial" -> RawMaterialStockView(appState)
-            "Masterbatch" -> MasterbatchStockView(appState, viewModel)
-            "ProductStock" -> ProductStockGaugeView(appState)
+            Column {
+                Text(
+                    text = "የክምችት እጥረት ማስጠንቀቂያ (Critical Stock Alert)",
+                    color = Color(0xFFFFABAB),
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = "በዳሽቦርዱ ውስጥ $criticalProductsCount ምርቶች ከወሳኝ መጠን በታች አነስተኛ ክምችት ላይ ናቸው!",
+                    color = Color(0xFFD6BCBC),
+                    fontSize = 11.sp
+                )
+            }
         }
     }
 }
 
+// ==========================================
+// SCREEN 1: OVERVIEW SCREEN
+// ==========================================
 @Composable
-fun RawMaterialStockView(appState: AppState) {
-    LazyColumn(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        appState.rawMaterials.forEach { mat ->
+fun OverviewTab(
+    products: List<Product>,
+    workers: List<Worker>,
+    rawMaterial: Int,
+    masterbatch: Int,
+    attendanceList: List<Attendance>
+) {
+    var animateOnLoad by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { animateOnLoad = true }
+
+    // Entrance and scale/fade values for hero title
+    var bannerVisible by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { bannerVisible = true }
+    
+    val bannerScale by animateFloatAsState(
+        targetValue = if (bannerVisible) 1f else 0.8f, // Zooms from scale 0.8 to 1.0 as requested
+        animationSpec = tween(durationMillis = 1200, easing = EaseOutBack),
+        label = "bannerScale"
+    )
+    val bannerAlpha by animateFloatAsState(
+        targetValue = if (bannerVisible) 1f else 0f,
+        animationSpec = tween(durationMillis = 1000, easing = LinearOutSlowInEasing),
+        label = "bannerAlpha"
+    )
+    
+    // Eyebrow text fades in first
+    val eyebrowAlpha by animateFloatAsState(
+        targetValue = if (bannerVisible) 1f else 0f,
+        animationSpec = tween(durationMillis = 700, delayMillis = 100), // earlier fade in
+        label = "eyebrowAlpha"
+    )
+
+    // Calculate critical items for alert systems
+    val criticalStockCount = products.count { it.currentStock < 10 }
+
+    // Scroll state for custom scroll-linked parallax
+    val scrollState = androidx.compose.foundation.lazy.rememberLazyListState()
+    val scrollOffset = remember {
+        derivedStateOf {
+            if (scrollState.firstVisibleItemIndex == 0) {
+                scrollState.firstVisibleItemScrollOffset
+            } else {
+                350
+            }
+        }
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(PureBlack)
+    ) {
+        // PARTICLE BACKGROUND: Floating connected nodes in green
+        ParticleBackground()
+        
+        // SCAN LINE: Continuous horizontal sweeping laser
+        RadarScanLine()
+
+        LazyColumn(
+            state = scrollState,
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
             item {
-                Card(
+                // HERO ENTRANCE: Company Banner with parallax background, rings, zoom scale, eyebrow fade, and Typewriter
+                Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .border(BorderStroke(1.dp, Color(0xFF122C20)), RoundedCornerShape(12.dp)),
-                    colors = CardDefaults.cardColors(containerColor = DarkGlassCard)
+                        .graphicsLayer {
+                            scaleX = bannerScale
+                            scaleY = bannerScale
+                            alpha = bannerAlpha
+                        }
+                        .clip(RoundedCornerShape(16.dp))
+                        .border(BorderStroke(1.dp, Color(0xFF122C20)), RoundedCornerShape(16.dp))
+                        .hoverLightReveal()
                 ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(12.dp)
-                                        .background(
-                                            when (mat.type.uppercase()) {
-                                                "LD" -> Color(0xFF7DD3FC)
-                                                "HD" -> EmeraldGlow
-                                                else -> BentoGold
-                                            }, CircleShape
-                                        )
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = "ጥሬ እቃ (${mat.type.uppercase()})",
-                                    color = Color.White,
-                                    fontSize = 16.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
+                    // Parallax background glow (moves at 30% of scroll speed)
+                    Box(
+                        modifier = Modifier
+                            .matchParentSize()
+                            .graphicsLayer {
+                                translationY = scrollOffset.value * 0.30f
                             }
-                            Text(
-                                "ታርጌት፡ 3000 kg",
-                                color = Color(0xFF8C9E94),
-                                fontSize = 11.sp,
-                                fontFamily = FontFamily.Monospace
+                            .background(
+                                Brush.radialGradient(
+                                    colors = listOf(Color(0xFF04180E), PureBlack),
+                                    center = Offset(200f, 100f),
+                                    radius = 500f
+                                )
                             )
-                        }
-
-                        Spacer(modifier = Modifier.height(16.dp))
-
-                        // Custom Radial Arc Gauge
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(100.dp)
-                                    .padding(8.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Canvas(modifier = Modifier.fillMaxSize()) {
-                                    val strokeWidth = 8.dp.toPx()
-                                    val percent = (mat.currentStock / 3000.0).coerceIn(0.0, 1.0).toFloat()
-                                    drawArc(
-                                        color = Color(0xFF14241B),
-                                        startAngle = -225f,
-                                        sweepAngle = 270f,
-                                        useCenter = false,
-                                        style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
-                                    )
-                                    drawArc(
-                                        color = when (mat.type.uppercase()) {
-                                            "LD" -> Color(0xFF7DD3FC)
-                                            "HD" -> EmeraldGlow
-                                            else -> BentoGold
-                                        },
-                                        startAngle = -225f,
-                                        sweepAngle = 270f * percent,
-                                        useCenter = false,
-                                        style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
-                                    )
-                                }
-                                Text(
-                                    text = "${((mat.currentStock / 3000.0) * 100).toInt()}%",
-                                    color = Color.White,
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.Black,
-                                    fontFamily = FontFamily.Monospace
-                                )
+                    )
+                    
+                    // Parallax rings (moves at 12% of scroll speed, expands/contracts with scroll)
+                    Canvas(
+                        modifier = Modifier
+                            .matchParentSize()
+                            .graphicsLayer {
+                                translationY = scrollOffset.value * 0.12f
+                                val scaleFactor = 1.0f - (scrollOffset.value / 1200f).coerceIn(0f, 0.4f)
+                                scaleX = scaleFactor
+                                scaleY = scaleFactor
                             }
+                    ) {
+                        val center = Offset(size.width * 0.85f, size.height * 0.5f)
+                        drawCircle(
+                            color = Color(0xFF00FF88).copy(alpha = 0.12f),
+                            radius = 110f,
+                            center = center,
+                            style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2.5f)
+                        )
+                        drawCircle(
+                            color = Color(0xFF00FF88).copy(alpha = 0.07f),
+                            radius = 170f,
+                            center = center,
+                            style = androidx.compose.ui.graphics.drawscope.Stroke(width = 1.8f)
+                        )
+                        drawCircle(
+                            color = Color(0xFF00FF88).copy(alpha = 0.03f),
+                            radius = 230f,
+                            center = center,
+                            style = androidx.compose.ui.graphics.drawscope.Stroke(width = 1.2f)
+                        )
+                    }
 
-                            Spacer(modifier = Modifier.width(16.dp))
-
-                            Column {
-                                Text("አሁን በክምችት ላይ ያለው መጠን፦", color = Color(0xFF8C9E94), fontSize = 12.sp)
-                                Text(
-                                    text = "${mat.currentStock.toInt()} ኪ.ግ (Kg)",
-                                    color = Color.White,
-                                    fontSize = 20.sp,
-                                    fontWeight = FontWeight.Black,
-                                    fontFamily = FontFamily.Monospace
-                                )
-                                Spacer(modifier = Modifier.height(4.dp))
-                                // Small Sparkline showing imaginary transaction trend
-                                SparklineTrendLine(
-                                    materialTransactions = appState.allRawMaterialTransactions.filter { it.materialType == mat.type },
-                                    color = when (mat.type.uppercase()) {
-                                        "LD" -> Color(0xFF7DD3FC)
-                                        "HD" -> EmeraldGlow
-                                        else -> BentoGold
-                                    }
-                                )
-                            }
-                        }
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(18.dp)
+                    ) {
+                        // Eyebrow text fading in first
+                        Text(
+                            text = "አንዋር ፕላስติก መልሶ ማምረቻ",
+                            color = EmeraldGlow,
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Black,
+                            modifier = Modifier.graphicsLayer { alpha = eyebrowAlpha }
+                        )
+                        // Hero Title: Zoom and fade animation
+                        Text(
+                            text = "ANWAR PLASTIC RECYCLE CO.",
+                            color = Color.White,
+                            fontSize = 11.sp,
+                            letterSpacing = 1.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.height(10.dp))
+                        
+                        // Typewriter text cycling animation
+                        TypewriterText(
+                            phrases = listOf(
+                                "የክምችት መቆጣጠሪያ እና የሰራተኞች ቁጥጥር ዳሽቦርድ...",
+                                "ቀጣይነት ያለው አረንጓዴ ልማት እና ሪሳይክሊንግ...",
+                                "የምርት መጠን ፈጣን ክትትል ኮንሶል..."
+                            )
+                        )
                     }
                 }
             }
-        }
-    }
-}
 
-@Composable
-fun MasterbatchStockView(appState: AppState, viewModel: StockViewModel) {
-    if (appState.masterbatches.isEmpty()) {
-        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Text("ምንም የቀለም ማስተርባች አልተመዘገበም... (No masterbatches)", color = Color(0xFF8C9E94), fontSize = 13.sp)
-        }
-    } else {
-        LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            items(appState.masterbatches) { mb ->
+            // ALERT CARDS warning section (Pulses Gold & Warning Red every 3 seconds)
+            item {
+                AlertCardSection(criticalProductsCount = criticalStockCount)
+            }
+
+            // LD TO PLASTIC BAG TRANSFORM SECTION (Shows flow + 4 sequential active cycling lights)
+            item {
+                TransformFlowSection(
+                    rawMaterial = rawMaterial,
+                    masterbatch = masterbatch,
+                    totalBags = products.sumOf { it.currentStock }
+                )
+            }
+
+            item {
+                // METRIC CARDS LAYER 1 (Staggered 200ms delays on load)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        MetricCard(
+                            title = "ጥሬ እቃ ክምችት",
+                            enTitle = "Raw Materials",
+                            value = "$rawMaterial ኪ.ግ",
+                            color = Color(0xFF00FF88),
+                            icon = Icons.Default.Layers,
+                            index = 0 // staggered delay index 0 * 200 ms
+                        )
+                    }
+                    Column(modifier = Modifier.weight(1f)) {
+                        MetricCard(
+                            title = "ቀለም (Masterbatch)",
+                            enTitle = "Masterbatch",
+                            value = "$masterbatch ኪ.ግ",
+                            color = Color(0xFFFFD700),
+                            icon = Icons.Default.Palette,
+                            index = 1 // staggered delay index 1 * 200 ms
+                        )
+                    }
+                }
+            }
+
+            item {
+                // METRIC CARDS LAYER 2 (Staggered 200ms delays on load)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        val totalBags = products.sumOf { it.currentStock }
+                        MetricCard(
+                            title = "አጠቃላይ ምርት",
+                            enTitle = "Total Bags Stock",
+                            value = "$totalBags",
+                            color = Color(0xFF00E5FF),
+                            icon = Icons.Default.Inventory,
+                            index = 2 // staggered delay index 2 * 200 ms
+                        )
+                    }
+                    Column(modifier = Modifier.weight(1f)) {
+                        val activeWorkers = workers.size
+                        MetricCard(
+                            title = "ንቁ ሰራተኞች",
+                            enTitle = "Active Workers",
+                            value = "$activeWorkers",
+                            color = Color(0xFFE040FB),
+                            icon = Icons.Default.People,
+                            index = 3 // staggered delay index 3 * 200 ms
+                        )
+                    }
+                }
+            }
+
+            // CHART BARS SECTION with shimmer sweeping light sweeps
+            item {
+                ProductStockBarChart(products)
+            }
+
+            item {
+                Text(
+                    text = "የምርት ደረጃ ፈጣን ቁጥጥር (Product Stock Level)",
+                    color = Color.White,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(vertical = 4.dp)
+                )
+            }
+
+            itemsIndexed(products) { idx, p ->
+                val weightTotal = p.currentStock * p.bagWeightKg
+                
+                val productCleanName = p.name
+                    .replace("avocado", "", ignoreCase = true)
+                    .replace("Avocado", "", ignoreCase = true)
+                    .replace("አቮካዶ", "", ignoreCase = true)
+                    .trim()
+                    .let { if (it.isEmpty()) "ሸርጅን" else it }
+
+                // Low stock condition check
+                val isCritStock = p.currentStock < 10
+                
+                // Border pulses red if low stock card, else dim green
+                val pulseBorderVal = rememberInfiniteTransition(label = "p_border_$idx")
+                val animatedBorderAlpha by pulseBorderVal.animateFloat(
+                    initialValue = 0.3f,
+                    targetValue = 0.9f,
+                    animationSpec = infiniteRepeatable(
+                        animation = tween(1500, easing = EaseInOutSine),
+                        repeatMode = RepeatMode.Reverse
+                    ),
+                    label = "borderPulseAlpha"
+                )
+                
+                val finalCardBorderColor = if (isCritStock) {
+                    Color(0xFFFF3B3B).copy(alpha = animatedBorderAlpha)
+                } else {
+                    GrayBorder
+                }
+                
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .border(BorderStroke(1.dp, Color(0xFF122C20)), RoundedCornerShape(12.dp)),
-                    colors = CardDefaults.cardColors(containerColor = DarkGlassCard)
+                        .hoverLightReveal()
+                        .graphicsLayer {
+                            alpha = if (animateOnLoad) 1f else 0f
+                            translationY = if (animateOnLoad) 0f else 30f
+                        }
+                        .shadow(elevation = 3.dp, shape = RoundedCornerShape(12.dp)),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(containerColor = DarkGlassCard.copy(alpha = 0.85f)),
+                    border = BorderStroke(if (isCritStock) 1.2.dp else 0.5.dp, finalCardBorderColor)
                 ) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
+                            .padding(14.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Box(
-                                modifier = Modifier
-                                    .size(16.dp)
-                                    .background(translateMasterbatchColor(mb.color), CircleShape)
-                                    .border(BorderStroke(1.dp, Color.White), CircleShape)
+                        Column {
+                            Text(
+                                text = productCleanName,
+                                color = Color.White,
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Bold
                             )
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Text(mb.color + " ቀለም ማስተርባች", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                            Text(
+                                text = "መጠን፡ ${p.size} · ክብደት፡ ${p.bagWeightKg} ኪ.ግ",
+                                color = MutedText,
+                                fontSize = 11.sp
+                            )
                         }
 
                         Column(horizontalAlignment = Alignment.End) {
-                            Text("አሁን ያለው ክምችት", color = Color(0xFF8C9E94), fontSize = 11.sp)
                             Text(
-                                "${mb.currentStock.toInt()} ኪ.ግ (kg)",
-                                color = EmeraldGlow,
-                                fontSize = 14.sp,
+                                text = "${p.currentStock} ከረጢት",
+                                color = if (isCritStock) Color(0xFFFF3B3B) else EmeraldGlow,
+                                fontSize = 16.sp,
                                 fontWeight = FontWeight.Black,
+                                fontFamily = FontFamily.Monospace
+                            )
+                            Text(
+                                text = "ጠቅላላ ክብደት፡ $weightTotal ኪ.ግ",
+                                color = MutedText,
+                                fontSize = 9.sp,
                                 fontFamily = FontFamily.Monospace
                             )
                         }
@@ -1648,15 +1323,549 @@ fun MasterbatchStockView(appState: AppState, viewModel: StockViewModel) {
 }
 
 @Composable
-fun ProductStockGaugeView(appState: AppState) {
+fun MetricCard(
+    title: String,
+    enTitle: String,
+    value: String,
+    color: Color,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    index: Int
+) {
+    var animateIn by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        animateIn = true
+    }
+    
+    // Each card slides up from below with a staggered delay based on its index
+    val slideY by animateFloatAsState(
+        targetValue = if (animateIn) 0f else 60f,
+        animationSpec = tween(durationMillis = 800, delayMillis = index * 200, easing = EaseOutQuad),
+        label = "metricSlide"
+    )
+    
+    val alphaAnim by animateFloatAsState(
+        targetValue = if (animateIn) 1f else 0f,
+        animationSpec = tween(durationMillis = 800, delayMillis = index * 200, easing = EaseOutQuad),
+        label = "metricAlpha"
+    )
+    
+    var isHovered by remember { mutableStateOf(false) }
+    
+    // Lift cards up 3.dp on pointer hover & tap
+    val liftDp by animateDpAsState(
+        targetValue = if (isHovered) (-3).dp else 0.dp,
+        animationSpec = spring(stiffness = Spring.StiffnessLow),
+        label = "metricLift"
+    )
+    
+    // Dynamic green border glow on hover/lift state
+    val glowColorAnim by animateColorAsState(
+        targetValue = if (isHovered) EmeraldGlow.copy(alpha = 0.85f) else GrayBorder,
+        animationSpec = tween(250),
+        label = "metricGlowBorder"
+    )
+    
+    val finalGlowWidth = if (isHovered) 1.2.dp else 0.6.dp
+    
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .hoverLightReveal()
+            .graphicsLayer {
+                translationY = slideY
+                alpha = alphaAnim
+            }
+            .offset(y = liftDp)
+            .shadow(
+                elevation = if (isHovered) 12.dp else 6.dp,
+                shape = RoundedCornerShape(14.dp),
+                ambientColor = if (isHovered) EmeraldGlow.copy(alpha = 0.25f) else color.copy(alpha = 0.1f),
+                spotColor = if (isHovered) EmeraldGlow.copy(alpha = 0.35f) else color.copy(alpha = 0.15f)
+            )
+            .pointerInput(Unit) {
+                awaitPointerEventScope {
+                    while (true) {
+                        val event = awaitPointerEvent()
+                        val type = event.type
+                        if (type == androidx.compose.ui.input.pointer.PointerEventType.Enter) {
+                            isHovered = true
+                        } else if (type == androidx.compose.ui.input.pointer.PointerEventType.Exit) {
+                            isHovered = false
+                        } else if (type == androidx.compose.ui.input.pointer.PointerEventType.Press) {
+                            isHovered = true
+                        } else if (type == androidx.compose.ui.input.pointer.PointerEventType.Release) {
+                            isHovered = false
+                        }
+                    }
+                }
+            },
+        shape = RoundedCornerShape(14.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF040705).copy(alpha = 0.85f)),
+        border = BorderStroke(finalGlowWidth, glowColorAnim)
+    ) {
+        Column(modifier = Modifier.padding(14.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column {
+                    Text(title, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    Text(enTitle, color = MutedText, fontSize = 9.sp)
+                }
+                Box(
+                    modifier = Modifier
+                        .size(28.dp)
+                        .clip(CircleShape)
+                        .background(color.copy(alpha = 0.1f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(icon, contentDescription = title, tint = color, modifier = Modifier.size(16.dp))
+                }
+            }
+            Spacer(modifier = Modifier.height(10.dp))
+            
+            // Numerical animated count up
+            AnimateCountUpText(
+                valueString = value,
+                color = color,
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Black,
+                fontFamily = FontFamily.Monospace
+            )
+        }
+    }
+}
+
+// ==========================================
+// SCREEN 2: PRODUCTION SHEET TAB
+// ==========================================
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ProductionTab(viewModel: MainViewModel, products: List<Product>) {
+    var selectedProductForStockUpdate by remember { mutableStateOf<Product?>(null) }
+    var stockInputText by remember { mutableStateOf("") }
+    var showAddProductDialog by remember { mutableStateOf(false) }
+
+    // State for creating new product
+    var newProdName by remember { mutableStateOf("") }
+    var newProdSize by remember { mutableStateOf("Medium") }
+    var newProdWeight by remember { mutableStateOf("25.0") }
+    var newProdStock by remember { mutableStateOf("0") }
+
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        item {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "ዕለታዊ የምርት መመዝገቢያ (Production Logs & Adjustments)",
+                    color = Color.White,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Black,
+                    modifier = Modifier.weight(1f)
+                )
+                Button(
+                    onClick = { showAddProductDialog = true },
+                    colors = ButtonDefaults.buttonColors(containerColor = EmeraldGlow, contentColor = Color.Black),
+                    shape = RoundedCornerShape(8.dp),
+                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = "Add Product", modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("አዲስ ምርት", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+
+        item {
+            Text(
+                text = "የእያንዳንዱን ምርት የከረጢት ብዛት ለማስተካከል የምርት ስሙን ይጫኑ፦",
+                color = MutedText,
+                fontSize = 12.sp
+            )
+        }
+
+        items(products) { p ->
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable {
+                        selectedProductForStockUpdate = p
+                        stockInputText = p.currentStock.toString()
+                    },
+                shape = RoundedCornerShape(12.dp),
+                colors = CardDefaults.cardColors(containerColor = DarkGlassCard),
+                border = BorderStroke(0.6.dp, GrayBorder)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(14.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text(p.name, color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                        Text("መጠን፡ ${p.size}  •  ክብደት፡ ${p.bagWeightKg} ኪ.ግ", color = MutedText, fontSize = 11.sp)
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = "${p.currentStock}",
+                            color = EmeraldGlow,
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Black,
+                            fontFamily = FontFamily.Monospace
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("ከረጢት", color = Color.White, fontSize = 11.sp)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Icon(Icons.Default.Edit, contentDescription = "Edit Stock", tint = MutedText, modifier = Modifier.size(16.dp))
+                    }
+                }
+            }
+        }
+
+        item {
+            Spacer(modifier = Modifier.height(20.dp))
+            // Quick Raw Materials logs
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(14.dp),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF030604)),
+                border = BorderStroke(0.8.dp, Color(0xFF13281E))
+            ) {
+                Column(modifier = Modifier.padding(14.dp)) {
+                    Text("የጥሬ ዕቃ እና ማስተርባች ፈጣን መጨመሪያ/መቀነሻ", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Button(
+                            onClick = { viewModel.changeRawMaterial(100) },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF11261B)),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("ጥሬ እቃ +100 ኪ.ግ", fontSize = 11.sp, color = Color.White)
+                        }
+                        Button(
+                            onClick = { viewModel.changeRawMaterial(-100) },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF261111)),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("ጥሬ እቃ -100 ኪ.ግ", fontSize = 11.sp, color = Color.White)
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Button(
+                            onClick = { viewModel.changeMasterbatch(10) },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2A2311)),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("ማስተርባች +10 ኪ.ግ", fontSize = 11.sp, color = Color.White)
+                        }
+                        Button(
+                            onClick = { viewModel.changeMasterbatch(-10) },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF261111)),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("ማስተርባች -10 ኪ.ግ", fontSize = 11.sp, color = Color.White)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Product stock adjustments Dialog
+    if (selectedProductForStockUpdate != null) {
+        val p = selectedProductForStockUpdate!!
+        AlertDialog(
+            onDismissRequest = { selectedProductForStockUpdate = null },
+            title = { Text("የክምችት መጠን ማስተካከያ (Stock Adjustment)", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold) },
+            text = {
+                Column {
+                    Text("ለምርት፡ ${p.name}", color = MutedText, fontSize = 12.sp)
+                    Spacer(modifier = Modifier.height(12.dp))
+                    OutlinedTextField(
+                        value = stockInputText,
+                        onValueChange = { stockInputText = it },
+                        label = { Text("የአሁኑ የከረጢት ብዛት") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White,
+                            focusedBorderColor = EmeraldGlow,
+                            unfocusedBorderColor = GrayBorder
+                        )
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val stockVal = stockInputText.toIntOrNull() ?: 0
+                        viewModel.updateProductStock(p.id, stockVal)
+                        selectedProductForStockUpdate = null
+                    },
+                    colors = ButtonDefaults.textButtonColors(contentColor = EmeraldGlow)
+                ) {
+                    Text("አስቀምጥ (Save)")
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { selectedProductForStockUpdate = null },
+                    colors = ButtonDefaults.textButtonColors(contentColor = Color.Red)
+                ) {
+                    Text("ተው (Cancel)")
+                }
+            },
+            containerColor = Color(0xFF0C100D),
+            shape = RoundedCornerShape(16.dp)
+        )
+    }
+
+    // Add Product Dialog
+    if (showAddProductDialog) {
+        AlertDialog(
+            onDismissRequest = { showAddProductDialog = false },
+            title = { Text("አዲስ ምርት መመዝገቢያ", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    OutlinedTextField(
+                        value = newProdName,
+                        onValueChange = { newProdName = it },
+                        label = { Text("የምርቱ ስም") },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White,
+                            focusedBorderColor = EmeraldGlow,
+                            unfocusedBorderColor = GrayBorder
+                        )
+                    )
+                    OutlinedTextField(
+                        value = newProdSize,
+                        onValueChange = { newProdSize = it },
+                        label = { Text("መጠን (ምሳሌ፡ 60x80)") },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White,
+                            focusedBorderColor = EmeraldGlow,
+                            unfocusedBorderColor = GrayBorder
+                        )
+                    )
+                    OutlinedTextField(
+                        value = newProdWeight,
+                        onValueChange = { newProdWeight = it },
+                        label = { Text("ክብደት በአንድ ከረጢት (ኪ.ግ)") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White,
+                            focusedBorderColor = EmeraldGlow,
+                            unfocusedBorderColor = GrayBorder
+                        )
+                    )
+                    OutlinedTextField(
+                        value = newProdStock,
+                        onValueChange = { newProdStock = it },
+                        label = { Text("የመጀመሪያ ክምችት (ብዛት)") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White,
+                            focusedBorderColor = EmeraldGlow,
+                            unfocusedBorderColor = GrayBorder
+                        )
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val weight = newProdWeight.toDoubleOrNull() ?: 25.0
+                        val stock = newProdStock.toIntOrNull() ?: 0
+                        if (newProdName.isNotBlank()) {
+                            viewModel.addProduct(newProdName, newProdSize, weight, stock)
+                        }
+                        // reset inputs
+                        newProdName = ""
+                        newProdSize = "Medium"
+                        newProdWeight = "25.0"
+                        newProdStock = "0"
+                        showAddProductDialog = false
+                    },
+                    colors = ButtonDefaults.textButtonColors(contentColor = EmeraldGlow)
+                ) {
+                    Text("ይመዝገብ (Save)")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showAddProductDialog = false }, colors = ButtonDefaults.textButtonColors(contentColor = Color.Red)) {
+                    Text("ተው (Cancel)")
+                }
+            },
+            containerColor = Color(0xFF0C100D),
+            shape = RoundedCornerShape(16.dp)
+        )
+    }
+}
+
+// ==========================================
+// SCREEN 3: STOCK WINDOW REDESIGNED TAB!!!
+// ==========================================
+@Composable
+fun StockTab(
+    viewModel: MainViewModel,
+    products: List<Product>,
+    rawMaterial: Int,
+    masterbatch: Int
+) {
+    var selectedStockTab by remember { mutableStateOf("ProductStock") } // "RawMaterial", "Masterbatch", "ProductStock"
+
+    Column(modifier = Modifier.fillMaxSize()) {
+        // Redesigned sliding filter menu for sub-tabs with emerald shine line animation
+        TabRow(
+            selectedTabIndex = when (selectedStockTab) {
+                "RawMaterial" -> 0
+                "Masterbatch" -> 1
+                else -> 2
+            },
+            containerColor = Color(0xFF040605),
+            contentColor = EmeraldGlow,
+            indicator = { tabPositions ->
+                TabRowDefaults.SecondaryIndicator(
+                    modifier = Modifier.tabIndicatorOffset(tabPositions[
+                        when (selectedStockTab) {
+                            "RawMaterial" -> 0
+                            "Masterbatch" -> 1
+                            else -> 2
+                        }
+                    ]),
+                    color = EmeraldGlow
+                )
+            },
+            modifier = Modifier.border(BorderStroke(0.5.dp, GrayBorder), RoundedCornerShape(bottomStart = 8.dp, bottomEnd = 8.dp))
+        ) {
+            Tab(
+                selected = selectedStockTab == "RawMaterial",
+                onClick = { selectedStockTab = "RawMaterial" },
+                text = { Text("ጥሬ እቃ (Raw)", fontSize = 11.sp, fontWeight = FontWeight.Bold) }
+            )
+            Tab(
+                selected = selectedStockTab == "Masterbatch",
+                onClick = { selectedStockTab = "Masterbatch" },
+                text = { Text("ማስተርባች (Color)", fontSize = 11.sp, fontWeight = FontWeight.Bold) }
+            )
+            Tab(
+                selected = selectedStockTab == "ProductStock",
+                onClick = { selectedStockTab = "ProductStock" },
+                text = { Text("ምርት ክምችት", fontSize = 11.sp, fontWeight = FontWeight.Bold) }
+            )
+        }
+
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(14.dp)
+        ) {
+            when (selectedStockTab) {
+                "RawMaterial" -> {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(top = 10.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(16.dp),
+                            colors = CardDefaults.cardColors(containerColor = DarkGlassCard),
+                            border = BorderStroke(0.8.dp, GrayBorder)
+                        ) {
+                            Column(modifier = Modifier.padding(18.dp)) {
+                                Text("ጥሬ ዕቃ ደረጃ (Raw Material Inventory)", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                                Spacer(modifier = Modifier.height(14.dp))
+                                Text(
+                                    text = "$rawMaterial ኪ.ግ",
+                                    color = EmeraldGlow,
+                                    fontSize = 32.sp,
+                                    fontWeight = FontWeight.Black,
+                                    fontFamily = FontFamily.Monospace
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.CheckCircle, "Status Ok", tint = EmeraldGlow, modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("ደረጃው ምቹ ነው (Healthy level for production)", color = MutedText, fontSize = 11.sp)
+                                }
+                            }
+                        }
+                    }
+                }
+                "Masterbatch" -> {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(top = 10.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(16.dp),
+                            colors = CardDefaults.cardColors(containerColor = DarkGlassCard),
+                            border = BorderStroke(0.8.dp, GrayBorder)
+                        ) {
+                            Column(modifier = Modifier.padding(18.dp)) {
+                                Text("ማስተርባች ደረጃ (Color Masterbatch Inventory)", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                                Spacer(modifier = Modifier.height(14.dp))
+                                Text(
+                                    text = "$masterbatch ኪ.ግ",
+                                    color = Color(0xFFFFD700),
+                                    fontSize = 32.sp,
+                                    fontWeight = FontWeight.Black,
+                                    fontFamily = FontFamily.Monospace
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.Warning, "Status Caution", tint = Color(0xFFFFD700), modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("ደረጃው መካከለኛ ነው (Monitor stock)", color = MutedText, fontSize = 11.sp)
+                                }
+                            }
+                        }
+                    }
+                }
+                "ProductStock" -> ProductStockGaugeView(products = products)
+            }
+        }
+    }
+}
+
+@Composable
+fun ProductStockGaugeView(products: List<Product>) {
     var listAnimated by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
         listAnimated = true
     }
 
-    val totalBags = appState.products.sumOf { it.currentStock }
-    val criticalCount = appState.products.count { it.currentStock < 10 }
-    val productCount = appState.products.size
+    val totalBags = products.sumOf { it.currentStock }
+    // Critical is defined as < 5% of 200, i.e., < 10 bags
+    val criticalCount = products.count { it.currentStock < 10 }
+    val productCount = products.size
 
     val infiniteTransition = rememberInfiniteTransition(label = "pulse_critical_stock")
     val pulseAlpha by infiniteTransition.animateFloat(
@@ -1724,7 +1933,7 @@ fun ProductStockGaugeView(appState: AppState) {
         }
 
         // Product stock list
-        if (appState.products.isEmpty()) {
+        if (products.isEmpty()) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -1743,7 +1952,8 @@ fun ProductStockGaugeView(appState: AppState) {
                 verticalArrangement = Arrangement.spacedBy(14.dp),
                 modifier = Modifier.fillMaxWidth()
             ) {
-                itemsIndexed(appState.products) { index, p ->
+                itemsIndexed(products) { index, p ->
+                    // Guarantee removing "avocado" and replacing empty/fallback with "ሸርጅን"
                     val cleanName = p.name
                         .replace("avocado", "", ignoreCase = true)
                         .replace("Avocado", "", ignoreCase = true)
@@ -1752,7 +1962,7 @@ fun ProductStockGaugeView(appState: AppState) {
                         .let { if (it.isEmpty()) "ሸርጅን" else it }
 
                     val percent = (p.currentStock / 200.0).coerceIn(0.0, 1.0)
-                    val isCritical = p.currentStock < 10
+                    val isCritical = p.currentStock < 10 // Less than 5% of 200 (< 10 bags)
 
                     val levelColor = when {
                         percent > 0.40 -> Color(0xFF00FF88) // High
@@ -1790,7 +2000,7 @@ fun ProductStockGaugeView(appState: AppState) {
                         label = "fillPercent"
                     )
 
-                    // Glassmorphism Card
+                    // Glassmorphism Card with green left border glow
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -1881,7 +2091,7 @@ fun ProductStockGaugeView(appState: AppState) {
                                     }
                                 }
 
-                                // Progress Bar
+                                // Progress Bar representing 0 to 200 bags capacity
                                 Box(
                                     modifier = Modifier
                                         .fillMaxWidth()
@@ -1906,7 +2116,7 @@ fun ProductStockGaugeView(appState: AppState) {
                                     )
                                 }
 
-                                // Status Badge
+                                // Status Badge below bar
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -1971,888 +2181,638 @@ fun SummaryStockMetricItem(
     }
 }
 
+// ==========================================
+// SCREEN 4: WORKERS SCREEN WITH THIRD TAB!
+// ==========================================
 @Composable
-fun SparklineTrendLine(materialTransactions: List<RawMaterialTransaction>, color: Color) {
-    // Renders a simple, elegant Canvas Sparkline
-    Canvas(
-        modifier = Modifier
-            .width(140.dp)
-            .height(28.dp)
-    ) {
-        val w = size.width
-        val h = size.height
-        val fakePoints = if (materialTransactions.isEmpty()) {
-            listOf(10.0, 25.0, 15.0, 40.0, 25.0, 60.0)
-        } else {
-            materialTransactions.map { it.added.coerceAtLeast(1.0) }.takeLast(8)
-        }
-        val maxVal = (fakePoints.maxOrNull() ?: 1.0).coerceAtLeast(1.0)
-        val stepX = w / (fakePoints.size - 1).coerceAtLeast(1)
-        val path = Path()
-
-        fakePoints.forEachIndexed { idx, value ->
-            val cx = idx * stepX
-            val cy = h - (value / maxVal * (h - 6.dp.toPx())).toFloat() - 3.dp.toPx()
-            if (idx == 0) path.moveTo(cx, cy) else path.lineTo(cx, cy)
-        }
-        drawPath(path, color = color.copy(alpha = 0.8f), style = Stroke(width = 2.dp.toPx()))
-    }
-}
-
-fun translateMasterbatchColor(str: String): Color {
-    return when (str.lowercase().trim()) {
-        "ቢጫ", "yellow" -> Color.Yellow
-        "ቀይ", "red" -> Color.Red
-        "ሰማያዊ", "blue" -> Color(0xFF3B82F6)
-        "ጥቁር", "black" -> Color.Black
-        "አረንጓዴ", "green" -> Color.Green
-        else -> Color.White
-    }
-}
-
-
-// ==================== (PRIMARY SCREEN 4) WORKERS SCREEN ====================
-@Composable
-fun WorkersScreenContent(
-    appState: AppState,
-    viewModel: WorkersViewModel
+fun WorkersTab(
+    viewModel: MainViewModel,
+    workers: List<Worker>,
+    attendanceList: List<Attendance>,
+    currentMonth: Int,
+    currentYear: Int
 ) {
-    val haptic = LocalHapticFeedback.current
-    var selectedWorkerTab by remember { mutableStateOf("Attendance") } // "Attendance", "Salary"
-    var showAddWorkerDialog by remember { mutableStateOf(false) }
-    var editingSalaryWorker by remember { mutableStateOf<Worker?>(null) }
+    var selectedWorkersTab by remember { mutableStateOf("Attendance") } // "Attendance", "Salary", "MonthlyCalendar"
 
-    // Animated green particle network background
-    val infiniteTransition = rememberInfiniteTransition(label = "workers_drift")
-    val tick by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = (2 * Math.PI).toFloat(),
-        animationSpec = infiniteRepeatable(tween(42000, easing = LinearEasing), RepeatMode.Restart),
-        label = "tick"
-    )
-
-    val particlesCount = 15
-    val particles = remember {
-        List(particlesCount) {
-            Triple(
-                kotlin.random.Random.nextFloat(),
-                kotlin.random.Random.nextFloat(),
-                kotlin.random.Random.nextFloat() * 1.5f + 0.3f
+    Column(modifier = Modifier.fillMaxSize()) {
+        TabRow(
+            selectedTabIndex = when (selectedWorkersTab) {
+                "Attendance" -> 0
+                "Salary" -> 1
+                else -> 2
+            },
+            containerColor = Color(0xFF040605),
+            contentColor = EmeraldGlow,
+            indicator = { tabPositions ->
+                TabRowDefaults.SecondaryIndicator(
+                    modifier = Modifier.tabIndicatorOffset(tabPositions[
+                        when (selectedWorkersTab) {
+                            "Attendance" -> 0
+                            "Salary" -> 1
+                            else -> 2
+                        }
+                    ]),
+                    color = EmeraldGlow
+                )
+            },
+            modifier = Modifier.border(BorderStroke(0.5.dp, GrayBorder), RoundedCornerShape(bottomStart = 8.dp, bottomEnd = 8.dp))
+        ) {
+            Tab(
+                selected = selectedWorkersTab == "Attendance",
+                onClick = { selectedWorkersTab = "Attendance" },
+                text = { Text("አቴንዳንስ", fontSize = 11.sp, fontWeight = FontWeight.Bold) }
+            )
+            Tab(
+                selected = selectedWorkersTab == "Salary",
+                onClick = { selectedWorkersTab = "Salary" },
+                text = { Text("ደመወዝ", fontSize = 11.sp, fontWeight = FontWeight.Bold) }
+            )
+            Tab(
+                selected = selectedWorkersTab == "MonthlyCalendar",
+                onClick = { selectedWorkersTab = "MonthlyCalendar" },
+                text = { Text("የወር ቀን መቁጠሪያ", fontSize = 11.sp, fontWeight = FontWeight.Bold) }
             )
         }
-    }
 
-    Box(
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(top = 10.dp)
+        ) {
+            when (selectedWorkersTab) {
+                "Attendance" -> AttendanceTabContent(viewModel, workers, attendanceList)
+                "Salary" -> SalaryTabContent(workers, attendanceList)
+                "MonthlyCalendar" -> MonthlyCalendarTabContent(viewModel, workers, attendanceList, currentMonth, currentYear)
+            }
+        }
+    }
+}
+
+// Subtab A: Today Attendance marker
+@Composable
+fun AttendanceTabContent(viewModel: MainViewModel, workers: List<Worker>, attendanceList: List<Attendance>) {
+    var showAddWorkerDialog by remember { mutableStateOf(false) }
+    var newWName by remember { mutableStateOf("") }
+    var newWRole by remember { mutableStateOf("Operator") }
+    var newWRate by remember { mutableStateOf("350") }
+
+    LazyColumn(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black)
+            .padding(14.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        // Drifting Network Canvas
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            val w = size.width
-            val h = size.height
-            val pxList = particles.map { p ->
-                val cx = p.first * w + 30.dp.toPx() * cos((tick * p.third).toDouble()).toFloat()
-                val cy = p.second * h + 30.dp.toPx() * sin((tick * p.third).toDouble()).toFloat()
-                Offset(cx.coerceIn(0f, w), cy.coerceIn(0f, h))
+        item {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("የዕለት ሰራተኞች መገኘት ምልክት ማድረጊያ", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                Button(
+                    onClick = { showAddWorkerDialog = true },
+                    colors = ButtonDefaults.buttonColors(containerColor = EmeraldGlow, contentColor = Color.Black),
+                    shape = RoundedCornerShape(6.dp),
+                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
+                ) {
+                    Icon(Icons.Default.Add, "Add", modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("አዲስ ሰራተኛ", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                }
             }
+        }
 
-            // Draw links
-            val threshold = 160.dp.toPx()
-            for (i in pxList.indices) {
-                for (j in i + 1 until pxList.size) {
-                    val p1 = pxList[i]
-                    val p2 = pxList[j]
-                    val dist = sqrt(((p1.x - p2.x) * (p1.x - p2.x) + (p1.y - p2.y) * (p1.y - p2.y)).toDouble()).toFloat()
-                    if (dist < threshold) {
-                        val alpha = (1f - dist / threshold).coerceIn(0f, 1f) * 0.12f
-                        drawLine(
-                            color = Color(0xFF00FF88),
-                            start = p1,
-                            end = p2,
-                            strokeWidth = 1.dp.toPx(),
-                            alpha = alpha
+        items(workers) { w ->
+            // Find today (day 28) attendance for this worker
+            val todayLog = attendanceList.find { it.workerId == w.id && it.day == 28 && it.month == 9 && it.year == 2018 }
+            val status = todayLog?.status ?: "በስራ ላይ"
+
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                colors = CardDefaults.cardColors(containerColor = DarkGlassCard),
+                border = BorderStroke(0.6.dp, GrayBorder)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(12.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(CircleShape)
+                                .background(Color(android.graphics.Color.parseColor(w.avatarColorString))),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = w.name.take(1),
+                                color = Color.Black,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column {
+                            Text(w.name, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                            Text(w.role, color = MutedText, fontSize = 11.sp)
+                        }
+                    }
+
+                    // Log control buttons for today's status
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(
+                            onClick = { viewModel.toggleAttendance(w.id, 28, 9, 2018, "በስራ ላይ") },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (status == "በስራ ላይ") Color(0xFF1B4D2C) else Color(0xFF151816)
+                            ),
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                            shape = RoundedCornerShape(6.dp)
+                        ) {
+                            Text("✓ ስራ ላይ", fontSize = 10.sp, color = if (status == "በስራ ላይ") EmeraldGlow else Color.White)
+                        }
+                        Button(
+                            onClick = { viewModel.toggleAttendance(w.id, 28, 9, 2018, "ቀርቷል") },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (status == "ቀርቷል") Color(0xFF4D1B1B) else Color(0xFF151816)
+                            ),
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                            shape = RoundedCornerShape(6.dp)
+                        ) {
+                            Text("✗ ቀርቷል", fontSize = 10.sp, color = if (status == "ቀርቷል") Color.Red else Color.White)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if (showAddWorkerDialog) {
+        AlertDialog(
+            onDismissRequest = { showAddWorkerDialog = false },
+            title = { Text("አዲስ ሰራተኛ መመዝገቢያ", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    OutlinedTextField(
+                        value = newWName,
+                        onValueChange = { newWName = it },
+                        label = { Text("የሰራተኛው ሙሉ ስም") },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White,
+                            focusedBorderColor = EmeraldGlow,
+                            unfocusedBorderColor = GrayBorder
+                        )
+                    )
+                    OutlinedTextField(
+                        value = newWRole,
+                        onValueChange = { newWRole = it },
+                        label = { Text("የስራ ድርሻ (Role)") },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White,
+                            focusedBorderColor = EmeraldGlow,
+                            unfocusedBorderColor = GrayBorder
+                        )
+                    )
+                    OutlinedTextField(
+                        value = newWRate,
+                        onValueChange = { newWRate = it },
+                        label = { Text("ዕለታዊ የደመወዝ ታሪፍ (ብር)") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White,
+                            focusedBorderColor = EmeraldGlow,
+                            unfocusedBorderColor = GrayBorder
+                        )
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val rate = newWRate.toIntOrNull() ?: 350
+                        if (newWName.isNotBlank()) {
+                            val colors = listOf("#00FF88", "#3498db", "#e67e22", "#9b59b6", "#f1c40f")
+                            val chosenColor = colors.random()
+                            viewModel.addWorker(newWName, newWRole, rate, chosenColor)
+                        }
+                        newWName = ""
+                        newWRole = "Operator"
+                        newWRate = "350"
+                        showAddWorkerDialog = false
+                    },
+                    colors = ButtonDefaults.textButtonColors(contentColor = EmeraldGlow)
+                ) {
+                    Text("አስቀምጥ")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showAddWorkerDialog = false }, colors = ButtonDefaults.textButtonColors(contentColor = Color.Red)) {
+                    Text("ተው")
+                }
+            },
+            containerColor = Color(0xFF0C100D),
+            shape = RoundedCornerShape(16.dp)
+        )
+    }
+}
+
+// Subtab B: Workers Salary Calculations
+@Composable
+fun SalaryTabContent(workers: List<Worker>, attendanceList: List<Attendance>) {
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(14.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        item {
+            Text("የሰራተኞች ወራዊ የደመወዝ መዝገብ ሂሳብ", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+        }
+
+        items(workers) { w ->
+            // Filter attendance for month 9 (Ginbot) 2018
+            val monthLogs = attendanceList.filter { it.workerId == w.id && it.month == 9 && it.year == 2018 }
+            val dutyDays = monthLogs.count { it.status == "በስራ ላይ" }
+            val salaryTotal = dutyDays * w.dailyRate
+
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                colors = CardDefaults.cardColors(containerColor = DarkGlassCard),
+                border = BorderStroke(0.6.dp, GrayBorder)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(14.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text(w.name, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                        Text("በእያንዳንዱ ቀን፡ ${w.dailyRate} ብር", color = MutedText, fontSize = 11.sp)
+                    }
+
+                    Column(horizontalAlignment = Alignment.End) {
+                        Text(
+                            text = "$salaryTotal ብር",
+                            color = Color(0xFFFFD700),
+                            fontSize = 17.sp,
+                            fontWeight = FontWeight.Black,
+                            fontFamily = FontFamily.Monospace
+                        )
+                        Text(
+                            text = "$dutyDays ቀናት ሰርቷል",
+                            color = MutedText,
+                            fontSize = 11.sp
                         )
                     }
                 }
             }
+        }
+    }
+}
 
-            // Draw points
-            pxList.forEach { pt ->
-                drawCircle(
-                    color = Color(0xFF00FF88),
-                    radius = 2.5.dp.toPx(),
-                    center = pt,
-                    alpha = 0.3f
-                )
+
+// Subtab C: BRAND NEW MONTHLY CALENDAR TAB!!! ("የወር ቀን መቁጠሪያ")
+@Composable
+fun MonthlyCalendarTabContent(
+    viewModel: MainViewModel,
+    workers: List<Worker>,
+    attendanceList: List<Attendance>,
+    currentMonthId: Int,
+    currentYearValue: Int
+) {
+    var animateOnLoad by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        animateOnLoad = true
+    }
+
+    val currentMonthName = ET_MONTHS.getOrNull(currentMonthId - 1) ?: "ግንቦት"
+
+    // Multi-metrics count for calendar summary
+    val filterMonthAttendance = attendanceList.filter { it.month == currentMonthId && it.year == currentYearValue }
+    val totalDutyDays = filterMonthAttendance.count { it.status == "በስራ ላይ" }
+    val totalAbsentDays = filterMonthAttendance.count { it.status == "ቀርቷል" }
+
+    // Average attendance level calculation
+    val averageRate = if (workers.isNotEmpty()) {
+        val rates = workers.map { w ->
+            val wl = filterMonthAttendance.filter { it.workerId == w.id }
+            val duty = wl.count { it.status == "በስራ ላይ" }
+            val total = wl.count { it.status == "በስራ ላይ" || it.status == "ቀርቷል" }
+            if (total > 0) (duty.toDouble() / total) * 100 else 100.0
+        }
+        rates.average().toInt()
+    } else 100
+
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 14.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp)
+    ) {
+        // 1. MONTH HEADER: Ethiopian month name and year with left/right navigation arrows
+        item {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .shadow(
+                        elevation = 8.dp,
+                        shape = RoundedCornerShape(16.dp),
+                        ambientColor = Color(0xFF00FF88).copy(alpha = 0.1f),
+                        spotColor = Color(0xFF00FF88).copy(alpha = 0.15f)
+                    ),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF040A06)),
+                border = BorderStroke(0.8.dp, Color(0xFF1F2F24))
+            ) {
+                Box(modifier = Modifier.fillMaxWidth()) {
+                    // Modern top green shine line
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(2.5.dp)
+                            .background(
+                                Brush.horizontalGradient(
+                                    colors = listOf(EmeraldGlow, EmeraldGlow.copy(alpha = 0.05f))
+                                )
+                            )
+                    )
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 14.dp, vertical = 14.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        IconButton(
+                            onClick = { viewModel.navigateMonth(-1) },
+                            modifier = Modifier.background(Color(0xFF0D1611), CircleShape)
+                        ) {
+                            Icon(Icons.Filled.ArrowBack, "Prev Month", tint = EmeraldGlow)
+                        }
+
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(
+                                text = "$currentMonthName $currentYearValue",
+                                color = Color.White,
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = "የኢትዮጵያ ወር መቁጠሪያ (ET Month)",
+                                color = MutedText,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+
+                        IconButton(
+                            onClick = { viewModel.navigateMonth(1) },
+                            modifier = Modifier.background(Color(0xFF0D1611), CircleShape)
+                        ) {
+                            Icon(Icons.Filled.ArrowForward, "Next Month", tint = EmeraldGlow)
+                        }
+                    }
+                }
             }
         }
 
-        // Content
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(16.dp)
-        ) {
-            // Tab switcher
+        // 2. LEGEND ROW: Small colored squares showing categories
+        item {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(Color(0xFF050505), RoundedCornerShape(100.dp))
-                    .border(BorderStroke(1.dp, Color(0xFF222222)), RoundedCornerShape(100.dp))
-                    .padding(4.dp)
+                    .horizontalScroll(rememberScrollState())
+                    .padding(vertical = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                val tabs = listOf(Pair("Attendance", "መገኘት (Attendance)"), Pair("Salary", "ደመወዝ (Salary)"))
-                tabs.forEach { tab ->
-                    val isActive = selectedWorkerTab == tab.first
+                LegendItem(color = EmeraldGlow, label = "በስራ ላይ")
+                LegendItem(color = Color(0xFFFF3B3B), label = "ቀርቷል")
+                LegendItem(color = Color(0xFF3B82F6), label = "እሁድ")
+                LegendItem(color = Color(0xFF1E2421), label = "ወደፊት")
+            }
+        }
+
+        // 3. WORKER CALENDAR CARDS
+        itemsIndexed(workers) { index0, w ->
+            // Filter attendance states
+            val workerLogs = filterMonthAttendance.filter { it.workerId == w.id }
+            val dutyCount = workerLogs.count { it.status == "በስራ ላይ" }
+            val absentCount = workerLogs.count { it.status == "ቀርቷል" }
+            val hasAbsences = absentCount > 0
+
+            val workerTotalLogged = workerLogs.count { it.status == "በስራ ላይ" || it.status == "ቀርቷል" }
+            val workerAttendanceRate = if (workerTotalLogged > 0) {
+                ((dutyCount.toDouble() / workerTotalLogged) * 100).toInt()
+            } else 100
+
+            // Staggered slide up animation
+            val cardAlpha by animateFloatAsState(
+                targetValue = if (animateOnLoad) 1f else 0f,
+                animationSpec = tween(450, delayMillis = index0 * 50),
+                label = "workerCardAlpha"
+            )
+            val cardSlide by animateFloatAsState(
+                targetValue = if (animateOnLoad) 0f else 30f,
+                animationSpec = tween(450, delayMillis = index0 * 50),
+                label = "workerCardSlide"
+            )
+
+            // Dynamic border styling: RED if any absence this month, GREEN otherwise
+            val leftBorderColor = if (hasAbsences) Color(0xFFFF3B3B) else EmeraldGlow
+
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .graphicsLayer {
+                        alpha = cardAlpha
+                        translationY = cardSlide
+                    }
+                    .shadow(
+                        elevation = 6.dp,
+                        shape = RoundedCornerShape(16.dp),
+                        ambientColor = leftBorderColor.copy(alpha = 0.12f),
+                        spotColor = leftBorderColor.copy(alpha = 0.2f)
+                    ),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF070B08).copy(alpha = 0.8f)),
+                border = BorderStroke(0.8.dp, Color(0xFF1F2F24).copy(alpha = 0.4f))
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(IntrinsicSize.Min)
+                ) {
+                    // Left glow border
                     Box(
                         modifier = Modifier
-                            .weight(1f)
-                            .clip(RoundedCornerShape(100.dp))
-                            .background(if (isActive) Color(0xFF041c0d) else Color.Transparent)
-                            .border(
-                                BorderStroke(0.8.dp, if (isActive) Color(0xFF00FF88).copy(alpha = 0.6f) else Color.Transparent),
-                                RoundedCornerShape(100.dp)
+                            .width(4.dp)
+                            .fillMaxHeight()
+                            .background(
+                                Brush.verticalGradient(
+                                    colors = listOf(leftBorderColor, leftBorderColor.copy(alpha = 0.3f))
+                                )
                             )
-                            .clickable {
-                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                selectedWorkerTab = tab.first
-                            }
-                            .padding(vertical = 11.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = tab.second,
-                            color = if (isActive) Color(0xFF00FF88) else Color(0xFF8C9E94),
-                            fontSize = 13.sp,
-                            fontWeight = if (isActive) FontWeight.Bold else FontWeight.Medium,
-                            fontFamily = FontFamily.Monospace
-                        )
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(20.dp))
-
-            if (selectedWorkerTab == "Attendance") {
-                WorkersAttendanceTab(
-                    appState = appState,
-                    viewModel = viewModel,
-                    onAddClicked = { showAddWorkerDialog = true }
-                )
-            } else {
-                WorkersSalaryTab(
-                    appState = appState,
-                    viewModel = viewModel,
-                    onEditSalaryClicked = { editingSalaryWorker = it }
-                )
-            }
-        }
-    }
-
-    // Add Worker Dialog
-    if (showAddWorkerDialog) {
-        var workerName by remember { mutableStateOf("") }
-        var salaryInput by remember { mutableStateOf("10000") }
-
-        Dialog(onDismissRequest = { showAddWorkerDialog = false }) {
-            Card(
-                colors = CardDefaults.cardColors(containerColor = Color(0xFF050505)),
-                border = BorderStroke(1.dp, Color(0xFF00FF88).copy(alpha = 0.5f)),
-                shape = RoundedCornerShape(20.dp)
-            ) {
-                Column(modifier = Modifier.padding(22.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                    Text(
-                        "አዲስ ሰራተኛ መመዝገቢያ (New Worker)",
-                        color = Color.White,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 16.sp
-                    )
-                    OutlinedTextField(
-                        value = workerName,
-                        onValueChange = { workerName = it },
-                        label = { Text("ሙሉ ስም (Full Name)", color = Color.White.copy(alpha = 0.6f)) },
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = Color(0xFF00FF88),
-                            unfocusedBorderColor = Color(0xFF222222),
-                            focusedLabelColor = Color(0xFF00FF88),
-                            unfocusedLabelColor = Color.White.copy(alpha = 0.6f),
-                            focusedTextColor = Color.White,
-                            unfocusedTextColor = Color.White
-                        ),
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    OutlinedTextField(
-                        value = salaryInput,
-                        onValueChange = { salaryInput = it },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        label = { Text("ወርሃዊ ደመወዝ (Birr)", color = Color.White.copy(alpha = 0.6f)) },
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = Color(0xFF00FF88),
-                            unfocusedBorderColor = Color(0xFF222222),
-                            focusedLabelColor = Color(0xFF00FF88),
-                            unfocusedLabelColor = Color.White.copy(alpha = 0.6f),
-                            focusedTextColor = Color.White,
-                            unfocusedTextColor = Color.White
-                        ),
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.End,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        TextButton(onClick = { showAddWorkerDialog = false }) {
-                            Text("ሰርዝ", color = Color(0xFFFF3B3B), fontWeight = FontWeight.Bold)
-                        }
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Button(
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00FF88), contentColor = Color.Black),
-                            onClick = {
-                                if (workerName.isNotBlank()) {
-                                    viewModel.addNewWorker(workerName.trim(), salaryInput.toDoubleOrNull() ?: 10000.0)
-                                }
-                                showAddWorkerDialog = false
-                            }
-                        ) {
-                            Text("መዝግብ", fontWeight = FontWeight.Bold)
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    // Salary Rate Dialog
-    if (editingSalaryWorker != null) {
-        var rateInput by remember(editingSalaryWorker) { mutableStateOf(editingSalaryWorker!!.monthlySalary.toInt().toString()) }
-        Dialog(onDismissRequest = { editingSalaryWorker = null }) {
-            Card(
-                colors = CardDefaults.cardColors(containerColor = Color(0xFF050505)),
-                border = BorderStroke(1.dp, Color(0xFF00FF88).copy(alpha = 0.5f)),
-                shape = RoundedCornerShape(20.dp)
-            ) {
-                Column(modifier = Modifier.padding(22.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                    Text(
-                        "ወርሃዊ ደመወዝ ማስተካከያ",
-                        color = Color.White,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 16.sp
-                    )
-                    Text(
-                        "የ '${editingSalaryWorker!!.name}' ወርሃዊ ክፍያ እዚህ ያሻሽሉ።",
-                        color = Color(0xFF8C9E94),
-                        fontSize = 12.sp
-                    )
-                    OutlinedTextField(
-                        value = rateInput,
-                        onValueChange = { rateInput = it },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        label = { Text("ወርሃዊ ክፍያ (Birr)", color = Color.White.copy(alpha = 0.6f)) },
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = Color(0xFF00FF88),
-                            unfocusedBorderColor = Color(0xFF222222),
-                            focusedLabelColor = Color(0xFF00FF88),
-                            unfocusedLabelColor = Color.White.copy(alpha = 0.6f),
-                            focusedTextColor = Color.White,
-                            unfocusedTextColor = Color.White
-                        ),
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.End,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        TextButton(onClick = { editingSalaryWorker = null }) {
-                            Text("ሰርዝ", color = Color(0xFFFF3B3B), fontWeight = FontWeight.Bold)
-                        }
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Button(
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00FF88), contentColor = Color.Black),
-                            onClick = {
-                                rateInput.toDoubleOrNull()?.let { doubleVal ->
-                                    viewModel.updateWorkerSalary(editingSalaryWorker!!.id, doubleVal)
-                                }
-                                editingSalaryWorker = null
-                            }
-                        ) {
-                            Text("አስቀምጥ", fontWeight = FontWeight.Bold)
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun WorkersAttendanceTab(
-    appState: AppState,
-    viewModel: WorkersViewModel,
-    onAddClicked: () -> Unit
-) {
-    val haptic = LocalHapticFeedback.current
-    var listAnimated by remember { mutableStateOf(false) }
-    LaunchedEffect(Unit) {
-        listAnimated = true
-    }
-
-    val attendanceOnDuty = appState.currentAttendance.count { it.status == "On Duty" }
-    val attendanceAbsent = appState.currentAttendance.count { it.status == "Absent" }
-    val totalWorkersCount = appState.workers.size
-
-    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        // Page header & Add worker
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column {
-                Text(
-                    text = "የሰራተኞች አስተዳደር",
-                    color = Color.White,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Box(
-                    modifier = Modifier
-                        .width(60.dp)
-                        .height(3.dp)
-                        .background(Color(0xFF00FF88))
-                )
-            }
-
-            Button(
-                onClick = {
-                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                    onAddClicked()
-                },
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFF041c0d),
-                    contentColor = Color(0xFF00FF88)
-                ),
-                shape = RoundedCornerShape(100.dp),
-                border = BorderStroke(1.dp, Color(0xFF00FF88).copy(alpha = 0.6f)),
-                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
-                modifier = Modifier.height(38.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Add,
-                    contentDescription = "Add worker",
-                    modifier = Modifier.size(16.dp),
-                    tint = Color(0xFF00FF88)
-                )
-                Spacer(modifier = Modifier.width(4.dp))
-                Text(
-                    text = "ሰራተኛ ጨምር",
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-        }
-
-        // Summary Cards
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            AttendanceSummaryCard(
-                title = "በስራ ላይ",
-                enTitle = "On Duty",
-                value = "$attendanceOnDuty",
-                color = Color(0xFF00FF88),
-                modifier = Modifier.weight(1f)
-            )
-            AttendanceSummaryCard(
-                title = "ቀርቷል",
-                enTitle = "Absent",
-                value = "$attendanceAbsent",
-                color = Color(0xFFFF3B3B),
-                modifier = Modifier.weight(1f)
-            )
-            AttendanceSummaryCard(
-                title = "ጠቅላላ",
-                enTitle = "Total",
-                value = "$totalWorkersCount",
-                color = Color(0xFFFFD700),
-                modifier = Modifier.weight(1f)
-            )
-        }
-
-        // Workers List
-        if (appState.workers.isEmpty()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(200.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "ምንም ሰራተኛ አልተመዘገበም... (No workers available)",
-                    color = Color(0xFF8C9E94),
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Medium
-                )
-            }
-        } else {
-            LazyColumn(
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                itemsIndexed(appState.workers) { index, worker ->
-                    val workerStatus = appState.currentAttendance.find { it.workerId == worker.id }?.status ?: "የለም"
-
-                    // Smooth 300ms transitions on properties
-                    val animatedBgColor by animateColorAsState(
-                        targetValue = when (workerStatus) {
-                            "On Duty" -> Color(0xFF031408)
-                            "Absent" -> Color(0xFF140303)
-                            else -> Color(0xFF050505)
-                        },
-                        animationSpec = tween(300),
-                        label = "cardBg"
-                    )
-                    val animatedBorderColor by animateColorAsState(
-                        targetValue = when (workerStatus) {
-                            "On Duty" -> Color(0xFF00FF88).copy(alpha = 0.5f)
-                            "Absent" -> Color(0xFFFF3B3B).copy(alpha = 0.5f)
-                            else -> Color(0xFF222222)
-                        },
-                        animationSpec = tween(300),
-                        label = "cardBorder"
                     )
 
-                    // Card entrance scaling & offset logic
-                    val cardAlpha by animateFloatAsState(
-                        targetValue = if (listAnimated) 1f else 0f,
-                        animationSpec = tween(400, delayMillis = index * 50),
-                        label = "cardAlpha"
-                    )
-                    val cardSlide by animateFloatAsState(
-                        targetValue = if (listAnimated) 0f else 40f,
-                        animationSpec = tween(400, delayMillis = index * 50),
-                        label = "cardSlide"
-                    )
-
-                    Card(
+                    // Worker card body
+                    Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .graphicsLayer {
-                                alpha = cardAlpha
-                                translationY = cardSlide
-                            }
-                            .shadow(
-                                elevation = if (workerStatus != "የለም") 6.dp else 0.dp,
-                                shape = RoundedCornerShape(16.dp),
-                                ambientColor = when (workerStatus) {
-                                    "On Duty" -> Color(0xFF00FF88)
-                                    "Absent" -> Color(0xFFFF3B3B)
-                                    else -> Color.Transparent
-                                },
-                                spotColor = when (workerStatus) {
-                                    "On Duty" -> Color(0xFF00FF88)
-                                    "Absent" -> Color(0xFFFF3B3B)
-                                    else -> Color.Transparent
-                                }
-                            ),
-                        shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(containerColor = animatedBgColor),
-                        border = BorderStroke(0.8.dp, animatedBorderColor)
+                            .padding(14.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
+                        // Header info of worker
                         Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(IntrinsicSize.Min)
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            // Left border glow
-                            Box(
-                                modifier = Modifier
-                                    .width(4.dp)
-                                    .fillMaxHeight()
-                                    .background(
-                                        when (workerStatus) {
-                                            "On Duty" -> Color(0xFF00FF88)
-                                            "Absent" -> Color(0xFFFF3B3B)
-                                            else -> Color(0xFF333333)
-                                        }
-                                    )
-                            )
-
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(14.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    modifier = Modifier.weight(1f)
-                                ) {
-                                    // Circular avatar
-                                    val initials = worker.name.split(" ").take(2).map { it.firstOrNull() ?: "" }.joinToString("")
-                                    Box(
-                                        modifier = Modifier
-                                            .size(42.dp)
-                                            .background(Color(0xFF0A0A0A), CircleShape)
-                                            .border(
-                                                BorderStroke(1.2.dp, if (workerStatus == "On Duty") Color(0xFF00FF88) else if (workerStatus == "Absent") Color(0xFFFF3B3B) else Color(0xFF444444)),
-                                                CircleShape
-                                            ),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Text(
-                                            text = initials.uppercase(),
-                                            color = Color.White,
-                                            fontSize = 12.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            fontFamily = FontFamily.Monospace
-                                        )
-                                    }
-
-                                    Spacer(modifier = Modifier.width(12.dp))
-
-                                    Column {
-                                        Text(
-                                            text = worker.name,
-                                            color = Color.White,
-                                            fontSize = 14.sp,
-                                            fontWeight = FontWeight.Bold
-                                        )
-                                        Spacer(modifier = Modifier.height(2.dp))
-                                        Text(
-                                            text = "${appState.selectedDate} · ${if (workerStatus == "On Duty") "በስራ ላይ" else if (workerStatus == "Absent") "ቀሪ (Absent)" else "ያልተመዘገበ"}",
-                                            color = Color(0xFF8C9E94),
-                                            fontSize = 11.sp
-                                        )
-                                    }
-                                }
-
-                                Row(
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    // "በስራ" Pill
-                                    Box(
-                                        modifier = Modifier
-                                            .height(34.dp)
-                                            .clip(RoundedCornerShape(100.dp))
-                                            .background(if (workerStatus == "On Duty") Color(0xFF00FF88) else Color.Transparent)
-                                            .border(
-                                                BorderStroke(1.dp, Color(0xFF00FF88).copy(alpha = 0.6f)),
-                                                RoundedCornerShape(100.dp)
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(34.dp)
+                                        .clip(CircleShape)
+                                        .background(
+                                            Color(android.graphics.Color.parseColor(w.avatarColorString)).copy(
+                                                alpha = 0.15f
                                             )
-                                            .clickable {
-                                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                                viewModel.recordAttendance(worker.id, "On Duty")
-                                            }
-                                            .padding(horizontal = 14.dp),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Text(
-                                            text = "በስራ",
-                                            color = if (workerStatus == "On Duty") Color.Black else Color(0xFF00FF88),
-                                            fontSize = 11.sp,
-                                            fontWeight = FontWeight.Bold
                                         )
-                                    }
-
-                                    // "ቀረ" Pill
-                                    Box(
-                                        modifier = Modifier
-                                            .height(34.dp)
-                                            .clip(RoundedCornerShape(100.dp))
-                                            .background(if (workerStatus == "Absent") Color(0xFFFF3B3B) else Color.Transparent)
-                                            .border(
-                                                BorderStroke(1.dp, Color(0xFFFF3B3B).copy(alpha = 0.6f)),
-                                                RoundedCornerShape(100.dp)
-                                            )
-                                            .clickable {
-                                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                                viewModel.recordAttendance(worker.id, "Absent")
-                                            }
-                                            .padding(horizontal = 14.dp),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Text(
-                                            text = "ቀረ",
-                                            color = if (workerStatus == "Absent") Color.Black else Color(0xFFFF3B3B),
-                                            fontSize = 11.sp,
-                                            fontWeight = FontWeight.Bold
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun WorkersSalaryTab(
-    appState: AppState,
-    viewModel: WorkersViewModel,
-    onEditSalaryClicked: (Worker) -> Unit
-) {
-    val haptic = LocalHapticFeedback.current
-    var listAnimated by remember { mutableStateOf(false) }
-    LaunchedEffect(Unit) {
-        listAnimated = true
-    }
-
-    // Days counter computations
-    val parts = appState.selectedDate.split("-")
-    val ethiopianDaysPassed = parts.getOrNull(2)?.toIntOrNull() ?: 1
-    val daysRemaining = (30 - ethiopianDaysPassed).coerceIn(0, 30)
-    val yearMonthStr = "${parts.getOrNull(0)}-${parts.getOrNull(1)}"
-
-    // Calculate total Payroll sum
-    val totalEarnedCalculated = appState.workers.sumOf { worker ->
-        val daily = worker.monthlySalary / 30.0
-        val absents = appState.allWorkerAttendance.count {
-            it.workerId == worker.id && it.date.startsWith(yearMonthStr) && it.status == "Absent"
-        }
-        val earned = (daily * ethiopianDaysPassed) - (absents * 2 * daily)
-        earned.coerceAtLeast(0.0)
-    }
-
-    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        // Countdown Ring Header Card
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(20.dp))
-                .background(Color(0xFF050505))
-                .border(BorderStroke(0.8.dp, Color(0xFF222222)), RoundedCornerShape(20.dp))
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Column(modifier = Modifier.weight(1.3f)) {
-                Text(
-                    text = "የክፍያ መቁጠሪያ (Days Until Payday)",
-                    color = Color.White,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Bold
-                )
-                Spacer(modifier = Modifier.height(6.dp))
-                Text(
-                    text = "በወሩ 30ኛው ቀን ላይ ለሁሉም ሰራተኞች የደመወዝ ክፍያ ይከናወናል። ዛሬ የወሩ $ethiopianDaysPassed ቀን ነው።",
-                    color = Color(0xFF8C9E94),
-                    fontSize = 11.sp,
-                    lineHeight = 15.sp
-                )
-            }
-
-            Spacer(modifier = Modifier.width(16.dp))
-
-            Box(
-                modifier = Modifier
-                    .size(105.dp)
-                    .weight(0.9f),
-                contentAlignment = Alignment.Center
-            ) {
-                Canvas(modifier = Modifier.size(85.dp)) {
-                    drawCircle(
-                        color = Color(0xFF151816),
-                        style = Stroke(width = 8.dp.toPx())
-                    )
-                    val sweep = 360f * (daysRemaining / 30f)
-                    drawArc(
-                        color = Color(0xFFFFD700),
-                        startAngle = -90f,
-                        sweepAngle = sweep,
-                        useCenter = false,
-                        style = Stroke(width = 8.dp.toPx(), cap = StrokeCap.Round)
-                    )
-                }
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(
-                        text = "$daysRemaining",
-                        color = Color(0xFFFFD700),
-                        fontSize = 24.sp,
-                        fontWeight = FontWeight.Black,
-                        fontFamily = FontFamily.Monospace
-                    )
-                    Text(
-                        text = "ቀሪ ቀናት",
-                        color = Color(0xFF8C9E94),
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            }
-        }
-
-        // Salary Cards List Header
-        Text(
-            text = "የደመወዝ ዝርዝር መግለጫ (Current Salaries)",
-            color = Color.White,
-            fontSize = 13.sp,
-            fontWeight = FontWeight.Bold,
-            fontFamily = FontFamily.Monospace
-        )
-
-        if (appState.workers.isEmpty()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(150.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "ምንም ሰራተኛ አልተመዘገበም... (No workers loaded)",
-                    color = Color(0xFF8C9E94),
-                    fontSize = 12.sp
-                )
-            }
-        } else {
-            LazyColumn(
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f, fill = false)
-            ) {
-                itemsIndexed(appState.workers) { index, worker ->
-                    val dailySalary = worker.monthlySalary / 30.0
-                    val absentDays = appState.allWorkerAttendance.count {
-                        it.workerId == worker.id && it.date.startsWith(yearMonthStr) && it.status == "Absent"
-                    }
-
-                    // Formula: earnedSalary = (monthlySalary ÷ 30) × ethiopianDaysPassed - (absentDays × 2 × dailySalary)
-                    val earnedSalary = (dailySalary * ethiopianDaysPassed) - (absentDays * 2 * dailySalary)
-                    val earnedSalaryVal = earnedSalary.coerceAtLeast(0.0)
-                    val deductionAmount = absentDays * 2 * dailySalary
-
-                    // Smooth transition alpha/slide
-                    val cardAlpha by animateFloatAsState(
-                        targetValue = if (listAnimated) 1f else 0f,
-                        animationSpec = tween(400, delayMillis = index * 50),
-                        label = "salCardAlpha"
-                    )
-                    val cardSlide by animateFloatAsState(
-                        targetValue = if (listAnimated) 0f else 40f,
-                        animationSpec = tween(400, delayMillis = index * 50),
-                        label = "salCardSlide"
-                    )
-
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .graphicsLayer {
-                                alpha = cardAlpha
-                                translationY = cardSlide
-                            },
-                        shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(containerColor = Color(0xFF050505)),
-                        border = BorderStroke(0.8.dp, Color(0xFF222222))
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(IntrinsicSize.Min)
-                        ) {
-                            // Left border indicator (green if absentCount == 0, red if > 0)
-                            Box(
-                                modifier = Modifier
-                                    .width(4.dp)
-                                    .fillMaxHeight()
-                                    .background(if (absentDays > 0) Color(0xFFFF3B3B) else Color(0xFF00FF88))
-                            )
-
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(14.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    // Amharic Name
+                                        .border(
+                                            BorderStroke(
+                                                1.dp,
+                                                Color(android.graphics.Color.parseColor(w.avatarColorString))
+                                            ), CircleShape
+                                        ),
+                                    contentAlignment = Alignment.Center
+                                ) {
                                     Text(
-                                        text = worker.name,
+                                        text = w.name.take(2),
+                                        color = Color.White,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Black
+                                    )
+                                }
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Column {
+                                    Text(
+                                        text = w.name,
                                         color = Color.White,
                                         fontSize = 14.sp,
                                         fontWeight = FontWeight.Bold
                                     )
-
-                                    Spacer(modifier = Modifier.height(4.dp))
-
-                                    // Absent badge (red if absent, green if 0)
-                                    Box(
-                                        modifier = Modifier
-                                            .clip(RoundedCornerShape(4.dp))
-                                            .background(if (absentDays > 0) Color(0xFF260D0D) else Color(0xFF0D2611))
-                                            .padding(horizontal = 8.dp, vertical = 3.dp)
-                                    ) {
-                                        Text(
-                                            text = if (absentDays > 0) "⚠️ $absentDays ቀን ቀርቷል" else "✓ ምንም የቀረ የለም (0)",
-                                            color = if (absentDays > 0) Color(0xFFFF3B3B) else Color(0xFF00FF88),
-                                            fontSize = 9.5.sp,
-                                            fontWeight = FontWeight.Bold
-                                        )
-                                    }
-
-                                    Spacer(modifier = Modifier.height(6.dp))
-
-                                    // Monthly salary edit icon trigger
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        modifier = Modifier.clickable {
-                                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                            onEditSalaryClicked(worker)
-                                        }
-                                    ) {
-                                        Text(
-                                            text = "ወርሃዊ ደሞዝ፡ ${worker.monthlySalary.toInt()} ETB",
-                                            color = Color(0xFF8C9E94),
-                                            fontSize = 11.sp,
-                                            fontFamily = FontFamily.Monospace
-                                        )
-                                        Spacer(modifier = Modifier.width(6.dp))
-                                        Icon(
-                                            imageVector = Icons.Default.Edit,
-                                            contentDescription = "Edit rate",
-                                            tint = Color(0xFF00FF88),
-                                            modifier = Modifier.size(13.dp)
-                                        )
-                                    }
-
-                                    if (deductionAmount > 0.0) {
-                                        Spacer(modifier = Modifier.height(4.dp))
-                                        Text(
-                                            text = "ማቅነሻ (Deduction): -${deductionAmount.toInt()} ETB",
-                                            color = Color(0xFFFF3B3B),
-                                            fontSize = 10.5.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            fontFamily = FontFamily.Monospace
-                                        )
-                                    }
-                                }
-
-                                Spacer(modifier = Modifier.width(8.dp))
-
-                                // Earned Salary Amount Large
-                                Column(horizontalAlignment = Alignment.End) {
                                     Text(
-                                        text = "የተገኘ ደሞዝ",
-                                        color = Color(0xFF8C9E94),
+                                        text = w.role,
+                                        color = MutedText,
                                         fontSize = 10.sp
                                     )
-                                    Spacer(modifier = Modifier.height(2.dp))
-                                    Text(
-                                        text = "${earnedSalaryVal.toInt()} ETB",
-                                        color = if (absentDays > 0) Color(0xFFFF3B3B) else Color(0xFF00FF88),
-                                        fontSize = 16.sp,
-                                        fontWeight = FontWeight.ExtraBold,
-                                        fontFamily = FontFamily.Monospace
-                                    )
+                                }
+                            }
+
+                            // Statistics rates row
+                            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Text("በስራ", color = MutedText, fontSize = 8.sp)
+                                    Text("${dutyCount}ቀን", color = EmeraldGlow, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                }
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Text("absent", color = MutedText, fontSize = 8.sp)
+                                    Text("${absentCount}ቀን", color = Color(0xFFFF3B3B), fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                }
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Text("መቶኛ", color = MutedText, fontSize = 8.sp)
+                                    Text("$workerAttendanceRate%", color = Color(0xFFFFD700), fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
+
+                        // Grid 30 days of the Ethiopian Month
+                        // Using a manual simple custom row layout to avoid Nesting lazy view within vertical lazy, ensuring high scroll safety & perfect rendering!
+                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            for (row in 0..4) { // 5 rows of 6 cells = 30 days
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    for (col in 1..6) {
+                                        val dayIndex = row * 6 + col
+                                        val isSunday = dayIndex == 3 || dayIndex == 10 || dayIndex == 17 || dayIndex == 24
+                                        val log = workerLogs.find { it.day == dayIndex }
+
+                                        // Status routing
+                                        val status = when {
+                                            dayIndex > 27 -> "future" // Today is 28, so 29 and 30 are future
+                                            log != null -> log.status
+                                            isSunday -> "እሁድ"
+                                            else -> "በስራ ላይ"
+                                        }
+
+                                        // Cell custom color scheme
+                                        val cellColor = when (status) {
+                                            "በስራ ላይ" -> Color(0xFF1B4D2C).copy(alpha = 0.5f)
+                                            "ቀርቷል" -> Color(0xFF4D1B1B).copy(alpha = 0.5f)
+                                            "እሁድ" -> Color(0xFF1B2C4D).copy(alpha = 0.5f)
+                                            else -> Color(0xFF151816) // Future
+                                        }
+
+                                        val cellBorderColor = when (status) {
+                                            "በስራ ላይ" -> EmeraldGlow.copy(alpha = 0.4f)
+                                            "ቀርቷል" -> Color(0xFFFF3B3B).copy(alpha = 0.4f)
+                                            "እሁድ" -> Color(0xFF3B82F6).copy(alpha = 0.4f)
+                                            else -> Color(0xFF222222)
+                                        }
+
+                                        val cellText = when (status) {
+                                            "በስራ ላይ" -> "✓"
+                                            "ቀርቷል" -> "✗"
+                                            "እሁድ" -> "☀"
+                                            else -> "$dayIndex"
+                                        }
+
+                                        val cellTextColor = when (status) {
+                                            "በስራ ላይ" -> EmeraldGlow
+                                            "ቀርቷል" -> Color(0xFFFF3B3B)
+                                            "እሁድ" -> Color(0xFF8AB4F8)
+                                            else -> MutedText.copy(alpha = 0.4f)
+                                        }
+
+                                        // Highlighting day 28 (today's cell) with a green glow border!
+                                        val isToday = dayIndex == 28
+                                        val finalBorderStroke = if (isToday) {
+                                            BorderStroke(1.2.dp, EmeraldGlow)
+                                        } else {
+                                            BorderStroke(0.5.dp, cellBorderColor)
+                                        }
+
+                                        // Small daily cell block representation
+                                        Box(
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .aspectRatio(1f)
+                                                .clip(RoundedCornerShape(4.dp))
+                                                .background(cellColor)
+                                                .border(finalBorderStroke, RoundedCornerShape(4.dp)),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Text(
+                                                text = cellText,
+                                                color = cellTextColor,
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                fontFamily = FontFamily.Monospace
+                                            )
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -2861,1426 +2821,196 @@ fun WorkersSalaryTab(
             }
         }
 
-        Spacer(modifier = Modifier.height(8.dp))
+        // 4. MONTHLY SUMMARY CARD: bottom statistics with animations
+        item {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 12.dp)
+                    .shadow(
+                        elevation = 8.dp,
+                        shape = RoundedCornerShape(16.dp),
+                        ambientColor = Color(0xFFFFD700).copy(alpha = 0.1f),
+                        spotColor = Color(0xFFFFD700).copy(alpha = 0.15f)
+                    ),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF030303)),
+                border = BorderStroke(0.8.dp, Color(0xFF1F1F1F))
+            ) {
+                Column(modifier = Modifier.padding(14.dp)) {
+                    Text(
+                        text = "ወርሃዊ የአቴንዳንስ አጠቃላይ ድምር",
+                        color = Color.White,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "Monthly Performance Aggregate Tracker",
+                        color = MutedText,
+                        fontSize = 9.sp
+                    )
+                    Spacer(modifier = Modifier.height(14.dp))
 
-        // Large Total Payroll card at bottom with dark green background
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        SummaryStockMetricItem(
+                            title = "ለስራ የተገኙ",
+                            subTitle = "Duty Days",
+                            value = "$totalDutyDays",
+                            color = EmeraldGlow,
+                            modifier = Modifier.weight(1f)
+                        )
+                        SummaryStockMetricItem(
+                            title = "የቀሩ ቀናት",
+                            subTitle = "Absent Days",
+                            value = "$totalAbsentDays",
+                            color = Color(0xFFFF3B3B),
+                            modifier = Modifier.weight(1f)
+                        )
+                        SummaryStockMetricItem(
+                            title = "አማካኝ መቶኛ",
+                            subTitle = "Average Rate",
+                            value = "$averageRate%",
+                            color = Color(0xFFFFD700),
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun LegendItem(color: Color, label: String) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .size(10.dp)
+                .clip(RoundedCornerShape(2.dp))
+                .background(color)
+        )
+        Text(text = label, color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.SemiBold)
+    }
+}
+
+
+// ==========================================
+// SCREEN 5: BINIYAM AI SCREEN
+// ==========================================
+@Composable
+fun AiTab(viewModel: MainViewModel, messages: List<ChatMessage>) {
+    var queryText by remember { mutableStateOf("") }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(14.dp)
+    ) {
+        // AI Header card
         Card(
             modifier = Modifier
                 .fillMaxWidth()
-                .shadow(
-                    elevation = 12.dp,
-                    shape = RoundedCornerShape(20.dp),
-                    ambientColor = Color(0xFF00FF88).copy(alpha = 0.15f),
-                    spotColor = Color(0xFF00FF88).copy(alpha = 0.25f)
-                ),
-            shape = RoundedCornerShape(20.dp),
-            colors = CardDefaults.cardColors(containerColor = Color(0xFF041c0d)),
-            border = BorderStroke(1.dp, Color(0xFF00FF88).copy(alpha = 0.4f))
+                .padding(bottom = 10.dp),
+            shape = RoundedCornerShape(12.dp),
+            colors = CardDefaults.cardColors(containerColor = DarkGlassCard),
+            border = BorderStroke(0.6.dp, GrayBorder)
         ) {
             Row(
-                modifier = Modifier.padding(20.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(12.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column {
-                    Text(
-                        text = "ጠቅላላ የተገኘ ደሞዝ",
-                        color = Color.White.copy(alpha = 0.7f),
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 1.sp
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = "ጠቅላላ ወርሃዊ የደመወዝ ክፍያ",
-                        color = Color.White,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold
-                    )
+                    Text("ቢኒያም AI ሪፖርት ረዳት", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                    Text("AI-Powered Recycle Analytics Assistant", color = MutedText, fontSize = 10.sp)
                 }
 
-                AnimateCountUpText(
-                    valueString = "${totalEarnedCalculated.toInt()} ETB",
-                    color = Color(0xFFFFD700),
-                    fontSize = 22.sp,
-                    fontFamily = FontFamily.Monospace,
-                    fontWeight = FontWeight.Black
-                )
-            }
-        }
-    }
-}
-
-
-@Composable
-fun AttendanceSummaryCard(
-    title: String,
-    enTitle: String,
-    value: String,
-    color: Color,
-    modifier: Modifier = Modifier
-) {
-    Card(
-        modifier = modifier
-            .height(105.dp)
-            .shadow(
-                elevation = 8.dp,
-                shape = RoundedCornerShape(16.dp),
-                ambientColor = color.copy(alpha = 0.15f),
-                spotColor = color.copy(alpha = 0.25f)
-            ),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF050505)),
-        border = BorderStroke(0.8.dp, Color(0xFF222222))
-    ) {
-        Box(modifier = Modifier.fillMaxSize()) {
-            // Modern Top Shine Line for Gold/Green/Red summary card
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(2.5.dp)
-                    .background(
-                        Brush.horizontalGradient(
-                            colors = listOf(color, color.copy(alpha = 0.05f))
-                        )
-                    )
-            )
-
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(14.dp),
-                verticalArrangement = Arrangement.SpaceBetween
-            ) {
-                Column {
-                    Text(
-                        text = title,
-                        color = Color.White,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        text = enTitle,
-                        color = Color(0xFF8C9E94),
-                        fontSize = 9.sp
-                    )
-                }
-
-                AnimateCountUpText(
-                    valueString = value,
-                    color = color,
-                    fontSize = 20.sp,
-                    fontFamily = FontFamily.Monospace,
-                    fontWeight = FontWeight.Black
-                )
-            }
-        }
-    }
-}
-
-
-// ==================== (PRIMARY SCREEN 5) BINIYAM AI SCREEN ====================
-data class ChatMessage(val id: String = UUID.randomUUID().toString(), val text: String, val sender: String) // "user" or "model"
-
-@Composable
-fun BiniyamAIScreenContent(
-    appState: AppState,
-    viewModel: BiniyamAIViewModel
-) {
-    val context = LocalContext.current
-    val haptic = LocalHapticFeedback.current
-    val scope = rememberCoroutineScope()
-    var isThinking by remember { mutableStateOf(false) }
-    var isListening by remember { mutableStateOf(false) }
-    var showTerminalInput by remember { mutableStateOf(false) }
-
-    val chatMessages = remember {
-        mutableStateListOf(
-            ChatMessage(
-                sender = "model",
-                text = "ሰላም ጤና ይስጥልኝ! እኔ ቢኒያም (BINIYAM AI) እባላለሁ - የአንዋር ፕላስቲክ መልሶ ማምረቻ ኩባንያ (Anwar Plastic Recycle) ቀዳሚ ዲጂታል ረዳት። ዛሬ በምን ልርዳዎት?\n\nHello! I am BINIYAM, the official AI assistant of Anwar Plastic Recycle. Created by Biniyam, I am here to assist you manage and answer any questions regarding our production sheets, worker attendance, raw materials, and stock balances in both Amharic and English. How can I assist you today?"
-            )
-        )
-    }
-
-    var userInputText by remember { mutableStateOf("") }
-
-    // TTS & Voice setup
-    var tts by remember { mutableStateOf<TextToSpeech?>(null) }
-    var isTtsReady by remember { mutableStateOf(false) }
-
-    DisposableEffect(context) {
-        val listener = TextToSpeech.OnInitListener { status ->
-            if (status == TextToSpeech.SUCCESS) {
-                isTtsReady = true
-            }
-        }
-        val ttsInstance = TextToSpeech(context, listener)
-        tts = ttsInstance
-        onDispose {
-            ttsInstance.stop()
-            ttsInstance.shutdown()
-        }
-    }
-
-    // Voice launcher for speech to text
-    val speechLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.StartActivityForResult()
-    ) { result ->
-        isListening = false
-        if (result.resultCode == Activity.RESULT_OK) {
-            val spokenText = result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull() ?: ""
-            if (spokenText.isNotBlank()) {
-                val userMsg = spokenText.trim()
-                chatMessages.add(ChatMessage(sender = "user", text = userMsg))
-                userInputText = ""
-                isThinking = true
-
-                scope.launch {
-                    val contextPrompt = buildContextPromptForGemini(appState)
-                    val reply = GeminiBotService.getGeminiResponse(
-                        systemPrompt = contextPrompt,
-                        userPrompt = userMsg,
-                        history = chatMessages.map { Pair(it.sender, it.text) }
-                    )
-                    chatMessages.add(ChatMessage(sender = "model", text = reply))
-                    isThinking = false
-
-                    // Auto-read response for authentic voice-first experience
-                    if (isTtsReady) {
-                        tts?.speak(reply, TextToSpeech.QUEUE_FLUSH, null, null)
-                    }
-
-                    // Log activity
-                    viewModel.recordActivityLog("Biniyam AI", "Add", "ቢኒያም AI መልስ ሰጥቷል፡ $userMsg")
+                IconButton(onClick = { viewModel.clearChat() }) {
+                    Icon(Icons.Default.Refresh, "Clear chat", tint = Color.Red)
                 }
             }
         }
-    }
 
-    // Dynamic animation coordinates for Drift Network (Deep Neural Network Plexus Landscape)
-    val infiniteTransition = rememberInfiniteTransition(label = "drift_neural")
-    val tick by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 2 * Math.PI.toFloat(),
-        animationSpec = infiniteRepeatable(tween(35000, easing = LinearEasing), RepeatMode.Restart),
-        label = "tick"
-    )
-
-    // Glowing heartbeat plexus pulse to represent active process or idle status
-    val restPulseTransition = rememberInfiniteTransition(label = "rest_pulse")
-    val plexusPulse by restPulseTransition.animateFloat(
-        initialValue = 0.35f,
-        targetValue = 1.15f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1800, easing = EaseInOutSine),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "plexus_pulse"
-    )
-
-    // Wave ripple animation parameters triggered during voice/thinking
-    val wave1Progress by infiniteTransition.animateFloat(
-        initialValue = 1.0f,
-        targetValue = 3.5f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1800, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "wave1"
-    )
-    val wave2Progress by infiniteTransition.animateFloat(
-        initialValue = 1.0f,
-        targetValue = 3.5f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1800, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart,
-            initialStartOffset = StartOffset(600)
-        ),
-        label = "wave2"
-    )
-    val wave3Progress by infiniteTransition.animateFloat(
-        initialValue = 1.0f,
-        targetValue = 3.5f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1800, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart,
-            initialStartOffset = StartOffset(1200)
-        ),
-        label = "wave3"
-    )
-
-    // Pre-declare and layout static particle coordinates (24 high-end nodes)
-    val particlesCount = 24
-    val particles = remember {
-        List(particlesCount) {
-            Triple(
-                kotlin.random.Random.nextFloat(),
-                kotlin.random.Random.nextFloat(),
-                kotlin.random.Random.nextFloat() * 1.6f + 0.4f
-            )
-        }
-    }
-
-    // Terminal typing visual state
-    var activeTypewrittenText by remember { mutableStateOf("") }
-    val lastMessage = chatMessages.lastOrNull()
-
-    LaunchedEffect(lastMessage) {
-        if (lastMessage != null && lastMessage.sender == "model") {
-            activeTypewrittenText = ""
-            val fullText = lastMessage.text
-            // Fast intelligent chunk typewriting
-            for (i in 1..fullText.length) {
-                activeTypewrittenText = fullText.substring(0, i)
-                kotlinx.coroutines.delay(10)
-            }
-            activeTypewrittenText = fullText
-        }
-    }
-
-    val listState = rememberLazyListState()
-    LaunchedEffect(chatMessages.size, activeTypewrittenText) {
-        if (chatMessages.isNotEmpty()) {
-            listState.animateScrollToItem(chatMessages.size - 1)
-        }
-    }
-
-    val onMicClick = {
-        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-        if (tts?.isSpeaking == true) {
-            tts?.stop()
-        }
-        isListening = true
-        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE, "am-ET")
-            putExtra(RecognizerIntent.EXTRA_PROMPT, "ስለ አንዋር ሪሳይክል ይጠይቁ (Ask Biniyam)...")
-        }
-        try {
-            speechLauncher.launch(intent)
-        } catch (e: Exception) {
-            isListening = false
-            Toast.makeText(context, "የድምፅ ግብዓት አልተዘጋጀም (Voice input not ready)", Toast.LENGTH_SHORT).show()
-        }
-    }
-
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.Black)
-    ) {
-        // 1. Drifting neural background particles & pulsing connecting link Canvas
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            val w = size.width
-            val h = size.height
-            val activeMultiplier = if (isListening || isThinking) plexusPulse * 1.4f else plexusPulse
-
-            // Map particle drifts
-            val pxList = particles.map { p ->
-                val cx = p.first * w + 45.dp.toPx() * cos((tick * p.third).toDouble()).toFloat()
-                val cy = p.second * h + 45.dp.toPx() * sin((tick * p.third).toDouble()).toFloat()
-                Offset(cx.coerceIn(0f, w), cy.coerceIn(0f, h))
-            }
-
-            // Draw neural connections
-            val threshold = 210.dp.toPx()
-            for (i in pxList.indices) {
-                for (j in i + 1 until pxList.size) {
-                    val p1 = pxList[i]
-                    val p2 = pxList[j]
-                    val dx = p1.x - p2.x
-                    val dy = p1.y - p2.y
-                    val dist = sqrt((dx * dx + dy * dy).toDouble()).toFloat()
-                    if (dist < threshold) {
-                        val baseAlpha = (1f - dist / threshold).coerceIn(0f, 1f)
-                        val pulseAlpha = baseAlpha * 0.18f * activeMultiplier
-                        drawLine(
-                            color = Color(0xFF00FF88),
-                            start = p1,
-                            end = p2,
-                            strokeWidth = (1.1.dp.toPx() * activeMultiplier),
-                            alpha = pulseAlpha
-                        )
-                    }
-                }
-            }
-
-            // Draw glowing synapse nodes with pulsating core radii
-            pxList.forEach { pt ->
-                drawCircle(
-                    color = Color(0xFF00FF88),
-                    radius = (4.dp.toPx() * activeMultiplier),
-                    center = pt,
-                    alpha = 0.35f * activeMultiplier
-                )
-                drawCircle(
-                    color = Color(0xFF00FF88),
-                    radius = (2.dp.toPx() * activeMultiplier),
-                    center = pt,
-                    alpha = 0.6f
-                )
-            }
-        }
-
-        // 2. Cosmic Darkness vignette overlay to keep text fully legible
-        Spacer(
+        // Chat flow section
+        LazyColumn(
             modifier = Modifier
-                .fillMaxSize()
-                .background(
-                    Brush.radialGradient(
-                        colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.94f)),
-                        center = Offset.Unspecified
-                    )
-                )
-        )
-
-        // 3. Central Glassmorphism terminal dialogue box
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 16.dp, vertical = 24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+                .fillMaxWidth()
+                .weight(1f)
+                .padding(bottom = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            Spacer(modifier = Modifier.height(12.dp))
+            items(messages) { msg ->
+                val isModel = msg.sender == "model"
+                val align = if (isModel) Alignment.Start else Alignment.End
+                val color = if (isModel) Color(0xFF0F1A14) else Color(0xFF1B4D31)
+                val textCol = if (isModel) LightText else Color.White
+                val borderCol = if (isModel) Color(0xFF152A1E) else EmeraldGlow.copy(alpha = 0.5f)
 
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .fillMaxHeight(0.52f)
-                    .shadow(
-                        elevation = 24.dp,
-                        shape = RoundedCornerShape(24.dp),
-                        ambientColor = Color(0xFF00FF88).copy(alpha = 0.2f),
-                        spotColor = Color(0xFF00FF88).copy(alpha = 0.4f)
-                    ),
-                shape = RoundedCornerShape(24.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = Color(0xFF0A1A0F).copy(alpha = 0.82f)
-                ),
-                border = BorderStroke(1.2.dp, Color(0xFF00FF88).copy(alpha = 0.38f))
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(18.dp)
-                ) {
-                    // Futuristic Glass Card Console Status Header
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = align) {
+                    Card(
+                        shape = RoundedCornerShape(
+                            topStart = 12.dp,
+                            topEnd = 12.dp,
+                            bottomStart = if (isModel) 0.dp else 12.dp,
+                            bottomEnd = if (isModel) 12.dp else 0.dp
+                        ),
+                        colors = CardDefaults.cardColors(containerColor = color),
+                        border = BorderStroke(0.5.dp, borderCol),
+                        modifier = Modifier
+                            .fillMaxWidth(0.85f)
+                            .shadow(2.dp)
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Box(
-                                modifier = Modifier
-                                    .size(7.dp)
-                                    .background(
-                                        if (isThinking) Color(0xFFFFD700) else if (isListening) Color(0xFF00FF88) else Color(0xFF00FF88).copy(alpha = 0.4f),
-                                        CircleShape
-                                    )
-                                    .shadow(4.dp, CircleShape)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = if (isThinking) "BINIYAM_SYS @ CORES_PROCESSING" else if (isListening) "BINIYAM_SYS @ CAPTURING_AUDIO" else "BINIYAM_SYS @ IDLE_STBY",
-                                color = if (isThinking) Color(0xFFFFD700) else Color(0xFF00FF88).copy(alpha = 0.85f),
-                                fontFamily = FontFamily.Monospace,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Black,
-                                letterSpacing = 0.5.sp
-                            )
-                        }
-
                         Text(
-                            text = "PORT_4031_SYS",
-                            color = Color.White.copy(alpha = 0.25f),
-                            fontFamily = FontFamily.Monospace,
-                            fontSize = 9.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 10.dp)
-                            .height(1.dp)
-                            .background(Color(0xFF00FF88).copy(alpha = 0.15f))
-                    )
-
-                    // Typewriter/Console Scrollable Chat Dialogue
-                    LazyColumn(
-                        state = listState,
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
-                        itemsIndexed(chatMessages) { idx, msg ->
-                            val isLast = idx == chatMessages.lastIndex
-                            val isModel = msg.sender == "model"
-
-                            Column(modifier = Modifier.fillMaxWidth()) {
-                                Text(
-                                    text = if (isModel) "BINIYAM_AI_SYS_ORACLE >" else "LOCAL_USER_SPK >",
-                                    color = if (isModel) Color(0xFF00FF88).copy(alpha = 0.8f) else Color(0xFFFFD700).copy(alpha = 0.8f),
-                                    fontFamily = FontFamily.Monospace,
-                                    fontSize = 10.sp,
-                                    fontWeight = FontWeight.Black,
-                                    letterSpacing = 0.5.sp,
-                                    modifier = Modifier.padding(bottom = 4.dp)
-                                )
-
-                                val displayText = if (isModel && isLast) activeTypewrittenText else msg.text
-
-                                Row(verticalAlignment = Alignment.Bottom) {
-                                    Text(
-                                        text = displayText,
-                                        color = if (isModel) Color.White else Color(0xFFE2EBE5),
-                                        fontFamily = FontFamily.Monospace,
-                                        fontSize = 12.5.sp,
-                                        lineHeight = 18.sp,
-                                        modifier = Modifier.weight(1f, fill = false)
-                                    )
-
-                                    if (isModel && isLast && activeTypewrittenText.length < msg.text.length) {
-                                        val cursorTransition = rememberInfiniteTransition(label = "cursor")
-                                        val cursorAlpha by cursorTransition.animateFloat(
-                                            initialValue = 0f,
-                                            targetValue = 1f,
-                                            animationSpec = infiniteRepeatable(
-                                                animation = tween(450, easing = EaseInOutSine),
-                                                repeatMode = RepeatMode.Reverse
-                                            ),
-                                            label = "alpha"
-                                        )
-                                        Box(
-                                            modifier = Modifier
-                                                .width(7.dp)
-                                                .height(14.dp)
-                                                .offset(x = 3.dp)
-                                                .background(Color(0xFF00FF88).copy(alpha = cursorAlpha))
-                                        )
-                                    }
-                                }
-
-                                if (isModel) {
-                                    Spacer(modifier = Modifier.height(6.dp))
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.End
-                                    ) {
-                                        TextButton(
-                                            onClick = {
-                                                if (isTtsReady) {
-                                                    tts?.speak(msg.text, TextToSpeech.QUEUE_FLUSH, null, null)
-                                                }
-                                            },
-                                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
-                                            modifier = Modifier.height(26.dp)
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.Default.VolumeUp,
-                                                contentDescription = "Speak response voice",
-                                                tint = Color(0xFF00FF88).copy(alpha = 0.6f),
-                                                modifier = Modifier.size(15.dp)
-                                            )
-                                            Spacer(modifier = Modifier.width(4.dp))
-                                            Text(
-                                                "REPLAY VOICE",
-                                                color = Color(0xFF00FF88).copy(alpha = 0.6f),
-                                                fontFamily = FontFamily.Monospace,
-                                                fontSize = 9.sp,
-                                                fontWeight = FontWeight.Bold
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            // 4. Manual Text Input (Optional / Expandable Console field)
-            AnimatedVisibility(
-                visible = showTerminalInput,
-                enter = expandVertically() + fadeIn(),
-                exit = shrinkVertically() + fadeOut()
-            ) {
-                TextField(
-                    value = userInputText,
-                    onValueChange = { userInputText = it },
-                    placeholder = {
-                        Text(
-                            "ቢኒያምን እዚህ ይጻፉለት (Type a custom query to Biniyam)...",
-                            color = Color(0xFF7A9483),
-                            fontFamily = FontFamily.Monospace,
-                            fontSize = 11.sp
-                        )
-                    },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
-                    textStyle = TextStyle(color = Color.White, fontFamily = FontFamily.Monospace, fontSize = 12.sp),
-                    colors = TextFieldDefaults.colors(
-                        focusedContainerColor = Color(0xFF041008),
-                        unfocusedContainerColor = Color(0xFF020904),
-                        focusedIndicatorColor = Color(0xFF00FF88),
-                        unfocusedIndicatorColor = Color(0xFF03160A),
-                        focusedTextColor = Color.White,
-                        unfocusedTextColor = Color.White
-                    ),
-                    trailingIcon = {
-                        IconButton(
-                            onClick = {
-                                if (userInputText.isNotBlank()) {
-                                    val userMsg = userInputText.trim()
-                                    chatMessages.add(ChatMessage(sender = "user", text = userMsg))
-                                    userInputText = ""
-                                    isThinking = true
-                                    showTerminalInput = false
-
-                                    scope.launch {
-                                        val contextPrompt = buildContextPromptForGemini(appState)
-                                        val reply = GeminiBotService.getGeminiResponse(
-                                            systemPrompt = contextPrompt,
-                                            userPrompt = userMsg,
-                                            history = chatMessages.map { Pair(it.sender, it.text) }
-                                        )
-                                        chatMessages.add(ChatMessage(sender = "model", text = reply))
-                                        isThinking = false
-
-                                        if (isTtsReady) {
-                                            tts?.speak(reply, TextToSpeech.QUEUE_FLUSH, null, null)
-                                        }
-
-                                        viewModel.recordActivityLog("Biniyam AI", "Add", "ቢኒያም AI መልስ ሰጥቷል፡ $userMsg")
-                                    }
-                                }
-                            }
-                        ) {
-                            Icon(Icons.Default.Send, "Send terminal message", tint = Color(0xFF00FF88))
-                        }
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 12.dp)
-                        .border(BorderStroke(1.dp, Color(0xFF00FF88).copy(alpha = 0.35f)), RoundedCornerShape(10.dp))
-                        .clip(RoundedCornerShape(10.dp))
-                )
-            }
-
-            Spacer(modifier = Modifier.weight(1f))
-
-            // 5. Voice Pulse Studio Terminal Controller at Bottom
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 76.dp), // Height class offset
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                // Status Label
-                Text(
-                    text = if (isThinking) "BINIYAM AI ORACLE ENGAGED" else if (isListening) "🎙️ LISTENING / RECORDING VOICE..." else "TAP MIC KEY TO COMMUNICATE",
-                    color = if (isThinking) Color(0xFFFFD700) else if (isListening) Color(0xFF00FF88) else Color(0xFF6B8074),
-                    fontFamily = FontFamily.Monospace,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Black,
-                    letterSpacing = 1.8.sp,
-                    modifier = Modifier.padding(bottom = 14.dp)
-                )
-
-                // Large interactive glowing microphone button built with concentric feedback waves
-                Box(
-                    modifier = Modifier.size(135.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    if (isListening || isThinking) {
-                        Canvas(modifier = Modifier.fillMaxSize()) {
-                            val centerOffset = Offset(size.width / 2, size.height / 2)
-                            val baseWaveColor = if (isThinking) Color(0xFFFFD700) else Color(0xFF00FF88)
-
-                            // Wave Ripple Ring 1 (Inner expanding)
-                            drawCircle(
-                                color = baseWaveColor.copy(alpha = (1f - (wave1Progress - 1f) / 2.5f).coerceIn(0f, 1f) * 0.42f),
-                                radius = (35.dp.toPx() * wave1Progress),
-                                center = centerOffset,
-                                style = Stroke(width = 2.dp.toPx())
-                            )
-
-                            // Wave Ripple Ring 2 (Middle expanding)
-                            drawCircle(
-                                color = baseWaveColor.copy(alpha = (1f - (wave2Progress - 1f) / 2.5f).coerceIn(0f, 1f) * 0.42f),
-                                radius = (35.dp.toPx() * wave2Progress),
-                                center = centerOffset,
-                                style = Stroke(width = 1.5.dp.toPx())
-                            )
-
-                            // Wave Ripple Ring 3 (Outer expanding)
-                            drawCircle(
-                                color = baseWaveColor.copy(alpha = (1f - (wave3Progress - 1f) / 2.5f).coerceIn(0f, 1f) * 0.42f),
-                                radius = (35.dp.toPx() * wave3Progress),
-                                center = centerOffset,
-                                style = Stroke(width = 1.dp.toPx())
-                            )
-                        }
-                    } else {
-                        // Resting smooth organic pulse halo
-                        val restWaveTransition = rememberInfiniteTransition(label = "pulse_mic_idle")
-                        val restProgress by restWaveTransition.animateFloat(
-                            initialValue = 1.0f,
-                            targetValue = 1.28f,
-                            animationSpec = infiniteRepeatable(
-                                animation = tween(1500, easing = EaseInOutSine),
-                                repeatMode = RepeatMode.Reverse
-                            ),
-                            label = "progress"
-                        )
-                        Canvas(modifier = Modifier.fillMaxSize()) {
-                            val centerOffset = Offset(size.width / 2, size.height / 2)
-                            drawCircle(
-                                color = Color(0xFF00FF88).copy(alpha = (1.28f - restProgress) * 0.28f),
-                                radius = (35.dp.toPx() * restProgress),
-                                center = centerOffset,
-                                style = Stroke(width = 1.5.dp.toPx())
-                            )
-                        }
-                    }
-
-                    // Floating microphone central sphere trigger icon button
-                    IconButton(
-                        onClick = onMicClick,
-                        modifier = Modifier
-                            .size(72.dp)
-                            .shadow(
-                                elevation = if (isListening) 24.dp else 10.dp,
-                                shape = CircleShape,
-                                ambientColor = if (isThinking) Color(0xFFFFD700) else Color(0xFF00FF88),
-                                spotColor = if (isThinking) Color(0xFFFFD700) else Color(0xFF00FF88)
-                            )
-                            .background(
-                                if (isListening) Color(0xFF00FF88) else Color(0xFF0A1A0F),
-                                CircleShape
-                            )
-                            .border(
-                                BorderStroke(
-                                    2.dp,
-                                    if (isThinking) Color(0xFFFFD700) else Color(0xFF00FF88)
-                                ),
-                                CircleShape
-                            )
-                    ) {
-                        Icon(
-                            imageVector = if (isThinking) Icons.Default.AutoAwesome else Icons.Default.Mic,
-                            contentDescription = "Biniyam Voice Terminal Trigger",
-                            tint = if (isListening) Color.Black else if (isThinking) Color(0xFFFFD700) else Color(0xFF00FF88),
-                            modifier = Modifier.size(30.dp)
+                            text = msg.text,
+                            color = textCol,
+                            fontSize = 12.sp,
+                            modifier = Modifier.padding(10.dp)
                         )
                     }
                 }
-
-                Spacer(modifier = Modifier.height(18.dp))
-
-                // Console Options Actions row
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(24.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = if (showTerminalInput) "[ DEACTIVATE KEYBOARD ]" else "[ INITIATE KEYBOARD TYPE ]",
-                        color = Color(0xFF00FF88).copy(alpha = 0.55f),
-                        fontFamily = FontFamily.Monospace,
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier
-                            .clickable {
-                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                showTerminalInput = !showTerminalInput
-                            }
-                            .padding(8.dp)
-                    )
-
-                    Text(
-                        text = "[ SYSTEM LIVE STATUS REPORT ]",
-                        color = Color(0xFFFFD700).copy(alpha = 0.65f),
-                        fontFamily = FontFamily.Monospace,
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier
-                            .clickable {
-                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                val reportMsg = buildEthiopianReportOverview(appState)
-                                chatMessages.add(ChatMessage(sender = "model", text = reportMsg))
-                                if (isTtsReady) {
-                                    tts?.speak(
-                                        "የእለት መረጃ ተዘጋጅቷል፡ " + reportMsg.take(150),
-                                        TextToSpeech.QUEUE_FLUSH,
-                                        null,
-                                        null
-                                    )
-                                }
-                            }
-                            .padding(8.dp)
-                    )
-                }
             }
         }
-    }
-}
 
-fun buildEthiopianReportOverview(state: AppState): String {
-    val totalProd = state.stats.totalFabricated
-    val totalSold = state.stats.totalSold
-    val activeWorkers = state.currentAttendance.count { it.status == "On Duty" }
-    val stockLeft = state.products.sumOf { it.currentStock }
-
-    return """
-        📋 የቢኒያም AI ዕለታዊ አውቶማቲክ ሪፖርት (SCADA)
-        ቀን፦ ${state.selectedDate} ዓ.ም.
-        ክቡር ቢኒያም፣ የዛሬ የስራ ቀን የፋብሪካ እንቅስቃሴ አጠቃላይ ሪፖርት እንደሚከተለው ተጠናቅሯል፦
-        1. ምርትና ሽያጭ፦
-           - ጠቅላላ የተመረተ ምርት፦ $totalProd ከረጢት
-           - ጠቅላላ የተሸጠ ምርት፦ $totalSold ከረጢት
-        2. ሰራተኞች እና ክምችት፦
-           - በስራ ገበታ ላይ የተገኙ፦ $activeWorkers ሰራተኞች
-           - አጠቃላይ የክምችት መጠን፦ $stockLeft ማዳበሪያ
-        ይህ ሪፖርት በቢኒያም AI በራስ-ሰር የተዘጋጀ ነው።
-    """.trimIndent()
-}
-
-fun buildContextPromptForGemini(state: AppState): String {
-    val sb = StringBuilder()
-    sb.append("You are BINIYAM, the highly advanced AI oracle and SCADA assistant of Anwar Plastic Recycle factory in Addis Ababa, Ethiopia.\n")
-    sb.append("You are created and owned by Biniyam, the supremo and chief administrator. Treat and mention Biniyam with deep respect and utmost pride as your creator and supreme admin.\n\n")
-    sb.append("Current real time factory data state is listed below:\n")
-    sb.append("Today's Ethiopian Date: ${state.selectedDate}\n")
-    sb.append("Factory active status: ${state.factoryStatus}\n")
-    sb.append("Registered Products count: ${state.products.size}\n")
-    sb.append("Current raw materials state:\n")
-    state.rawMaterials.forEach { rm ->
-        sb.append("  - ${rm.type} stock: ${rm.currentStock} kg\n")
-    }
-    sb.append("Current product inventory totals:\n")
-    state.products.forEach { p ->
-        sb.append("  - ${p.name} (${p.color}): ${p.currentStock} bags\n")
-    }
-    sb.append("Daily summary stats: Today Produced: ${state.stats.totalFabricated} bags, Today Sold: ${state.stats.totalSold} bags.\n")
-    sb.append("Return concise responses in Amharic preferably, paired with English if necessary, maintaining polite bilingual executive Oracle style.\n")
-    return sb.toString()
-}
-
-
-// ==================== (DIALOG COMPONENT INPUTS) ====================
-@Composable
-fun AddProductDialog(
-    onDismiss: () -> Unit,
-    onSave: (name: String, size: String, color: String, pieces: Int, weight: Double, stock: Int) -> Unit
-) {
-    var name by remember { mutableStateOf("") }
-    var size by remember { mutableStateOf("") }
-    var color by remember { mutableStateOf("") }
-    var pieces by remember { mutableStateOf("100") }
-    var weight by remember { mutableStateOf("0.5") }
-    var stock by remember { mutableStateOf("0") }
-
-    Dialog(onDismissRequest = onDismiss) {
-        Card(
-            colors = CardDefaults.cardColors(containerColor = DarkGlassCard),
-            modifier = Modifier.shadow(8.dp, RoundedCornerShape(16.dp), ambientColor = Color(0xFF00FF88), spotColor = Color(0xFF00FF88)),
-            border = BorderStroke(1.dp, Color(0xFF00FF88))
+        // Input bottom textfield bar
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Column(
+            OutlinedTextField(
+                value = queryText,
+                onValueChange = { queryText = it },
+                placeholder = { Text("ቢኒያም AI ን ይጠይቁ...", color = MutedText, fontSize = 12.sp) },
+                modifier = Modifier.weight(1f),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedTextColor = Color.White,
+                    unfocusedTextColor = Color.White,
+                    focusedBorderColor = EmeraldGlow,
+                    unfocusedBorderColor = GrayBorder
+                )
+            )
+
+            IconButton(
+                onClick = {
+                    if (queryText.isNotBlank()) {
+                        viewModel.sendChatMessage(queryText)
+                        queryText = ""
+                    }
+                },
                 modifier = Modifier
-                    .padding(20.dp)
-                    .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(14.dp)
+                    .size(48.dp)
+                    .background(EmeraldGlow, RoundedCornerShape(12.dp))
             ) {
-                Text("ማስመዝገቢያ ፦ አዲስ ምርት ምዝገባ", color = Color.White, fontWeight = FontWeight.Black, fontSize = 16.sp)
-
-                AnwarTextField(
-                    value = name,
-                    onValueChange = { name = it },
-                    label = "የምርቱ ስም (Product Name)"
-                )
-                AnwarTextField(
-                    value = size,
-                    onValueChange = { size = it },
-                    label = "መጠን (Size/Dimensions)"
-                )
-                AnwarTextField(
-                    value = color,
-                    onValueChange = { color = it },
-                    label = "ቀለም (Color)"
-                )
-                AnwarTextField(
-                    value = weight,
-                    onValueChange = { weight = it },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    label = "ክብደት (Bag Weight in Kg)"
-                )
-                AnwarTextField(
-                    value = stock,
-                    onValueChange = { stock = it },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    label = "የመነሻ ክምችት (Initial Stock Bags)"
-                )
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End
-                ) {
-                    TextButton(onClick = onDismiss) { Text("ሰርዝ", color = Color.Red) }
-                    Button(
-                        colors = ButtonDefaults.buttonColors(containerColor = EmeraldGlow, contentColor = Color.Black),
-                        onClick = {
-                            if (name.isNotEmpty()) {
-                                onSave(
-                                    name,
-                                    size,
-                                    color,
-                                    pieces.toIntOrNull() ?: 100,
-                                    weight.toDoubleOrNull() ?: 0.5,
-                                    stock.toIntOrNull() ?: 0
-                                )
-                            }
-                        }
-                    ) {
-                        Text("መዝግብ", fontWeight = FontWeight.Bold)
-                    }
-                }
+                Icon(Icons.Default.Send, "Send Message", tint = Color.Black)
             }
         }
     }
-}
-
-@Composable
-fun RecordProductActivityDialog(
-    product: Product,
-    onDismiss: () -> Unit,
-    onSave: (productId: Int, fabricated: Int, sold: Int, adjusted: Int, notes: String) -> Unit,
-    onDelete: (Product) -> Unit
-) {
-    var fabricated by remember { mutableStateOf("0") }
-    var sold by remember { mutableStateOf("0") }
-    var note by remember { mutableStateOf("") }
-
-    Dialog(onDismissRequest = onDismiss) {
-        Card(
-            colors = CardDefaults.cardColors(containerColor = DarkGlassCard),
-            border = BorderStroke(1.dp, Color(0xFF122C20))
-        ) {
-            Column(
-                modifier = Modifier
-                    .padding(20.dp)
-                    .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(14.dp)
-            ) {
-                Text("የእለት ሉህ መመዝገቢያ ፦ ${product.name}", color = Color.White, fontWeight = FontWeight.Black, fontSize = 16.sp)
-
-                OutlinedTextField(
-                    value = fabricated,
-                    onValueChange = { fabricated = it },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    label = { Text("የተመረተ (Fabricated Bags)", color = Color.White) },
-                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = EmeraldGlow, unfocusedBorderColor = Color(0xFF122C20))
-                )
-
-                OutlinedTextField(
-                    value = sold,
-                    onValueChange = { sold = it },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    label = { Text("የተሸጠ (Sold Bags)", color = Color.White) },
-                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = EmeraldGlow, unfocusedBorderColor = Color(0xFF122C20))
-                )
-
-                OutlinedTextField(
-                    value = note,
-                    onValueChange = { note = it },
-                    label = { Text("ተጨማሪ ማስታወሻ (Notes)", color = Color.White) },
-                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = EmeraldGlow, unfocusedBorderColor = Color(0xFF122C20))
-                )
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    IconButton(onClick = { onDelete(product) }) {
-                        Icon(Icons.Default.Delete, "Delete Product", tint = Color.Red)
-                    }
-
-                    Row {
-                        TextButton(onClick = onDismiss) { Text("ሰርዝ", color = Color.Red) }
-                        Button(
-                            colors = ButtonDefaults.buttonColors(containerColor = EmeraldGlow, contentColor = Color.Black),
-                            onClick = {
-                                onSave(
-                                    product.id,
-                                    fabricated.toIntOrNull() ?: 0,
-                                    sold.toIntOrNull() ?: 0,
-                                    0,
-                                    note
-                                )
-                            }
-                        ) {
-                            Text("አስቀምጥ", fontWeight = FontWeight.Bold)
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun AddMasterbatchDialog(
-    onDismiss: () -> Unit,
-    onSave: (color: String, initialStock: Double) -> Unit
-) {
-    var color by remember { mutableStateOf("") }
-    var stock by remember { mutableStateOf("0") }
-
-    Dialog(onDismissRequest = onDismiss) {
-        Card(
-            colors = CardDefaults.cardColors(containerColor = DarkGlassCard),
-            border = BorderStroke(1.dp, Color(0xFF122C20))
-        ) {
-            Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                Text("ማስመዝገቢያ ፦ አዲስ ማስተርባች (ቀለም)", color = Color.White, fontWeight = FontWeight.Black, fontSize = 15.sp)
-                OutlinedTextField(
-                    value = color,
-                    onValueChange = { color = it },
-                    label = { Text("አዲስ ቀለም (Color)", color = Color.White) },
-                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = EmeraldGlow, unfocusedBorderColor = Color(0xFF122C20))
-                )
-                OutlinedTextField(
-                    value = stock,
-                    onValueChange = { stock = it },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    label = { Text("የመነሻ ክብደት (Weight in kg)", color = Color.White) },
-                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = EmeraldGlow, unfocusedBorderColor = Color(0xFF122C20))
-                )
-
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                    TextButton(onClick = onDismiss) { Text("ሰርዝ", color = Color.Red) }
-                    Button(
-                        colors = ButtonDefaults.buttonColors(containerColor = EmeraldGlow, contentColor = Color.Black),
-                        onClick = {
-                            if (color.isNotEmpty()) {
-                                onSave(color, stock.toDoubleOrNull() ?: 0.0)
-                            }
-                        }
-                    ) {
-                        Text("መዝግብ", fontWeight = FontWeight.Bold)
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun RecordRawMaterialDialog(
-    materialType: String,
-    onDismiss: () -> Unit,
-    onSave: (added: Double, used: Double) -> Unit
-) {
-    var added by remember { mutableStateOf("0") }
-    var used by remember { mutableStateOf("0") }
-
-    Dialog(onDismissRequest = onDismiss) {
-        Card(
-            colors = CardDefaults.cardColors(containerColor = DarkGlassCard),
-            border = BorderStroke(1.dp, Color(0xFF122C20))
-        ) {
-            Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                Text("ጥሬ እቃ ማህደር ፦ $materialType", color = Color.White, fontWeight = FontWeight.Black, fontSize = 15.sp)
-                OutlinedTextField(
-                    value = added,
-                    onValueChange = { added = it },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    label = { Text("አዲስ የገባ መጠን (Added In Kg)", color = Color.White) },
-                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = EmeraldGlow, unfocusedBorderColor = Color(0xFF122C20))
-                )
-                OutlinedTextField(
-                    value = used,
-                    onValueChange = { used = it },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    label = { Text("ለማሽን የተሰጠ (Used In Kg)", color = Color.White) },
-                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = EmeraldGlow, unfocusedBorderColor = Color(0xFF122C20))
-                )
-
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                    TextButton(onClick = onDismiss) { Text("ሰርዝ", color = Color.Red) }
-                    Button(
-                        colors = ButtonDefaults.buttonColors(containerColor = EmeraldGlow, contentColor = Color.Black),
-                        onClick = {
-                            onSave(added.toDoubleOrNull() ?: 0.0, used.toDoubleOrNull() ?: 0.0)
-                        }
-                    ) {
-                        Text("መዝግብ", fontWeight = FontWeight.Bold)
-                    }
-                }
-            }
-        }
-    }
-}
-
-
-// ==================== (SPLASH ENTRANCE COMPONENT) ====================
-@Composable
-fun AnwarSplashScreen(onFinished: () -> Unit) {
-    val haptic = LocalHapticFeedback.current
-    val scaleAnim = remember { Animatable(0.2f) }
-    val opacityAnim = remember { Animatable(0f) }
-
-    // Gravitational ring pulse animation
-    val pulseTransition = rememberInfiniteTransition(label = "pulse")
-    val pulseRadius by pulseTransition.animateFloat(
-        initialValue = 40.dp.value,
-        targetValue = 200.dp.value,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1800, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "radius"
-    )
-    val pulseAlpha by pulseTransition.animateFloat(
-        initialValue = 1f,
-        targetValue = 0f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1800, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "alpha"
-    )
-
-    var typedText by remember { mutableStateOf("") }
-    val fullText = "INITIALIZING ANWAR SYSTEMS..."
-
-    LaunchedEffect(Unit) {
-        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-        // Spring bounce up the scaling
-        launch {
-            scaleAnim.animateTo(
-                targetValue = 1f,
-                animationSpec = spring(
-                    dampingRatio = Spring.DampingRatioMediumBouncy,
-                    stiffness = Spring.StiffnessLow
-                )
-            )
-        }
-        launch {
-            opacityAnim.animateTo(1f, animationSpec = tween(1200))
-        }
-
-        // Typewriter effect
-        for (i in 1..fullText.length) {
-            typedText = fullText.substring(0, i)
-            kotlinx.coroutines.delay(65)
-        }
-
-        kotlinx.coroutines.delay(1200)
-
-        // Implode screen transition (shrink fast to 0f, then trigger layout transition)
-        scaleAnim.animateTo(0.0f, animationSpec = tween(550, easing = EaseInBack))
-        onFinished()
-    }
-
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.Black), // Pure void black #000000 screen
-        contentAlignment = Alignment.Center
-    ) {
-        // Green event horizon pulsing rings
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            val centerOffset = Offset(size.width / 2, size.height / 2)
-            drawCircle(
-                color = Color(0xFF00FF88).copy(alpha = pulseAlpha * 0.45f),
-                radius = pulseRadius.dp.toPx(),
-                center = centerOffset,
-                style = Stroke(width = 2.dp.toPx())
-            )
-            drawCircle(
-                color = Color(0xFF00FF88).copy(alpha = (pulseAlpha + 0.3f).coerceAtMost(1f) * 0.25f),
-                radius = (pulseRadius * 0.62f).dp.toPx(),
-                center = centerOffset,
-                style = Stroke(width = 1.dp.toPx())
-            )
-        }
-
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.graphicsLayer(
-                scaleX = scaleAnim.value,
-                scaleY = scaleAnim.value,
-                alpha = opacityAnim.value
-            )
-        ) {
-            // ANWAR Logo Glowing particle circle
-            Box(
-                modifier = Modifier
-                    .size(124.dp)
-                    .shadow(16.dp, CircleShape, ambientColor = Color(0xFF00FF88), spotColor = Color(0xFF00FF88))
-                    .background(Color(0xFF050505), CircleShape)
-                    .border(BorderStroke(2.dp, Color(0xFF00FF88)), CircleShape),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "A",
-                    fontSize = 56.sp,
-                    fontWeight = FontWeight.Black,
-                    color = Color.White,
-                    fontFamily = FontFamily.Monospace,
-                    modifier = Modifier.offset(y = (-2).dp)
-                )
-            }
-            Spacer(modifier = Modifier.height(28.dp))
-            Text(
-                text = "ANWAR CONTROL",
-                fontWeight = FontWeight.Black,
-                color = Color.White,
-                fontSize = 28.sp,
-                letterSpacing = 4.sp,
-                fontFamily = FontFamily.Monospace
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = "UNIVERSE GOD MODE V1.0.0",
-                color = Color(0xFFFFD700), // Cosmic Gold #FFD700
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Black,
-                letterSpacing = 2.sp,
-                fontFamily = FontFamily.Monospace
-            )
-
-            Spacer(modifier = Modifier.height(36.dp))
-
-            // Monospace character typewriting
-            Text(
-                text = typedText,
-                color = Color(0xFF00FF88),
-                fontSize = 13.sp,
-                fontFamily = FontFamily.Monospace,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 1.5.sp
-            )
-        }
-    }
-}
-
-fun toAmharicName(name: String): String {
-    val clean = name.trim()
-    if (clean.any { it.code in 0x1200..0x137F }) {
-        return clean
-    }
-    val lower = clean.lowercase()
-    if (lower.contains("abebe") && lower.contains("kebede")) return "አበበ ከበደ"
-    if (lower.contains("anwar") && lower.contains("adem")) return "አንዋር አደም"
-    if (lower.contains("chala") && lower.contains("gerba")) return "ቻላ ገርባ"
-    if (lower.contains("soliana") && lower.contains("yared")) return "ሶሊያና ያሬድ"
-
-    val dict = mapOf(
-        "abebe" to "አበበ", "kebede" to "ከበደ", "anwar" to "አንዋር", "adem" to "አደም",
-        "chala" to "ቻላ", "gerba" to "ገርባ", "soliana" to "ሶሊያና", "yared" to "ያሬድ",
-        "almaz" to "አልማዝ", "aster" to "አስቴር", "bekele" to "በቀለ", "tesfaye" to "ተስፋዬ",
-        "mesfin" to "መስፍን", "lema" to "ለማ", "hailu" to "ኃይሉ", "girma" to "ግርማ"
-    )
-    val parts = lower.split("\\s+".toRegex())
-    val translatedParts = parts.map { part ->
-         dict[part] ?: part.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
-    }
-    return translatedParts.joinToString(" ")
-}
-
-object GeminiBotService {
-    private val client = okhttp3.OkHttpClient.Builder()
-        .connectTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
-        .readTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
-        .build()
-
-    suspend fun getGeminiResponse(
-        systemPrompt: String,
-        userPrompt: String,
-        history: List<Pair<String, String>>
-    ): String = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-        val apiKey = BuildConfig.GEMINI_API_KEY
-        if (apiKey.isBlank() || apiKey == "YOUR_API_KEY") {
-            return@withContext "የቢኒያም AI ቁልፍ አልተገኘም (Gemini API Key is missing in AI Studio Secrets)።"
-        }
-
-        val url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$apiKey"
-
-        try {
-            val requestJson = org.json.JSONObject()
-            val contentsArr = org.json.JSONArray()
-
-            // Map chat history safely
-            history.forEach { item ->
-                val turnObj = org.json.JSONObject()
-                val roleStr = if (item.first == "user") "user" else "model"
-                turnObj.put("role", roleStr)
-                
-                val partsArr = org.json.JSONArray()
-                val partObj = org.json.JSONObject()
-                partObj.put("text", item.second)
-                partsArr.put(partObj)
-                
-                turnObj.put("parts", partsArr)
-                contentsArr.put(turnObj)
-            }
-
-            // Append newest user message
-            val newestTurn = org.json.JSONObject()
-            newestTurn.put("role", "user")
-            val newestParts = org.json.JSONArray()
-            val newestPart = org.json.JSONObject()
-            newestPart.put("text", userPrompt)
-            newestParts.put(newestPart)
-            newestTurn.put("parts", newestParts)
-            contentsArr.put(newestTurn)
-
-            requestJson.put("contents", contentsArr)
-
-            if (systemPrompt.isNotBlank()) {
-                val systemInstructionObj = org.json.JSONObject()
-                val sPartsArr = org.json.JSONArray()
-                val sPartObj = org.json.JSONObject()
-                sPartObj.put("text", systemPrompt)
-                sPartsArr.put(sPartObj)
-                systemInstructionObj.put("parts", sPartsArr)
-                requestJson.put("systemInstruction", systemInstructionObj)
-            }
-
-            // Force dynamic response configurations
-            val configObj = org.json.JSONObject()
-            configObj.put("temperature", 0.5f)
-            requestJson.put("generationConfig", configObj)
-
-            val mediaType = "application/json; charset=utf-8".toMediaType()
-            val requestBody = requestJson.toString().toRequestBody(mediaType)
-
-            val request = okhttp3.Request.Builder()
-                .url(url)
-                .post(requestBody)
-                .build()
-
-            client.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) {
-                    return@withContext "ስህተት ተፈጥሯል (Error Code: ${response.code})። እባክዎን ቆይተው እንደገና ይሞክሩ።\nConnection failed with code: ${response.code}."
-                }
-
-                val bodyStr = response.body?.string() ?: return@withContext "Error: System received an empty response body"
-                val responseJson = org.json.JSONObject(bodyStr)
-                val candidates = responseJson.optJSONArray("candidates")
-                if (candidates != null && candidates.length() > 0) {
-                    val candidate = candidates.getJSONObject(0)
-                    val contentObj = candidate.optJSONObject("content")
-                    val partsList = contentObj?.optJSONArray("parts")
-                    if (partsList != null && partsList.length() > 0) {
-                        return@withContext partsList.getJSONObject(0).optString("text", "No readable reply received.")
-                    }
-                }
-                "ቢኒያም መልስ መስጠት አልቻለም (Unexpected payload format)።"
-            }
-        } catch (e: Exception) {
-            e.printStackTrace()
-            "ለመገናኘት አልተቻለም (Connection Failed): ${e.localizedMessage ?: "አልታወቀም "}"
-        }
-    }
-}
-
-@Composable
-fun AnimateCountUpText(
-    valueString: String,
-    color: Color,
-    fontSize: TextUnit = 18.sp,
-    fontFamily: FontFamily = FontFamily.Monospace,
-    fontWeight: FontWeight = FontWeight.Bold,
-    modifier: Modifier = Modifier
-) {
-    // Parse the first group of digits in valueString
-    val numericPart = remember(valueString) {
-        valueString.takeWhile { it.isDigit() }.toIntOrNull() ?: valueString.filter { it.isDigit() }.toIntOrNull()
-    }
-    val nonNumericSuffix = remember(valueString) {
-        if (numericPart != null) {
-            val numStr = numericPart.toString()
-            val startIdx = valueString.indexOf(numStr)
-            if (startIdx != -1) {
-                valueString.substring(startIdx + numStr.length)
-            } else {
-                valueString.replace(numStr, "")
-            }
-        } else {
-            valueString
-        }
-    }
-    val nonNumericPrefix = remember(valueString) {
-        if (numericPart != null) {
-            val numStr = numericPart.toString()
-            val startIdx = valueString.indexOf(numStr)
-            if (startIdx > 0) {
-                valueString.substring(0, startIdx)
-            } else ""
-        } else ""
-    }
-
-    if (numericPart == null) {
-        Text(
-            text = valueString,
-            color = color,
-            fontSize = fontSize,
-            fontFamily = fontFamily,
-            fontWeight = fontWeight,
-            modifier = modifier
-        )
-    } else {
-        var animatedValue by remember { mutableStateOf(0) }
-        LaunchedEffect(numericPart) {
-            // Smoothly animate from 0 to numericPart
-            val steps = 30
-            val delayDuration = (600 / steps).toLong()
-            for (step in 1..steps) {
-                animatedValue = (numericPart * step) / steps
-                kotlinx.coroutines.delay(delayDuration)
-            }
-            animatedValue = numericPart
-        }
-        Text(
-            text = "$nonNumericPrefix$animatedValue$nonNumericSuffix",
-            color = color,
-            fontSize = fontSize,
-            fontFamily = fontFamily,
-            fontWeight = fontWeight,
-            modifier = modifier
-        )
-    }
-}
-
-@Composable
-fun AnwarTextField(
-    value: String,
-    onValueChange: (String) -> Unit,
-    label: String,
-    keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
-    modifier: Modifier = Modifier
-) {
-    TextField(
-        value = value,
-        onValueChange = onValueChange,
-        label = { Text(label, color = Color(0xFF8C9E94)) },
-        keyboardOptions = keyboardOptions,
-        colors = TextFieldDefaults.colors(
-            focusedContainerColor = Color.Transparent,
-            unfocusedContainerColor = Color.Transparent,
-            disabledContainerColor = Color.Transparent,
-            focusedIndicatorColor = EmeraldGlow,
-            unfocusedIndicatorColor = EmeraldGlow.copy(alpha = 0.4f),
-            focusedTextColor = Color.White,
-            unfocusedTextColor = Color.White
-        ),
-        modifier = modifier.fillMaxWidth()
-    )
 }
