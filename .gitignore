@@ -4,6 +4,10 @@
 .build-outputs/*
 !.build-outputs/app-debug.apk
 !.build-outputs/download_apk.html
+
+# Explicitly track/allow the visible apks folder and its contents
+!apks/
+!apks/*
 app/build/
 build/
 local.properties

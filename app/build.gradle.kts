@@ -73,19 +73,29 @@ tasks.register("generateBase64Apk") {
         if (apkFile.exists()) {
             val base64Bytes = Base64.getEncoder().encode(apkFile.readBytes())
             val base64String = String(base64Bytes)
+            
+            // 1. Write to .build-outputs
             val outputFile = file("../.build-outputs/app-debug-base64.txt")
             outputFile.parentFile.mkdirs()
             outputFile.writeText(base64String)
             println("Base64 APK written to: ${outputFile.absolutePath}")
             
-            // Copy pure binary APK to .build-outputs/app-debug.apk
             val binaryApkFile = file("../.build-outputs/app-debug.apk")
             apkFile.copyTo(binaryApkFile, overwrite = true)
             println("Binary APK copied to: ${binaryApkFile.absolutePath}")
             
-            // Also write a helper HTML file in .build-outputs/download_apk.html so they can download it with a single click in their browser!
-            val htmlFile = file("../.build-outputs/download_apk.html")
-            htmlFile.writeText("""
+            // 2. Also write to /apks folder (non-hidden, standard tracking)
+            val apksFolder = file("../apks")
+            apksFolder.mkdirs()
+            
+            val apksBase64File = file("../apks/app-debug-base64.txt")
+            apksBase64File.writeText(base64String)
+            
+            val apksBinaryFile = file("../apks/app-debug.apk")
+            apkFile.copyTo(apksBinaryFile, overwrite = true)
+            println("Binary APK copied to tracking folder: ${apksBinaryFile.absolutePath}")
+            
+            val htmlContent = """
                 <!DOCTYPE html>
                 <html>
                 <head>
@@ -200,8 +210,15 @@ tasks.register("generateBase64Apk") {
                     </script>
                 </body>
                 </html>
-            """.trimIndent())
+            """.trimIndent()
+            
+            val htmlFile = file("../.build-outputs/download_apk.html")
+            htmlFile.writeText(htmlContent)
             println("HTML Downloader written to: ${htmlFile.absolutePath}")
+            
+            val apksHtmlFile = file("../apks/download_apk.html")
+            apksHtmlFile.writeText(htmlContent)
+            println("HTML Downloader copied to tracking folder: ${apksHtmlFile.absolutePath}")
         } else {
             println("APK file does not exist at: ${apkFile.absolutePath}")
         }
