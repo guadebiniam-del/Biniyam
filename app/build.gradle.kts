@@ -78,6 +78,11 @@ tasks.register("generateBase64Apk") {
             outputFile.writeText(base64String)
             println("Base64 APK written to: ${outputFile.absolutePath}")
             
+            // Copy pure binary APK to .build-outputs/app-debug.apk
+            val binaryApkFile = file("../.build-outputs/app-debug.apk")
+            apkFile.copyTo(binaryApkFile, overwrite = true)
+            println("Binary APK copied to: ${binaryApkFile.absolutePath}")
+            
             // Also write a helper HTML file in .build-outputs/download_apk.html so they can download it with a single click in their browser!
             val htmlFile = file("../.build-outputs/download_apk.html")
             htmlFile.writeText("""

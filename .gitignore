@@ -1,6 +1,9 @@
 # Built artifacts and Gradle caches
 .gradle/
-.build-outputs/
+# Ignore general .build-outputs except the binary APK and HTML downloader
+.build-outputs/*
+!.build-outputs/app-debug.apk
+!.build-outputs/download_apk.html
 app/build/
 build/
 local.properties
