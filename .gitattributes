@@ -1,0 +1,13 @@
+# Force git to treat APK, ZIP, BIN, and images as binary files to prevent corruption during sync
+*.apk binary
+*.zip binary
+*.bin binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.txt text
+*.html text
+*.kt text
+*.kts text
+*.xml text

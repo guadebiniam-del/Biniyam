@@ -1,8 +1,9 @@
 # Built artifacts and Gradle caches
 .gradle/
-# Ignore general .build-outputs except the binary APK and HTML downloader
+# Ignore general .build-outputs except the binary APK, zip, and HTML downloader
 .build-outputs/*
 !.build-outputs/app-debug.apk
+!.build-outputs/app-debug.zip
 !.build-outputs/download_apk.html
 
 # Explicitly track/allow the visible apks folder and its contents

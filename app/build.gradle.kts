@@ -1,4 +1,7 @@
 import java.util.Base64
+import java.io.FileOutputStream
+import java.util.zip.ZipEntry
+import java.util.zip.ZipOutputStream
 
 plugins {
     id("com.android.application")
@@ -69,6 +72,14 @@ dependencies {
 tasks.register("generateBase64Apk") {
     dependsOn("assembleDebug")
     doLast {
+        println("--- Searching for all APK files ---")
+        project.buildDir.walkTopDown().forEach { file ->
+            if (file.name.endsWith(".apk")) {
+                println("Found APK at: ${file.absolutePath} (Size: ${file.length()} bytes)")
+            }
+        }
+        println("-----------------------------------")
+        
         val apkFile = file("build/outputs/apk/debug/app-debug.apk")
         if (apkFile.exists()) {
             val base64Bytes = Base64.getEncoder().encode(apkFile.readBytes())
@@ -84,6 +95,15 @@ tasks.register("generateBase64Apk") {
             apkFile.copyTo(binaryApkFile, overwrite = true)
             println("Binary APK copied to: ${binaryApkFile.absolutePath}")
             
+            // Zip the APK in .build-outputs
+            val zipBuildOutputsFile = file("../.build-outputs/app-debug.zip")
+            ZipOutputStream(FileOutputStream(zipBuildOutputsFile)).use { zos ->
+                zos.putNextEntry(ZipEntry("app-debug.apk"))
+                apkFile.inputStream().use { it.copyTo(zos) }
+                zos.closeEntry()
+            }
+            println("Zip APK written to: ${zipBuildOutputsFile.absolutePath}")
+            
             // 2. Also write to /apks folder (non-hidden, standard tracking)
             val apksFolder = file("../apks")
             apksFolder.mkdirs()
@@ -94,6 +114,15 @@ tasks.register("generateBase64Apk") {
             val apksBinaryFile = file("../apks/app-debug.apk")
             apkFile.copyTo(apksBinaryFile, overwrite = true)
             println("Binary APK copied to tracking folder: ${apksBinaryFile.absolutePath}")
+            
+            // Zip the APK in apks
+            val zipApksFile = file("../apks/app-debug.zip")
+            ZipOutputStream(FileOutputStream(zipApksFile)).use { zos ->
+                zos.putNextEntry(ZipEntry("app-debug.apk"))
+                apkFile.inputStream().use { it.copyTo(zos) }
+                zos.closeEntry()
+            }
+            println("Zip APK written to tracking folder: ${zipApksFile.absolutePath}")
             
             val htmlContent = """
                 <!DOCTYPE html>
